@@ -25,19 +25,14 @@ import {
 } from "lucide-react";
 
 interface Props {
-  params: Promise<{ quizId: string }>;
+  params: { quizId: string };
 }
 
 type TabType = "presets" | "wizard" | "json";
 
 export default function ThemeEditorPage({ params }: Props) {
-  const [quizId, setQuizId] = useState("");
+  const { quizId } = params;
   const router = useRouter();
-
-  // Unwrap params (Next.js 15)
-  useEffect(() => {
-    params.then((p) => setQuizId(p.quizId));
-  }, [params]);
 
   const [quizTitle, setQuizTitle] = useState("");
   const [currentTheme, setCurrentTheme] = useState<QuizTheme | null>(null);
@@ -60,8 +55,6 @@ export default function ThemeEditorPage({ params }: Props) {
 
   // Load current theme
   useEffect(() => {
-    if (!quizId) return; // Wait for quizId to be set
-
     async function loadTheme() {
       try {
         const res = await fetch(`/api/quizzes/${quizId}/theme`);

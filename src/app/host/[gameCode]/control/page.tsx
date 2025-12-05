@@ -72,10 +72,38 @@ export default function HostControlPage({
   function copyExternalUrl() {
     if (tunnelUrl) {
       const fullUrl = `${tunnelUrl}/play/${gameCode}`;
-      navigator.clipboard.writeText(fullUrl);
+
+      // Try modern clipboard API first, fallback to textarea method for non-secure contexts
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(fullUrl).then(() => {
+          setCopied(true);
+          setTimeout(() => setCopied(false), 2000);
+        }).catch(() => {
+          // Fallback if clipboard API fails
+          fallbackCopy(fullUrl);
+        });
+      } else {
+        // Use fallback for non-secure contexts (like Docker without HTTPS)
+        fallbackCopy(fullUrl);
+      }
+    }
+  }
+
+  function fallbackCopy(text: string) {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    try {
+      document.execCommand("copy");
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy:", err);
     }
+    document.body.removeChild(textarea);
   }
 
   function openDisplay() {
