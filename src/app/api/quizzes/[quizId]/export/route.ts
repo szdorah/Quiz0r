@@ -105,19 +105,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     zip.file("quiz.json", JSON.stringify(exportData, null, 2));
 
-    // 5. Generate ZIP buffer
-    const zipBuffer = await zip.generateAsync({
-      type: "uint8array",
+    // 5. Generate ZIP as blob for NextResponse compatibility
+    const zipBlob = await zip.generateAsync({
+      type: "blob",
       compression: "DEFLATE",
       compressionOptions: { level: 6 },
     });
 
     // 6. Return as download
-    return new NextResponse(zipBuffer, {
+    return new NextResponse(zipBlob, {
       headers: {
         "Content-Type": "application/zip",
         "Content-Disposition": `attachment; filename="${sanitizeFilename(quiz.title)}.zip"`,
-        "Content-Length": zipBuffer.length.toString(),
+        "Content-Length": zipBlob.size.toString(),
       },
     });
   } catch (error) {
