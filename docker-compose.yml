@@ -1,0 +1,19 @@
+services:
+  quiz-master:
+    container_name: quiz-master
+    build: .
+    ports:
+      - "3000:3000"
+    volumes:
+      # Persist SQLite database
+      - quiz-data:/app/prisma/data
+      # Persist uploaded images (if used)
+      - quiz-uploads:/app/public/uploads
+    environment:
+      - NODE_ENV=production
+      - DATABASE_URL=file:./data/quiz.db
+    restart: unless-stopped
+
+volumes:
+  quiz-data:
+  quiz-uploads:

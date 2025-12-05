@@ -1,0 +1,86 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+
+interface RouteParams {
+  params: Promise<{ quizId: string }>;
+}
+
+// GET /api/quizzes/[quizId] - Get quiz details
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { quizId } = await params;
+
+    const quiz = await prisma.quiz.findUnique({
+      where: { id: quizId },
+      include: {
+        questions: {
+          include: {
+            answers: {
+              orderBy: { orderIndex: "asc" },
+            },
+          },
+          orderBy: { orderIndex: "asc" },
+        },
+      },
+    });
+
+    if (!quiz) {
+      return NextResponse.json({ error: "Quiz not found" }, { status: 404 });
+    }
+
+    return NextResponse.json(quiz);
+  } catch (error) {
+    console.error("Error fetching quiz:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch quiz" },
+      { status: 500 }
+    );
+  }
+}
+
+// PUT /api/quizzes/[quizId] - Update quiz
+export async function PUT(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { quizId } = await params;
+    const body = await request.json();
+    const { title, description } = body;
+
+    const quiz = await prisma.quiz.update({
+      where: { id: quizId },
+      data: {
+        ...(title && { title: title.trim() }),
+        ...(description !== undefined && {
+          description: description?.trim() || null,
+        }),
+      },
+    });
+
+    return NextResponse.json(quiz);
+  } catch (error) {
+    console.error("Error updating quiz:", error);
+    return NextResponse.json(
+      { error: "Failed to update quiz" },
+      { status: 500 }
+    );
+  }
+}
+
+// DELETE /api/quizzes/[quizId] - Soft delete quiz
+export async function DELETE(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { quizId } = await params;
+
+    await prisma.quiz.update({
+      where: { id: quizId },
+      data: { isActive: false },
+    });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error deleting quiz:", error);
+    return NextResponse.json(
+      { error: "Failed to delete quiz" },
+      { status: 500 }
+    );
+  }
+}

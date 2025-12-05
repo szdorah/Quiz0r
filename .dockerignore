@@ -1,0 +1,30 @@
+# Dependencies
+node_modules
+
+# Next.js
+.next
+
+# Git
+.git
+.gitignore
+
+# IDE
+.vscode
+.idea
+
+# Environment files (will be set in docker-compose)
+.env
+.env.*
+
+# Database
+*.db
+*.db-journal
+prisma/data
+
+# Misc
+*.md
+*.log
+.DS_Store
+
+# Claude
+.claude

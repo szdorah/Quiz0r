@@ -1,0 +1,69 @@
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+
+interface RouteParams {
+  params: Promise<{ gameCode: string }>;
+}
+
+// GET /api/games/[gameCode] - Get game state
+export async function GET(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { gameCode } = await params;
+
+    const gameSession = await prisma.gameSession.findUnique({
+      where: { gameCode: gameCode.toUpperCase() },
+      include: {
+        quiz: {
+          select: {
+            title: true,
+            questions: {
+              select: {
+                id: true,
+              },
+              orderBy: { orderIndex: "asc" },
+            },
+          },
+        },
+        players: {
+          where: { isActive: true },
+          select: {
+            id: true,
+            name: true,
+            avatarColor: true,
+            totalScore: true,
+            isActive: true,
+          },
+          orderBy: { totalScore: "desc" },
+        },
+      },
+    });
+
+    if (!gameSession) {
+      return NextResponse.json(
+        { error: "Game not found" },
+        { status: 404 }
+      );
+    }
+
+    return NextResponse.json({
+      gameCode: gameSession.gameCode,
+      status: gameSession.status,
+      quizTitle: gameSession.quiz.title,
+      currentQuestionIndex: gameSession.currentQuestionIndex,
+      totalQuestions: gameSession.quiz.questions.length,
+      players: gameSession.players.map((p) => ({
+        id: p.id,
+        name: p.name,
+        avatarColor: p.avatarColor,
+        score: p.totalScore,
+        isActive: p.isActive,
+      })),
+    });
+  } catch (error) {
+    console.error("Error fetching game:", error);
+    return NextResponse.json(
+      { error: "Failed to fetch game" },
+      { status: 500 }
+    );
+  }
+}

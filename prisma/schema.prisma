@@ -1,0 +1,129 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Quiz template - reusable for multiple game sessions
+model Quiz {
+  id          String        @id @default(cuid())
+  title       String
+  description String?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  isActive    Boolean       @default(true)
+
+  questions    Question[]
+  gameSessions GameSession[]
+}
+
+// Individual question within a quiz
+// questionType: "SINGLE_SELECT" | "MULTI_SELECT"
+model Question {
+  id           String   @id @default(cuid())
+  quizId       String
+  quiz         Quiz     @relation(fields: [quizId], references: [id], onDelete: Cascade)
+
+  questionText String
+  imageUrl     String?
+  questionType String   @default("SINGLE_SELECT")
+  timeLimit    Int      @default(30)
+  points       Int      @default(100)
+  orderIndex   Int
+
+  answers       Answer[]
+  playerAnswers PlayerAnswer[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([quizId])
+}
+
+// Answer option for a question
+model Answer {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  answerText String
+  imageUrl   String?
+  isCorrect  Boolean  @default(false)
+  orderIndex Int
+
+  @@index([questionId])
+}
+
+// Active game session
+// status: "WAITING" | "ACTIVE" | "QUESTION" | "REVEALING" | "SCOREBOARD" | "FINISHED"
+model GameSession {
+  id       String @id @default(cuid())
+  gameCode String @unique
+  quizId   String
+  quiz     Quiz   @relation(fields: [quizId], references: [id])
+
+  status               String    @default("WAITING")
+  currentQuestionIndex Int       @default(-1)
+  questionStartedAt    DateTime?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  endedAt   DateTime?
+
+  players Player[]
+
+  @@index([gameCode])
+  @@index([status])
+}
+
+// Player in a game session
+model Player {
+  id            String      @id @default(cuid())
+  gameSessionId String
+  gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+
+  name        String
+  socketId    String?
+  avatarColor String?
+
+  totalScore    Int @default(0)
+  currentStreak Int @default(0)
+
+  joinedAt DateTime @default(now())
+  isActive Boolean  @default(true)
+
+  answers PlayerAnswer[]
+
+  @@unique([gameSessionId, name])
+  @@index([gameSessionId])
+}
+
+// Player's answer to a question
+// selectedAnswerIds: JSON array of answer IDs e.g. ["id1", "id2"]
+model PlayerAnswer {
+  id         String   @id @default(cuid())
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  selectedAnswerIds String
+  isCorrect         Boolean
+  timeToAnswer      Int
+  pointsEarned      Int
+
+  answeredAt DateTime @default(now())
+
+  @@unique([playerId, questionId])
+  @@index([playerId])
+  @@index([questionId])
+}
+
+// App settings (key-value store)
+model Setting {
+  key   String @id
+  value String
+}
