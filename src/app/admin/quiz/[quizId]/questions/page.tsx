@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -43,6 +43,27 @@ import {
   Layers,
 } from "lucide-react";
 
+// DnD Kit imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from "@dnd-kit/core";
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
+
 interface Answer {
   id?: string;
   answerText: string;
@@ -69,6 +90,227 @@ interface Quiz {
   questions: Question[];
 }
 
+interface SectionGroup {
+  section: Question | null;
+  questions: Question[];
+}
+
+// Group questions by sections for visual display
+function groupQuestionsBySections(questions: Question[]): SectionGroup[] {
+  const groups: SectionGroup[] = [];
+  let currentGroup: SectionGroup = {
+    section: null,
+    questions: [],
+  };
+
+  for (const q of questions) {
+    if (q.questionType === "SECTION") {
+      // Save previous group if it has content
+      if (currentGroup.section || currentGroup.questions.length > 0) {
+        groups.push(currentGroup);
+      }
+      // Start new group with this section
+      currentGroup = { section: q, questions: [] };
+    } else {
+      currentGroup.questions.push(q);
+    }
+  }
+  // Don't forget the last group
+  if (currentGroup.section || currentGroup.questions.length > 0) {
+    groups.push(currentGroup);
+  }
+  return groups;
+}
+
+// Flatten groups back to a single array preserving order
+function flattenGroups(groups: SectionGroup[]): Question[] {
+  const result: Question[] = [];
+  for (const group of groups) {
+    if (group.section) {
+      result.push(group.section);
+    }
+    result.push(...group.questions);
+  }
+  return result;
+}
+
+// Sortable Question Card Component
+function SortableQuestionCard({
+  question,
+  questionNumber,
+  onEdit,
+  onDelete,
+  isInSection,
+}: {
+  question: Question;
+  questionNumber: number;
+  onEdit: (question: Question) => void;
+  onDelete: (questionId: string) => void;
+  isInSection: boolean;
+}) {
+  const isSection = question.questionType === "SECTION";
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: question.id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  };
+
+  return (
+    <div
+      ref={setNodeRef}
+      style={style}
+      className={isInSection && !isSection ? "ml-8" : ""}
+    >
+      <Card
+        className={`group ${isSection ? "border-primary/50 bg-primary/5" : ""} ${
+          isDragging ? "ring-2 ring-primary" : ""
+        }`}
+      >
+        <CardHeader className="pb-2">
+          <div className="flex items-start gap-4">
+            {/* Drag Handle */}
+            <div
+              {...attributes}
+              {...listeners}
+              className="cursor-grab active:cursor-grabbing p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <GripVertical className="w-5 h-5" />
+            </div>
+            <div
+              className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
+                isSection
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-primary/10 text-primary"
+              }`}
+            >
+              {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
+            </div>
+            <div className="flex-1 min-w-0">
+              <CardTitle className="text-base font-medium">
+                {question.questionText}
+              </CardTitle>
+              <CardDescription className="flex items-center gap-3 mt-1">
+                {isSection ? (
+                  <>
+                    <span className="text-primary font-medium">Section</span>
+                    {question.hostNotes && (
+                      <>
+                        <span>•</span>
+                        <span className="truncate max-w-[200px]">{question.hostNotes}</span>
+                      </>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    <span>
+                      {question.questionType === "MULTI_SELECT"
+                        ? "Multi Select"
+                        : "Single Select"}
+                    </span>
+                    <span>•</span>
+                    <span>{question.timeLimit}s</span>
+                    <span>•</span>
+                    <span>{question.points} pts</span>
+                  </>
+                )}
+                {question.imageUrl && (
+                  <>
+                    <span>•</span>
+                    <span className="flex items-center">
+                      <Image className="w-3 h-3 mr-1" />
+                      Image
+                    </span>
+                  </>
+                )}
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onEdit(question)}
+              >
+                Edit
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => onDelete(question.id)}
+                className="text-destructive hover:text-destructive"
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        {!isSection && question.answers.length > 0 && (
+          <CardContent className="pt-0 pl-20">
+            <div className="flex flex-wrap gap-2">
+              {question.answers.map((answer, aIndex) => (
+                <div
+                  key={aIndex}
+                  className={`text-sm px-3 py-1 rounded-full ${
+                    answer.isCorrect
+                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                      : "bg-muted text-muted-foreground"
+                  }`}
+                >
+                  {answer.isCorrect && (
+                    <Check className="w-3 h-3 inline mr-1" />
+                  )}
+                  {answer.answerText}
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// Drag Overlay Card (shown while dragging)
+function DragOverlayCard({ question, questionNumber }: { question: Question; questionNumber: number }) {
+  const isSection = question.questionType === "SECTION";
+
+  return (
+    <Card
+      className={`${isSection ? "border-primary/50 bg-primary/5" : ""} ring-2 ring-primary shadow-lg`}
+    >
+      <CardHeader className="pb-2">
+        <div className="flex items-start gap-4">
+          <div className="p-1 -m-1 text-muted-foreground">
+            <GripVertical className="w-5 h-5" />
+          </div>
+          <div
+            className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
+              isSection
+                ? "bg-primary text-primary-foreground"
+                : "bg-primary/10 text-primary"
+            }`}
+          >
+            {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
+          </div>
+          <div className="flex-1 min-w-0">
+            <CardTitle className="text-base font-medium">
+              {question.questionText}
+            </CardTitle>
+          </div>
+        </div>
+      </CardHeader>
+    </Card>
+  );
+}
+
 export default function QuestionsPage({
   params,
 }: {
@@ -80,6 +322,7 @@ export default function QuestionsPage({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -96,6 +339,38 @@ export default function QuestionsPage({
   ]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // DnD sensors
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8,
+      },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  );
+
+  // Group questions for visual display
+  const sectionGroups = useMemo(
+    () => (quiz ? groupQuestionsBySections(quiz.questions) : []),
+    [quiz]
+  );
+
+  // Get the active dragging question
+  const activeQuestion = useMemo(
+    () => quiz?.questions.find((q) => q.id === activeId) || null,
+    [quiz, activeId]
+  );
+
+  // Calculate question number for the active question
+  const activeQuestionNumber = useMemo(() => {
+    if (!activeQuestion || !quiz || activeQuestion.questionType === "SECTION") return 0;
+    return quiz.questions
+      .slice(0, quiz.questions.findIndex((q) => q.id === activeQuestion.id) + 1)
+      .filter((q) => q.questionType !== "SECTION").length;
+  }, [activeQuestion, quiz]);
 
   useEffect(() => {
     fetchQuiz();
@@ -343,6 +618,110 @@ export default function QuestionsPage({
     }
   }
 
+  // DnD handlers
+  function handleDragStart(event: DragStartEvent) {
+    setActiveId(event.active.id as string);
+  }
+
+  async function handleDragEnd(event: DragEndEvent) {
+    const { active, over } = event;
+    setActiveId(null);
+
+    if (!over || !quiz || active.id === over.id) return;
+
+    const oldIndex = quiz.questions.findIndex((q) => q.id === active.id);
+    const newIndex = quiz.questions.findIndex((q) => q.id === over.id);
+
+    if (oldIndex === -1 || newIndex === -1) return;
+
+    const draggedItem = quiz.questions[oldIndex];
+    const isSection = draggedItem.questionType === "SECTION";
+
+    let newQuestions: Question[];
+
+    if (isSection) {
+      // When dragging a section, also move all questions that belong to it
+      const groups = groupQuestionsBySections(quiz.questions);
+      const sectionGroupIndex = groups.findIndex((g) => g.section?.id === active.id);
+
+      if (sectionGroupIndex === -1) return;
+
+      const sectionGroup = groups[sectionGroupIndex];
+      const itemsToMove = [sectionGroup.section!, ...sectionGroup.questions];
+
+      // Remove the section group from groups
+      const remainingGroups = groups.filter((_, i) => i !== sectionGroupIndex);
+
+      // Find where to insert based on the over target
+      const overItem = quiz.questions.find((q) => q.id === over.id);
+      if (!overItem) return;
+
+      // Find which group the over item belongs to
+      let targetGroupIndex = -1;
+      let insertAfterGroup = false;
+
+      for (let i = 0; i < remainingGroups.length; i++) {
+        const group = remainingGroups[i];
+        if (group.section?.id === over.id) {
+          targetGroupIndex = i;
+          insertAfterGroup = oldIndex < newIndex;
+          break;
+        }
+        if (group.questions.some((q) => q.id === over.id)) {
+          targetGroupIndex = i;
+          insertAfterGroup = true;
+          break;
+        }
+      }
+
+      // Create new groups array with the section group in the new position
+      const newGroups: SectionGroup[] = [];
+
+      if (targetGroupIndex === -1) {
+        // Insert at beginning
+        newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
+        newGroups.push(...remainingGroups);
+      } else {
+        for (let i = 0; i < remainingGroups.length; i++) {
+          if (!insertAfterGroup && i === targetGroupIndex) {
+            newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
+          }
+          newGroups.push(remainingGroups[i]);
+          if (insertAfterGroup && i === targetGroupIndex) {
+            newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
+          }
+        }
+      }
+
+      newQuestions = flattenGroups(newGroups);
+    } else {
+      // Simple question reorder
+      newQuestions = arrayMove(quiz.questions, oldIndex, newIndex);
+    }
+
+    // Optimistically update UI
+    setQuiz({ ...quiz, questions: newQuestions });
+
+    // Save to server
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/questions/reorder`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          questionIds: newQuestions.map((q) => q.id),
+        }),
+      });
+
+      if (!res.ok) {
+        // Revert on error
+        fetchQuiz();
+      }
+    } catch (error) {
+      console.error("Failed to reorder questions:", error);
+      fetchQuiz();
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -362,6 +741,16 @@ export default function QuestionsPage({
     );
   }
 
+  // Calculate question numbers
+  let questionCounter = 0;
+  const questionNumbers = new Map<string, number>();
+  for (const q of quiz.questions) {
+    if (q.questionType !== "SECTION") {
+      questionCounter++;
+      questionNumbers.set(q.id, questionCounter);
+    }
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -376,7 +765,9 @@ export default function QuestionsPage({
           </Link>
           <h1 className="text-3xl font-bold">{quiz.title}</h1>
           <p className="text-muted-foreground">
-            {quiz.questions.length} question{quiz.questions.length !== 1 ? "s" : ""}
+            {quiz.questions.length} item{quiz.questions.length !== 1 ? "s" : ""} •{" "}
+            {quiz.questions.filter((q) => q.questionType !== "SECTION").length} question
+            {quiz.questions.filter((q) => q.questionType !== "SECTION").length !== 1 ? "s" : ""}
           </p>
         </div>
         <div className="flex gap-2">
@@ -775,7 +1166,7 @@ export default function QuestionsPage({
         </div>
       </div>
 
-      {/* Questions List */}
+      {/* Questions List with Drag and Drop */}
       {quiz.questions.length === 0 ? (
         <Card className="border-dashed">
           <CardContent className="flex flex-col items-center justify-center py-16">
@@ -787,113 +1178,53 @@ export default function QuestionsPage({
           </CardContent>
         </Card>
       ) : (
-        <div className="space-y-3">
-          {quiz.questions.map((question, index) => {
-            const isSection = question.questionType === "SECTION";
-            // Count only questions (not sections) up to this index
-            const questionNumber = quiz.questions
-              .slice(0, index + 1)
-              .filter((q) => q.questionType !== "SECTION").length;
-
-            return (
-              <Card
-                key={question.id}
-                className={`group ${isSection ? "border-primary/50 bg-primary/5" : ""}`}
-              >
-                <CardHeader className="pb-2">
-                  <div className="flex items-start gap-4">
-                    <div
-                      className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
-                        isSection
-                          ? "bg-primary text-primary-foreground"
-                          : "bg-primary/10 text-primary"
-                      }`}
-                    >
-                      {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <CardTitle className="text-base font-medium">
-                        {question.questionText}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-3 mt-1">
-                        {isSection ? (
-                          <>
-                            <span className="text-primary font-medium">Section</span>
-                            {question.hostNotes && (
-                              <>
-                                <span>•</span>
-                                <span className="truncate max-w-[200px]">{question.hostNotes}</span>
-                              </>
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <span>
-                              {question.questionType === "MULTI_SELECT"
-                                ? "Multi Select"
-                                : "Single Select"}
-                            </span>
-                            <span>•</span>
-                            <span>{question.timeLimit}s</span>
-                            <span>•</span>
-                            <span>{question.points} pts</span>
-                          </>
-                        )}
-                        {question.imageUrl && (
-                          <>
-                            <span>•</span>
-                            <span className="flex items-center">
-                              <Image className="w-3 h-3 mr-1" />
-                              Image
-                            </span>
-                          </>
-                        )}
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => openEditDialog(question)}
-                      >
-                        Edit
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteQuestion(question.id)}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                {!isSection && question.answers.length > 0 && (
-                  <CardContent className="pt-0 pl-16">
-                    <div className="flex flex-wrap gap-2">
-                      {question.answers.map((answer, aIndex) => (
-                        <div
-                          key={aIndex}
-                          className={`text-sm px-3 py-1 rounded-full ${
-                            answer.isCorrect
-                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          {answer.isCorrect && (
-                            <Check className="w-3 h-3 inline mr-1" />
-                          )}
-                          {answer.answerText}
-                        </div>
-                      ))}
-                    </div>
-                  </CardContent>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <SortableContext
+            items={quiz.questions.map((q) => q.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <div className="space-y-3">
+              {sectionGroups.map((group, groupIndex) => (
+                <div key={groupIndex} className="space-y-2">
+                  {/* Section Header */}
+                  {group.section && (
+                    <SortableQuestionCard
+                      question={group.section}
+                      questionNumber={0}
+                      onEdit={openEditDialog}
+                      onDelete={deleteQuestion}
+                      isInSection={false}
+                    />
+                  )}
+                  {/* Questions in this section */}
+                  {group.questions.map((question) => (
+                    <SortableQuestionCard
+                      key={question.id}
+                      question={question}
+                      questionNumber={questionNumbers.get(question.id) || 0}
+                      onEdit={openEditDialog}
+                      onDelete={deleteQuestion}
+                      isInSection={group.section !== null}
+                    />
+                  ))}
+                </div>
+              ))}
+            </div>
+          </SortableContext>
+          <DragOverlay>
+            {activeQuestion && (
+              <DragOverlayCard
+                question={activeQuestion}
+                questionNumber={activeQuestionNumber}
+              />
+            )}
+          </DragOverlay>
+        </DndContext>
       )}
     </div>
   );
