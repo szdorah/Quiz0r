@@ -5,11 +5,9 @@ import { QRCodeSVG } from "qrcode.react";
 import { useSocket } from "@/hooks/useSocket";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Check, Trophy, Medal, Award, Settings, X, RefreshCw } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Check, Trophy, Medal, Award } from "lucide-react";
 
 export default function HostDisplayPage({
   params,
@@ -18,8 +16,6 @@ export default function HostDisplayPage({
 }) {
   const { gameCode } = params;
   const [baseUrl, setBaseUrl] = useState("");
-  const [showUrlInput, setShowUrlInput] = useState(false);
-  const [tempUrl, setTempUrl] = useState("");
 
   // Poll for tunnel URL - keeps checking until we get an external URL
   useEffect(() => {
@@ -70,33 +66,6 @@ export default function HostDisplayPage({
     };
   }, []);
 
-  function saveUrl() {
-    const url = tempUrl.trim().replace(/\/$/, ""); // Remove trailing slash
-    if (url) {
-      localStorage.setItem("quiz-master-base-url", url);
-      setBaseUrl(url);
-    }
-    setShowUrlInput(false);
-  }
-
-  const [detecting, setDetecting] = useState(false);
-
-  async function detectTunnel() {
-    setDetecting(true);
-    try {
-      const res = await fetch("/api/tunnel");
-      if (res.ok) {
-        const data = await res.json();
-        if (data.url) {
-          setTempUrl(data.url);
-        }
-      }
-    } catch {
-      // Tunnel not available
-    }
-    setDetecting(false);
-  }
-
   const {
     connected,
     gameState,
@@ -136,54 +105,6 @@ export default function HostDisplayPage({
 
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background p-8">
-        {/* Settings button */}
-        <button
-          onClick={() => {
-            setTempUrl(baseUrl);
-            setShowUrlInput(true);
-          }}
-          className="absolute top-4 right-4 p-2 rounded-lg hover:bg-black/10 transition-colors"
-          title="Set external URL for QR code"
-        >
-          <Settings className="w-6 h-6 text-muted-foreground" />
-        </button>
-
-        {/* URL Input Modal */}
-        {showUrlInput && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <Card className="p-6 w-full max-w-md mx-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-lg font-semibold">External URL</h3>
-                <button onClick={() => setShowUrlInput(false)}>
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <p className="text-sm text-muted-foreground mb-4">
-                Enter your ngrok/tunnel URL so mobile players can scan the QR code:
-              </p>
-              <div className="flex gap-2 mb-4">
-                <Input
-                  value={tempUrl}
-                  onChange={(e) => setTempUrl(e.target.value)}
-                  placeholder="https://abc123.ngrok.io"
-                  className="flex-1"
-                />
-                <Button variant="outline" onClick={detectTunnel} disabled={detecting}>
-                  <RefreshCw className={`w-4 h-4 ${detecting ? "animate-spin" : ""}`} />
-                </Button>
-              </div>
-              <div className="flex gap-2">
-                <Button variant="outline" onClick={() => setShowUrlInput(false)} className="flex-1">
-                  Cancel
-                </Button>
-                <Button onClick={saveUrl} className="flex-1">
-                  Save
-                </Button>
-              </div>
-            </Card>
-          </div>
-        )}
-
         <div className="max-w-4xl mx-auto">
           {/* Header */}
           <div className="text-center mb-8">
