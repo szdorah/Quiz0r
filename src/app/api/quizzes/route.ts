@@ -10,11 +10,27 @@ export async function GET() {
         _count: {
           select: { questions: true },
         },
+        questions: {
+          select: { questionType: true },
+        },
       },
       orderBy: { updatedAt: "desc" },
     });
 
-    return NextResponse.json(quizzes);
+    // Calculate actual question count (excluding sections)
+    const quizzesWithQuestionCount = quizzes.map((quiz) => {
+      const questionCount = quiz.questions.filter(
+        (q) => q.questionType !== "SECTION"
+      ).length;
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { questions, ...rest } = quiz;
+      return {
+        ...rest,
+        questionCount,
+      };
+    });
+
+    return NextResponse.json(quizzesWithQuestionCount);
   } catch (error) {
     console.error("Error fetching quizzes:", error);
     return NextResponse.json(

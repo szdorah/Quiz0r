@@ -141,7 +141,7 @@ export function useSocket({
       });
     });
 
-    socket.on("game:questionStart", ({ question, startTime }) => {
+    socket.on("game:questionStart", ({ question, questionIndex, questionNumber, startTime }) => {
       setCurrentQuestion(question);
       setTimeRemaining(question.timeLimit);
       setAnswerResult(null);
@@ -156,7 +156,13 @@ export function useSocket({
       // Use SECTION status for sections, QUESTION for questions
       const isSection = question.questionType === "SECTION";
       setGameState((prev) =>
-        prev ? { ...prev, status: isSection ? "SECTION" : "QUESTION", currentQuestion: question } : prev
+        prev ? {
+          ...prev,
+          status: isSection ? "SECTION" : "QUESTION",
+          currentQuestion: question,
+          currentQuestionIndex: questionIndex,
+          currentQuestionNumber: questionNumber,
+        } : prev
       );
     });
 

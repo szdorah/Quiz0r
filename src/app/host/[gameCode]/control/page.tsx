@@ -213,7 +213,7 @@ export default function HostControlPage({
                   <div>
                     <span className="text-muted-foreground">Question: </span>
                     <span className="font-medium">
-                      {gameState.currentQuestionIndex + 1} /{" "}
+                      {gameState.currentQuestionNumber} /{" "}
                       {gameState.totalQuestions}
                     </span>
                   </div>

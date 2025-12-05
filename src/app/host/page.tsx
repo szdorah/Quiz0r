@@ -23,9 +23,7 @@ import { ArrowLeft, Play, Monitor, Loader2 } from "lucide-react";
 interface Quiz {
   id: string;
   title: string;
-  _count: {
-    questions: number;
-  };
+  questionCount: number;
 }
 
 function HostPageContent() {
@@ -51,7 +49,7 @@ function HostPageContent() {
         const data = await res.json();
         // Filter to only quizzes with questions
         const withQuestions = data.filter(
-          (q: Quiz) => q._count.questions > 0
+          (q: Quiz) => q.questionCount > 0
         );
         setQuizzes(withQuestions);
 
@@ -150,7 +148,7 @@ function HostPageContent() {
                   <SelectContent>
                     {quizzes.map((quiz) => (
                       <SelectItem key={quiz.id} value={quiz.id}>
-                        {quiz.title} ({quiz._count.questions} questions)
+                        {quiz.title} ({quiz.questionCount} questions)
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -161,8 +159,8 @@ function HostPageContent() {
                 <div className="p-4 bg-muted rounded-lg">
                   <h3 className="font-medium">{selectedQuiz.title}</h3>
                   <p className="text-sm text-muted-foreground">
-                    {selectedQuiz._count.questions} question
-                    {selectedQuiz._count.questions !== 1 ? "s" : ""}
+                    {selectedQuiz.questionCount} question
+                    {selectedQuiz.questionCount !== 1 ? "s" : ""}
                   </p>
                 </div>
               )}

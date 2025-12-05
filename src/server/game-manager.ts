@@ -289,9 +289,16 @@ export class GameManager {
       },
     });
 
+    // Calculate question number (excluding sections)
+    const questionNumber = game.questions
+      .slice(0, game.currentQuestionIndex + 1)
+      .filter((q) => q.questionType !== "SECTION").length;
+
     // Send question/section to all clients
     this.io.to(`game:${gameCode}`).emit("game:questionStart", {
       question,
+      questionIndex: game.currentQuestionIndex,
+      questionNumber,
       startTime: game.questionStartedAt,
     });
 
@@ -478,12 +485,22 @@ export class GameManager {
     if (!game) return;
 
     const nextIndex = game.currentQuestionIndex + 1;
+    // Count only actual questions (not sections)
+    const totalQuestions = game.questions.filter(
+      (q) => q.questionType !== "SECTION"
+    ).length;
+
     if (nextIndex < game.questions.length) {
       const nextQuestion = game.questions[nextIndex];
+      // Calculate actual question number (excluding sections)
+      const questionNumber = game.questions
+        .slice(0, nextIndex + 1)
+        .filter((q) => q.questionType !== "SECTION").length;
+
       this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", {
         question: nextQuestion,
-        questionNumber: nextIndex + 1,
-        totalQuestions: game.questions.length,
+        questionNumber,
+        totalQuestions,
       });
     } else {
       // No more questions
@@ -627,7 +644,7 @@ export class GameManager {
         quiz: {
           select: {
             title: true,
-            questions: { select: { id: true }, orderBy: { orderIndex: "asc" } },
+            questions: { select: { id: true, questionType: true }, orderBy: { orderIndex: "asc" } },
           },
         },
         players: {
@@ -641,12 +658,25 @@ export class GameManager {
 
     const activeGame = this.activeGames.get(gameCode);
 
+    // Count only actual questions (not sections)
+    const totalQuestions = gameSession.quiz.questions.filter(
+      (q) => q.questionType !== "SECTION"
+    ).length;
+
+    // Calculate the current question number (excluding sections)
+    const currentQuestionNumber = gameSession.currentQuestionIndex >= 0
+      ? gameSession.quiz.questions
+          .slice(0, gameSession.currentQuestionIndex + 1)
+          .filter((q) => q.questionType !== "SECTION").length
+      : 0;
+
     return {
       gameCode: gameSession.gameCode,
       status: gameSession.status as GameStatus,
       quizTitle: gameSession.quiz.title,
       currentQuestionIndex: gameSession.currentQuestionIndex,
-      totalQuestions: gameSession.quiz.questions.length,
+      currentQuestionNumber,
+      totalQuestions,
       players: gameSession.players.map((p) => ({
         id: p.id,
         name: p.name,

@@ -18,9 +18,7 @@ interface Quiz {
   description: string | null;
   createdAt: string;
   updatedAt: string;
-  _count: {
-    questions: number;
-  };
+  questionCount: number;
 }
 
 export default function AdminDashboard() {
@@ -108,8 +106,8 @@ export default function AdminDashboard() {
                   <span className="truncate">{quiz.title}</span>
                 </CardTitle>
                 <CardDescription>
-                  {quiz._count.questions} question
-                  {quiz._count.questions !== 1 ? "s" : ""}
+                  {quiz.questionCount} question
+                  {quiz.questionCount !== 1 ? "s" : ""}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -131,9 +129,9 @@ export default function AdminDashboard() {
                   <Link href={`/host?quizId=${quiz.id}`}>
                     <Button
                       size="sm"
-                      disabled={quiz._count.questions === 0}
+                      disabled={quiz.questionCount === 0}
                       title={
-                        quiz._count.questions === 0
+                        quiz.questionCount === 0
                           ? "Add questions first"
                           : "Start game"
                       }

@@ -26,7 +26,8 @@ export interface GameState {
   status: GameStatus;
   quizTitle: string;
   currentQuestionIndex: number;
-  totalQuestions: number;
+  currentQuestionNumber: number; // Excludes sections from count
+  totalQuestions: number; // Excludes sections from count
   players: PlayerInfo[];
   currentQuestion?: QuestionData | null;
   timeRemaining?: number;
@@ -94,7 +95,9 @@ export interface ServerToClientEvents {
   "game:playerLeft": (data: { playerId: string }) => void;
   "game:questionStart": (data: {
     question: QuestionData;
-    startTime: number;
+    questionIndex: number;
+    questionNumber: number;
+    startTime: number | null;
   }) => void;
   "game:timerTick": (data: { remaining: number }) => void;
   "game:answerReceived": (data: {

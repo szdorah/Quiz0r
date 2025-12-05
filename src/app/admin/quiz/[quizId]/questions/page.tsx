@@ -772,7 +772,7 @@ export default function QuestionsPage({
         </div>
         <div className="flex gap-2">
           <Link href={`/host?quizId=${quizId}`}>
-            <Button variant="outline" disabled={quiz.questions.length === 0}>
+            <Button variant="outline" disabled={quiz.questions.filter((q) => q.questionType !== "SECTION").length === 0}>
               <Play className="w-4 h-4 mr-2" />
               Play
             </Button>
