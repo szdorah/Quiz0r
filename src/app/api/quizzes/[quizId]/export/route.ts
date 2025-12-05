@@ -107,7 +107,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // 5. Generate ZIP buffer
     const zipBuffer = await zip.generateAsync({
-      type: "nodebuffer",
+      type: "uint8array",
       compression: "DEFLATE",
       compressionOptions: { level: 6 },
     });
