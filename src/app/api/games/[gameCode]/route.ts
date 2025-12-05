@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { parseTheme } from "@/lib/theme";
 
 interface RouteParams {
   params: Promise<{ gameCode: string }>;
@@ -16,6 +17,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         quiz: {
           select: {
             title: true,
+            theme: true,
             questions: {
               select: {
                 id: true,
@@ -45,10 +47,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Parse theme JSON string to object
+    const parsedTheme = parseTheme(gameSession.quiz.theme);
+
     return NextResponse.json({
       gameCode: gameSession.gameCode,
       status: gameSession.status,
       quizTitle: gameSession.quiz.title,
+      quizTheme: parsedTheme,
       currentQuestionIndex: gameSession.currentQuestionIndex,
       totalQuestions: gameSession.quiz.questions.length,
       players: gameSession.players.map((p) => ({

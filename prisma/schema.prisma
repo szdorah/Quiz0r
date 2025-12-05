@@ -12,6 +12,7 @@ model Quiz {
   id          String        @id @default(cuid())
   title       String
   description String?
+  theme       String?       // JSON string containing QuizTheme
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   isActive    Boolean       @default(true)

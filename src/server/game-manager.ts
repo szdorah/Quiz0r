@@ -10,12 +10,14 @@ import {
   ClientToServerEvents,
   ServerToClientEvents,
 } from "@/types";
+import { QuizTheme } from "@/types/theme";
 import {
   calculateSingleSelectScore,
   calculateMultiSelectScore,
   isFullyCorrect,
   generateAvatarColor,
 } from "@/lib/scoring";
+import { parseTheme } from "@/lib/theme";
 
 const prisma = new PrismaClient();
 
@@ -642,9 +644,11 @@ export class GameManager {
       where: { gameCode },
       include: {
         quiz: {
-          select: {
-            title: true,
-            questions: { select: { id: true, questionType: true }, orderBy: { orderIndex: "asc" } },
+          include: {
+            questions: {
+              select: { id: true, questionType: true },
+              orderBy: { orderIndex: "asc" },
+            },
           },
         },
         players: {
@@ -670,10 +674,14 @@ export class GameManager {
           .filter((q) => q.questionType !== "SECTION").length
       : 0;
 
+    // Parse theme if present
+    const quizTheme = parseTheme(gameSession.quiz.theme);
+
     return {
       gameCode: gameSession.gameCode,
       status: gameSession.status as GameStatus,
       quizTitle: gameSession.quiz.title,
+      quizTheme,
       currentQuestionIndex: gameSession.currentQuestionIndex,
       currentQuestionNumber,
       totalQuestions,

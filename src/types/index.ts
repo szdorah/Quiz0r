@@ -1,3 +1,5 @@
+import { QuizTheme } from "./theme";
+
 // Question types
 export const QuestionType = {
   SINGLE_SELECT: "SINGLE_SELECT",
@@ -25,6 +27,7 @@ export interface GameState {
   gameCode: string;
   status: GameStatus;
   quizTitle: string;
+  quizTheme: QuizTheme | null; // Quiz theme for styling
   currentQuestionIndex: number;
   currentQuestionNumber: number; // Excludes sections from count
   totalQuestions: number; // Excludes sections from count

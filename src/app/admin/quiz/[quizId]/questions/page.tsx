@@ -41,6 +41,7 @@ import {
   Upload,
   Loader2,
   Layers,
+  Palette,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -775,6 +776,12 @@ export default function QuestionsPage({
             <Button variant="outline" disabled={quiz.questions.filter((q) => q.questionType !== "SECTION").length === 0}>
               <Play className="w-4 h-4 mr-2" />
               Play
+            </Button>
+          </Link>
+          <Link href={`/admin/quiz/${quizId}/theme`}>
+            <Button variant="outline">
+              <Palette className="w-4 h-4 mr-2" />
+              Theme
             </Button>
           </Link>
           <Button variant="outline" onClick={openSectionDialog}>
