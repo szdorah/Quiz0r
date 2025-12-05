@@ -222,14 +222,22 @@ export default function HostDisplayPage({
                   key={player.id}
                   className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-sm"
                 >
-                  <Avatar className="w-8 h-8">
-                    <AvatarFallback
-                      style={{ backgroundColor: player.avatarColor }}
-                      className="text-white text-sm"
-                    >
-                      {player.name.charAt(0).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
+                  {player.avatarEmoji?.startsWith("/") ? (
+                    <img
+                      src={player.avatarEmoji}
+                      alt={player.name}
+                      className="w-8 h-8 rounded-full object-cover"
+                    />
+                  ) : (
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback
+                        style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
+                        className={player.avatarEmoji ? "text-2xl" : "text-white text-sm"}
+                      >
+                        {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                  )}
                   <span className="font-medium">{player.name}</span>
                 </div>
               ))}
@@ -373,14 +381,22 @@ export default function HostDisplayPage({
             <div className="flex justify-center items-end gap-4 mb-12">
               {/* 2nd Place */}
               <div className="text-center">
-                <Avatar className="w-16 h-16 mx-auto mb-2">
-                  <AvatarFallback
-                    style={{ backgroundColor: displayScores[1]?.avatarColor }}
-                    className="text-white text-2xl"
-                  >
-                    {displayScores[1]?.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                {displayScores[1]?.avatarEmoji?.startsWith("/") ? (
+                  <img
+                    src={displayScores[1].avatarEmoji}
+                    alt={displayScores[1].name}
+                    className="w-16 h-16 rounded-full object-cover mx-auto mb-2"
+                  />
+                ) : (
+                  <Avatar className="w-16 h-16 mx-auto mb-2">
+                    <AvatarFallback
+                      style={{ backgroundColor: displayScores[1]?.avatarEmoji ? "transparent" : displayScores[1]?.avatarColor }}
+                      className={displayScores[1]?.avatarEmoji ? "text-4xl" : "text-white text-2xl"}
+                    >
+                      {displayScores[1]?.avatarEmoji || displayScores[1]?.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <Medal className="w-8 h-8 mx-auto text-gray-400" />
                 <p className="font-bold">{displayScores[1]?.name}</p>
                 <p className="text-xl font-bold text-primary">
@@ -391,14 +407,22 @@ export default function HostDisplayPage({
 
               {/* 1st Place */}
               <div className="text-center">
-                <Avatar className="w-20 h-20 mx-auto mb-2">
-                  <AvatarFallback
-                    style={{ backgroundColor: displayScores[0]?.avatarColor }}
-                    className="text-white text-3xl"
-                  >
-                    {displayScores[0]?.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                {displayScores[0]?.avatarEmoji?.startsWith("/") ? (
+                  <img
+                    src={displayScores[0].avatarEmoji}
+                    alt={displayScores[0].name}
+                    className="w-20 h-20 rounded-full object-cover mx-auto mb-2"
+                  />
+                ) : (
+                  <Avatar className="w-20 h-20 mx-auto mb-2">
+                    <AvatarFallback
+                      style={{ backgroundColor: displayScores[0]?.avatarEmoji ? "transparent" : displayScores[0]?.avatarColor }}
+                      className={displayScores[0]?.avatarEmoji ? "text-5xl" : "text-white text-3xl"}
+                    >
+                      {displayScores[0]?.avatarEmoji || displayScores[0]?.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <Trophy className="w-10 h-10 mx-auto text-yellow-500" />
                 <p className="font-bold text-lg">{displayScores[0]?.name}</p>
                 <p className="text-2xl font-bold text-primary">
@@ -409,14 +433,22 @@ export default function HostDisplayPage({
 
               {/* 3rd Place */}
               <div className="text-center">
-                <Avatar className="w-14 h-14 mx-auto mb-2">
-                  <AvatarFallback
-                    style={{ backgroundColor: displayScores[2]?.avatarColor }}
-                    className="text-white text-xl"
-                  >
-                    {displayScores[2]?.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                {displayScores[2]?.avatarEmoji?.startsWith("/") ? (
+                  <img
+                    src={displayScores[2].avatarEmoji}
+                    alt={displayScores[2].name}
+                    className="w-14 h-14 rounded-full object-cover mx-auto mb-2"
+                  />
+                ) : (
+                  <Avatar className="w-14 h-14 mx-auto mb-2">
+                    <AvatarFallback
+                      style={{ backgroundColor: displayScores[2]?.avatarEmoji ? "transparent" : displayScores[2]?.avatarColor }}
+                      className={displayScores[2]?.avatarEmoji ? "text-3xl" : "text-white text-xl"}
+                    >
+                      {displayScores[2]?.avatarEmoji || displayScores[2]?.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <Award className="w-7 h-7 mx-auto text-amber-600" />
                 <p className="font-bold">{displayScores[2]?.name}</p>
                 <p className="text-lg font-bold text-primary">
@@ -440,14 +472,22 @@ export default function HostDisplayPage({
                 <span className="text-2xl font-bold w-8 text-center">
                   {index + 1}
                 </span>
-                <Avatar>
-                  <AvatarFallback
-                    style={{ backgroundColor: player.avatarColor }}
-                    className="text-white"
-                  >
-                    {player.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                {player.avatarEmoji?.startsWith("/") ? (
+                  <img
+                    src={player.avatarEmoji}
+                    alt={player.name}
+                    className="w-10 h-10 rounded-full object-cover"
+                  />
+                ) : (
+                  <Avatar>
+                    <AvatarFallback
+                      style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
+                      className={player.avatarEmoji ? "text-2xl" : "text-white"}
+                    >
+                      {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <span className="font-medium flex-1">{player.name}</span>
                 {player.change !== 0 && (
                   <span

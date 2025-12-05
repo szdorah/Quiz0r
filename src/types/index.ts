@@ -34,6 +34,7 @@ export interface PlayerInfo {
   id: string;
   name: string;
   avatarColor: string;
+  avatarEmoji?: string | null;
   score: number;
   isActive: boolean;
   hasAnswered?: boolean;
@@ -59,6 +60,7 @@ export interface PlayerScore {
   playerId: string;
   name: string;
   avatarColor: string;
+  avatarEmoji?: string | null;
   score: number;
   position: number;
   change: number;
@@ -73,6 +75,7 @@ export interface PlayerAnswerDetail {
   playerId: string;
   playerName: string;
   avatarColor: string;
+  avatarEmoji?: string | null;
   selectedAnswerIds: string[];
   isCorrect: boolean;
   pointsEarned: number;

@@ -374,14 +374,22 @@ export default function HostControlPage({
                                 ${answer.isCorrect ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800"}
                               `}
                             >
+                              {answer.avatarEmoji?.startsWith("/") ? (
+                              <img
+                                src={answer.avatarEmoji}
+                                alt={answer.playerName}
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
                               <Avatar className="w-8 h-8">
                                 <AvatarFallback
-                                  style={{ backgroundColor: answer.avatarColor }}
-                                  className="text-white text-xs"
+                                  style={{ backgroundColor: answer.avatarEmoji ? "transparent" : answer.avatarColor }}
+                                  className={answer.avatarEmoji ? "text-xl" : "text-white text-xs"}
                                 >
-                                  {answer.playerName.charAt(0).toUpperCase()}
+                                  {answer.avatarEmoji || answer.playerName.charAt(0).toUpperCase()}
                                 </AvatarFallback>
                               </Avatar>
+                            )}
                               <div className="flex-1 min-w-0">
                                 <div className="flex items-center gap-2">
                                   <p className="font-medium truncate">
@@ -442,14 +450,22 @@ export default function HostControlPage({
                         <span className="text-sm font-bold w-5 text-center text-muted-foreground">
                           {index + 1}
                         </span>
-                        <Avatar className="w-8 h-8">
-                          <AvatarFallback
-                            style={{ backgroundColor: player.avatarColor }}
-                            className="text-white text-xs"
-                          >
-                            {player.name.charAt(0).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        {player.avatarEmoji?.startsWith("/") ? (
+                          <img
+                            src={player.avatarEmoji}
+                            alt={player.name}
+                            className="w-8 h-8 rounded-full object-cover"
+                          />
+                        ) : (
+                          <Avatar className="w-8 h-8">
+                            <AvatarFallback
+                              style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
+                              className={player.avatarEmoji ? "text-xl" : "text-white text-xs"}
+                            >
+                              {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                        )}
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">{player.name}</p>
                           {!isActive && (

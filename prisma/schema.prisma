@@ -88,6 +88,7 @@ model Player {
   name        String
   socketId    String?
   avatarColor String?
+  avatarEmoji String?
 
   totalScore    Int @default(0)
   currentStreak Int @default(0)

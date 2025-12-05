@@ -11,7 +11,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const { gameCode } = await params;
     const body = await request.json();
-    const { name } = body;
+    const { name, avatarEmoji } = body;
 
     if (!name || typeof name !== "string" || name.trim() === "") {
       return NextResponse.json(
@@ -69,13 +69,17 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       // Reactivate inactive player
       const player = await prisma.player.update({
         where: { id: existingPlayer.id },
-        data: { isActive: true },
+        data: {
+          isActive: true,
+          avatarEmoji: avatarEmoji || existingPlayer.avatarEmoji,
+        },
       });
 
       return NextResponse.json({
         playerId: player.id,
         name: player.name,
         avatarColor: player.avatarColor,
+        avatarEmoji: player.avatarEmoji,
       });
     }
 
@@ -85,6 +89,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         gameSessionId: gameSession.id,
         name: trimmedName,
         avatarColor: generateAvatarColor(),
+        avatarEmoji: avatarEmoji || null,
       },
     });
 
@@ -93,6 +98,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         playerId: player.id,
         name: player.name,
         avatarColor: player.avatarColor,
+        avatarEmoji: player.avatarEmoji,
       },
       { status: 201 }
     );

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, X, Trophy, Medal, Award, Loader2 } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Image as ImageIcon } from "lucide-react";
 
 export default function PlayerGamePage({
   params,
@@ -18,11 +18,65 @@ export default function PlayerGamePage({
   const { gameCode } = params;
   const router = useRouter();
   const [playerName, setPlayerName] = useState("");
+  const [selectedEmoji, setSelectedEmoji] = useState<string | null>(null);
+  const [avatarImage, setAvatarImage] = useState<string | null>(null);
+  const [uploadingImage, setUploadingImage] = useState(false);
   const [joined, setJoined] = useState(false);
   const [joining, setJoining] = useState(false);
   const [joinError, setJoinError] = useState("");
   const [selectedAnswers, setSelectedAnswers] = useState<Set<string>>(new Set());
   const [hasSubmitted, setHasSubmitted] = useState(false);
+
+  // Common emojis for avatar selection
+  const avatarEmojis = [
+    "😀", "😎", "🤓", "😈", "👻", "🤖", "👽", "🦊",
+    "🐱", "🐶", "🐸", "🦁", "🐼", "🐨", "🦄", "🐲",
+    "🌟", "⚡", "🔥", "💎", "🎮", "🎸", "🚀", "🏆",
+  ];
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Validate file type
+    const allowedTypes = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      setJoinError("Invalid file type. Use JPEG, PNG, GIF, or WebP");
+      return;
+    }
+
+    // Validate file size (max 5MB)
+    if (file.size > 5 * 1024 * 1024) {
+      setJoinError("Image too large. Maximum size is 5MB");
+      return;
+    }
+
+    setUploadingImage(true);
+    setJoinError("");
+
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setAvatarImage(data.url);
+        setSelectedEmoji(null); // Clear emoji when image is selected
+      } else {
+        const data = await res.json();
+        setJoinError(data.error || "Failed to upload image");
+      }
+    } catch {
+      setJoinError("Failed to upload image");
+    } finally {
+      setUploadingImage(false);
+    }
+  }
 
   const {
     connected,
@@ -67,7 +121,7 @@ export default function PlayerGamePage({
       const res = await fetch(`/api/games/${gameCode}/join`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, avatarEmoji: avatarImage || selectedEmoji }),
       });
 
       if (res.ok) {
@@ -153,12 +207,98 @@ export default function PlayerGamePage({
                   autoFocus
                   disabled={joining}
                 />
-                {joinError && (
-                  <p className="text-sm text-destructive text-center">
-                    {joinError}
-                  </p>
-                )}
               </div>
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Choose Your Avatar</label>
+
+                {/* Avatar Preview */}
+                {(avatarImage || selectedEmoji) && (
+                  <div className="flex justify-center mb-2">
+                    <div className="relative">
+                      {avatarImage ? (
+                        <img
+                          src={avatarImage}
+                          alt="Avatar"
+                          className="w-16 h-16 rounded-full object-cover ring-2 ring-primary"
+                        />
+                      ) : (
+                        <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center text-3xl ring-2 ring-primary">
+                          {selectedEmoji}
+                        </div>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAvatarImage(null);
+                          setSelectedEmoji(null);
+                        }}
+                        className="absolute -top-1 -right-1 w-5 h-5 bg-destructive text-white rounded-full flex items-center justify-center text-xs hover:bg-destructive/80"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Upload Image Button */}
+                <div className="flex justify-center mb-2">
+                  <label
+                    className={`
+                      flex items-center gap-2 px-4 py-2 rounded-lg cursor-pointer
+                      border-2 border-dashed border-muted-foreground/30 hover:border-primary
+                      transition-colors
+                      ${uploadingImage ? "opacity-50 cursor-not-allowed" : ""}
+                      ${avatarImage ? "bg-primary/10 border-primary" : ""}
+                    `}
+                  >
+                    {uploadingImage ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <Upload className="w-4 h-4" />
+                    )}
+                    <span className="text-sm">
+                      {uploadingImage ? "Uploading..." : avatarImage ? "Change Image" : "Upload Image"}
+                    </span>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      onChange={handleImageUpload}
+                      disabled={joining || uploadingImage}
+                      className="hidden"
+                    />
+                  </label>
+                </div>
+
+                <p className="text-xs text-center text-muted-foreground mb-2">or pick an emoji</p>
+
+                <div className="grid grid-cols-8 gap-2">
+                  {avatarEmojis.map((emoji) => (
+                    <button
+                      key={emoji}
+                      type="button"
+                      onClick={() => {
+                        setSelectedEmoji(selectedEmoji === emoji ? null : emoji);
+                        setAvatarImage(null); // Clear image when emoji is selected
+                      }}
+                      disabled={joining}
+                      className={`
+                        text-2xl p-2 rounded-lg transition-all
+                        ${selectedEmoji === emoji && !avatarImage
+                          ? "bg-primary/20 ring-2 ring-primary scale-110"
+                          : "hover:bg-muted"
+                        }
+                      `}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {joinError && (
+                <p className="text-sm text-destructive text-center">
+                  {joinError}
+                </p>
+              )}
               <Button
                 type="submit"
                 size="lg"
@@ -195,13 +335,28 @@ export default function PlayerGamePage({
 
   // Waiting for game to start
   if (gameState.status === "WAITING") {
+    const playerAvatar = avatarImage || selectedEmoji;
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
         <Card className="w-full max-w-sm text-center">
           <CardContent className="pt-6">
-            <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
-              <Check className="w-8 h-8 text-primary" />
-            </div>
+            {playerAvatar ? (
+              playerAvatar.startsWith("/") ? (
+                <img
+                  src={playerAvatar}
+                  alt="Avatar"
+                  className="w-16 h-16 rounded-full object-cover mx-auto mb-4 ring-2 ring-primary"
+                />
+              ) : (
+                <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4 text-4xl">
+                  {playerAvatar}
+                </div>
+              )
+            ) : (
+              <div className="w-16 h-16 rounded-full bg-primary/20 flex items-center justify-center mx-auto mb-4">
+                <Check className="w-8 h-8 text-primary" />
+              </div>
+            )}
             <h2 className="text-2xl font-bold mb-2">You&apos;re In!</h2>
             <p className="text-lg font-medium mb-4">{playerName}</p>
             <p className="text-muted-foreground">
@@ -428,14 +583,22 @@ export default function PlayerGamePage({
                 `}
               >
                 <span className="font-bold w-6 text-center">{index + 1}</span>
-                <Avatar className="w-8 h-8">
-                  <AvatarFallback
-                    style={{ backgroundColor: player.avatarColor }}
-                    className="text-white text-xs"
-                  >
-                    {player.name.charAt(0).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
+                {player.avatarEmoji?.startsWith("/") ? (
+                  <img
+                    src={player.avatarEmoji}
+                    alt={player.name}
+                    className="w-8 h-8 rounded-full object-cover"
+                  />
+                ) : (
+                  <Avatar className="w-8 h-8">
+                    <AvatarFallback
+                      style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
+                      className={player.avatarEmoji ? "text-xl" : "text-white text-xs"}
+                    >
+                      {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                )}
                 <span className={`flex-1 ${isMe ? "font-bold" : ""}`}>
                   {player.name}
                   {isMe && " (You)"}
