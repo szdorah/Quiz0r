@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from "react";
 import { io, Socket } from "socket.io-client";
 import {
   GameState,
-  PlayerInfo,
   QuestionData,
   PlayerScore,
   AnswerStats,
@@ -12,6 +11,12 @@ import {
   ServerToClientEvents,
   ClientToServerEvents,
 } from "@/types";
+
+interface NextQuestionPreview {
+  question: QuestionData;
+  questionNumber: number;
+  totalQuestions: number;
+}
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
@@ -31,6 +36,7 @@ interface UseSocketReturn {
   answerResult: { correct: boolean; points: number; position: number } | null;
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
   playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
+  nextQuestionPreview: NextQuestionPreview | null;
   error: string | null;
   gameCancelled: boolean;
   // Actions
@@ -66,6 +72,7 @@ export function useSocket({
   const [playerAnswers, setPlayerAnswers] = useState<Map<string, PlayerAnswerDetail[]>>(
     new Map()
   );
+  const [nextQuestionPreview, setNextQuestionPreview] = useState<NextQuestionPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [gameCancelled, setGameCancelled] = useState(false);
 
@@ -139,6 +146,7 @@ export function useSocket({
       setTimeRemaining(question.timeLimit);
       setAnswerResult(null);
       setQuestionEnded(null);
+      setNextQuestionPreview(null); // Clear preview when question starts
       // Clear answers for new question (but keep old questions' answers)
       setPlayerAnswers((prev) => {
         const newMap = new Map(prev);
@@ -202,6 +210,10 @@ export function useSocket({
       setGameState(null);
     });
 
+    socket.on("game:nextQuestionPreview", (data) => {
+      setNextQuestionPreview(data);
+    });
+
     socket.on("player:answerResult", (result) => {
       setAnswerResult(result);
     });
@@ -262,6 +274,7 @@ export function useSocket({
     answerResult,
     questionEnded,
     playerAnswers,
+    nextQuestionPreview,
     error,
     gameCancelled,
     startGame,

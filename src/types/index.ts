@@ -117,6 +117,11 @@ export interface ServerToClientEvents {
     winners: PlayerInfo[];
   }) => void;
   "game:cancelled": () => void;
+  "game:nextQuestionPreview": (data: {
+    question: QuestionData;
+    questionNumber: number;
+    totalQuestions: number;
+  } | null) => void;
   "player:answerResult": (data: {
     correct: boolean;
     points: number;

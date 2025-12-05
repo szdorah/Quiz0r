@@ -23,6 +23,7 @@ import {
   FastForward,
   StickyNote,
   X,
+  Eye,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -38,6 +39,7 @@ export default function HostControlPage({
     timeRemaining,
     scores,
     playerAnswers,
+    nextQuestionPreview,
     gameCancelled,
     startGame,
     nextQuestion,
@@ -319,6 +321,33 @@ export default function HostControlPage({
                         <p className="text-amber-900 dark:text-amber-200 text-sm whitespace-pre-wrap">{currentQuestion.hostNotes}</p>
                       </div>
                     )}
+                    {/* Next Question Preview */}
+                    {nextQuestionPreview && (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <p className="font-medium text-blue-800 dark:text-blue-300 text-sm">
+                            Up Next (Q{nextQuestionPreview.questionNumber} of {nextQuestionPreview.totalQuestions})
+                          </p>
+                        </div>
+                        <p className="text-blue-900 dark:text-blue-200">{nextQuestionPreview.question.questionText}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {nextQuestionPreview.question.answers.map((answer, i) => (
+                            <span
+                              key={answer.id}
+                              className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
+                            >
+                              {String.fromCharCode(65 + i)}. {answer.answerText}
+                            </span>
+                          ))}
+                        </div>
+                        {nextQuestionPreview.question.hostNotes && (
+                          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
+                            Notes: {nextQuestionPreview.question.hostNotes}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     <div className="flex gap-4">
                       <Button
                         onClick={showScoreboard}
@@ -341,6 +370,33 @@ export default function HostControlPage({
                     <p className="text-muted-foreground">
                       Showing scoreboard...
                     </p>
+                    {/* Next Question Preview */}
+                    {nextQuestionPreview && (
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                          <p className="font-medium text-blue-800 dark:text-blue-300 text-sm">
+                            Up Next (Q{nextQuestionPreview.questionNumber} of {nextQuestionPreview.totalQuestions})
+                          </p>
+                        </div>
+                        <p className="text-blue-900 dark:text-blue-200">{nextQuestionPreview.question.questionText}</p>
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {nextQuestionPreview.question.answers.map((answer, i) => (
+                            <span
+                              key={answer.id}
+                              className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
+                            >
+                              {String.fromCharCode(65 + i)}. {answer.answerText}
+                            </span>
+                          ))}
+                        </div>
+                        {nextQuestionPreview.question.hostNotes && (
+                          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
+                            Notes: {nextQuestionPreview.question.hostNotes}
+                          </p>
+                        )}
+                      </div>
+                    )}
                     {gameState.currentQuestionIndex <
                     gameState.totalQuestions - 1 ? (
                       <Button onClick={nextQuestion} size="lg" className="w-full">

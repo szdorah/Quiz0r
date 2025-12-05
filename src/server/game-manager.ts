@@ -458,6 +458,27 @@ export class GameManager {
     // Send updated scores
     const scores = await this.getPlayerScores(gameCode);
     this.io.to(`game:${gameCode}`).emit("game:scoreUpdate", { scores });
+
+    // Send next question preview to host
+    this.sendNextQuestionPreview(gameCode);
+  }
+
+  private sendNextQuestionPreview(gameCode: string) {
+    const game = this.activeGames.get(gameCode);
+    if (!game) return;
+
+    const nextIndex = game.currentQuestionIndex + 1;
+    if (nextIndex < game.questions.length) {
+      const nextQuestion = game.questions[nextIndex];
+      this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", {
+        question: nextQuestion,
+        questionNumber: nextIndex + 1,
+        totalQuestions: game.questions.length,
+      });
+    } else {
+      // No more questions
+      this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", null);
+    }
   }
 
   private async handleShowScoreboard(
