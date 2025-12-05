@@ -26,12 +26,17 @@ function isExternalRequest(request: NextRequest): boolean {
   // ngrok adds specific headers and the host will contain ngrok domain
   const isNgrokHost = host.includes("ngrok") ||
                       host.includes("ngrok-free.app") ||
-                      host.includes("ngrok.io");
+                      host.includes("ngrok.io") ||
+                      host.includes("ngrok-free.dev");
 
   const hasNgrokForwardedHost = xForwardedHost.includes("ngrok") ||
                                  xOriginalHost.includes("ngrok");
 
-  // ngrok-skip-browser-warning header is only present on ngrok requests
+  // ngrok-skip-browser-warning header bypasses ngrok's browser warning for API requests
+  // NOTE: This only works for fetch/XHR requests, NOT for initial browser navigation
+  // Users will see the ngrok warning once when first visiting, then ngrok sets a cookie
+  // We add this header to all client-side fetch requests to avoid warnings on API calls
+  // See: src/app/play/[gameCode]/page.tsx and src/app/api/quizzes/[quizId]/export/route.ts
   const hasNgrokSkipHeader = request.headers.get("ngrok-skip-browser-warning") !== null;
 
   // Check if x-forwarded-host contains ngrok (most reliable indicator)

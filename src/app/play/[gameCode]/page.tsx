@@ -37,7 +37,9 @@ export default function PlayerGamePage({
   useEffect(() => {
     async function checkGame() {
       try {
-        const res = await fetch(`/api/games/${gameCode}`);
+        const res = await fetch(`/api/games/${gameCode}`, {
+          headers: { "ngrok-skip-browser-warning": "true" },
+        });
         if (res.ok) {
           const data = await res.json();
           setJoinTheme(data.quizTheme);
@@ -94,6 +96,7 @@ export default function PlayerGamePage({
 
       const res = await fetch("/api/upload", {
         method: "POST",
+        headers: { "ngrok-skip-browser-warning": "true" },
         body: formData,
       });
 
@@ -155,7 +158,10 @@ export default function PlayerGamePage({
     try {
       const res = await fetch(`/api/games/${gameCode}/join`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          "ngrok-skip-browser-warning": "true",
+        },
         body: JSON.stringify({ name, avatarEmoji: avatarImage || selectedEmoji }),
       });
 

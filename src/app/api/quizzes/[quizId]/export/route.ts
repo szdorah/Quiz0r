@@ -147,7 +147,11 @@ async function downloadAndAddImage(
       ? url
       : `${process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000"}${url}`;
 
-    const response = await fetch(absoluteUrl);
+    const response = await fetch(absoluteUrl, {
+      headers: {
+        "ngrok-skip-browser-warning": "true",
+      },
+    });
 
     if (!response.ok) {
       console.warn(`Failed to download image: ${url}`);
