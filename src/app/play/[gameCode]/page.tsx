@@ -26,6 +26,34 @@ export default function PlayerGamePage({
   const [joinError, setJoinError] = useState("");
   const [selectedAnswers, setSelectedAnswers] = useState<Set<string>>(new Set());
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [gameStatus, setGameStatus] = useState<"loading" | "valid" | "not_found" | "ended">("loading");
+
+  // Check if game exists and is joinable on mount
+  useEffect(() => {
+    async function checkGame() {
+      try {
+        const res = await fetch(`/api/games/${gameCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === "WAITING") {
+            setGameStatus("valid");
+          } else if (data.status === "FINISHED") {
+            setGameStatus("ended");
+          } else {
+            // Game is in progress (ACTIVE, QUESTION, REVEALING, SCOREBOARD)
+            setGameStatus("ended");
+          }
+        } else if (res.status === 404) {
+          setGameStatus("not_found");
+        } else {
+          setGameStatus("not_found");
+        }
+      } catch {
+        setGameStatus("not_found");
+      }
+    }
+    checkGame();
+  }, [gameCode]);
 
   // Common emojis for avatar selection
   const avatarEmojis = [
@@ -203,7 +231,61 @@ export default function PlayerGamePage({
     );
   }
 
-  // Not joined yet - show name entry
+  // Loading state while checking game
+  if (!joined && gameStatus === "loading") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="pt-6 text-center">
+            <Loader2 className="w-8 h-8 animate-spin mx-auto mb-4 text-primary" />
+            <p className="text-muted-foreground">Checking game...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Game not found
+  if (!joined && gameStatus === "not_found") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="pt-6 text-center">
+            <X className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-lg font-medium">Game Not Found</p>
+            <p className="text-muted-foreground mt-2">
+              This game code doesn&apos;t exist. Please check the code and try again.
+            </p>
+            <Button onClick={() => router.push("/play")} className="mt-4">
+              Enter Different Code
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Game has ended or is in progress
+  if (!joined && gameStatus === "ended") {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="pt-6 text-center">
+            <X className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-lg font-medium">Game Has Ended</p>
+            <p className="text-muted-foreground mt-2">
+              This game is no longer accepting new players.
+            </p>
+            <Button onClick={() => router.push("/play")} className="mt-4">
+              Join Another Game
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Not joined yet - show name entry (only if game is valid)
   if (!joined) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
