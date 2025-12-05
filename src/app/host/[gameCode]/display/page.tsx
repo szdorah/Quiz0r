@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, Trophy, Medal, Award } from "lucide-react";
+import { Check, Trophy, Medal, Award, Layers } from "lucide-react";
 
 export default function HostDisplayPage({
   params,
@@ -177,6 +177,34 @@ export default function HostDisplayPage({
               )}
             </div>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Section View
+  if (gameState.status === "SECTION" && currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-8">
+        <div className="max-w-4xl mx-auto text-center text-white">
+          <div className="mb-8">
+            <Layers className="w-16 h-16 mx-auto mb-4 opacity-80" />
+          </div>
+          <h1 className="text-5xl font-bold mb-6">
+            {currentQuestion.questionText}
+          </h1>
+          {currentQuestion.hostNotes && (
+            <p className="text-2xl opacity-90 mb-8">
+              {currentQuestion.hostNotes}
+            </p>
+          )}
+          {currentQuestion.imageUrl && (
+            <img
+              src={currentQuestion.imageUrl}
+              alt="Section"
+              className="max-h-80 mx-auto rounded-xl shadow-2xl"
+            />
+          )}
         </div>
       </div>
     );

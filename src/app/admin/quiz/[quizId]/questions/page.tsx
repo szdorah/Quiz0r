@@ -40,6 +40,7 @@ import {
   Image,
   Upload,
   Loader2,
+  Layers,
 } from "lucide-react";
 
 interface Answer {
@@ -77,6 +78,7 @@ export default function QuestionsPage({
   const [quiz, setQuiz] = useState<Quiz | null>(null);
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
 
   // Form state
@@ -145,7 +147,67 @@ export default function QuestionsPage({
         isCorrect: a.isCorrect,
       }))
     );
-    setDialogOpen(true);
+    // Open the appropriate dialog based on type
+    if (question.questionType === "SECTION") {
+      setSectionDialogOpen(true);
+    } else {
+      setDialogOpen(true);
+    }
+  }
+
+  function openSectionDialog() {
+    resetForm();
+    setQuestionType("SECTION");
+    setSectionDialogOpen(true);
+  }
+
+  async function saveSection() {
+    if (!questionText.trim()) {
+      alert("Section title is required");
+      return;
+    }
+
+    const sectionData = {
+      questionText,
+      imageUrl: imageUrl || null,
+      hostNotes: hostNotes || null,
+      questionType: "SECTION",
+      timeLimit: 0,
+      points: 0,
+      answers: [],
+    };
+
+    try {
+      let res;
+      if (editingQuestion) {
+        res = await fetch(
+          `/api/quizzes/${quizId}/questions/${editingQuestion.id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(sectionData),
+          }
+        );
+      } else {
+        res = await fetch(`/api/quizzes/${quizId}/questions`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sectionData),
+        });
+      }
+
+      if (res.ok) {
+        setSectionDialogOpen(false);
+        resetForm();
+        fetchQuiz();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to save section");
+      }
+    } catch (error) {
+      console.error("Failed to save section:", error);
+      alert("Failed to save section");
+    }
   }
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
@@ -212,6 +274,7 @@ export default function QuestionsPage({
     }
 
     const validAnswers = answers.filter((a) => a.answerText.trim());
+
     if (validAnswers.length < 2) {
       alert("At least 2 answers are required");
       return;
@@ -323,6 +386,10 @@ export default function QuestionsPage({
               Play
             </Button>
           </Link>
+          <Button variant="outline" onClick={openSectionDialog}>
+            <Layers className="w-4 h-4 mr-2" />
+            Add Section
+          </Button>
           <Dialog
             open={dialogOpen}
             onOpenChange={(open) => {
@@ -339,7 +406,7 @@ export default function QuestionsPage({
             <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle>
-                  {editingQuestion ? "Edit Question" : "Add Question"}
+                  {editingQuestion ? "Edit" : "Add"} Question
                 </DialogTitle>
                 <DialogDescription>
                   Create a multiple choice question with 2-6 answer options.
@@ -444,20 +511,22 @@ export default function QuestionsPage({
                   </p>
                 </div>
 
-                {/* Question Type & Settings */}
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={questionType} onValueChange={setQuestionType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="SINGLE_SELECT">Single Select</SelectItem>
-                        <SelectItem value="MULTI_SELECT">Multi Select</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                {/* Type Selection */}
+                <div className="space-y-2">
+                  <Label>Type</Label>
+                  <Select value={questionType} onValueChange={setQuestionType}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="SINGLE_SELECT">Single Select</SelectItem>
+                      <SelectItem value="MULTI_SELECT">Multi Select</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {/* Time & Points Settings */}
+                <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label htmlFor="timeLimit">Time (seconds)</Label>
                     <Input
@@ -571,6 +640,138 @@ export default function QuestionsPage({
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Section Dialog */}
+          <Dialog
+            open={sectionDialogOpen}
+            onOpenChange={(open) => {
+              setSectionDialogOpen(open);
+              if (!open) resetForm();
+            }}
+          >
+            <DialogContent className="max-w-lg">
+              <DialogHeader>
+                <DialogTitle>
+                  {editingQuestion ? "Edit" : "Add"} Section
+                </DialogTitle>
+                <DialogDescription>
+                  Add a section divider to introduce a new topic or group of questions.
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="space-y-4 py-4">
+                {/* Section Title */}
+                <div className="space-y-2">
+                  <Label htmlFor="sectionTitle">Section Title</Label>
+                  <Input
+                    id="sectionTitle"
+                    placeholder="Enter section title..."
+                    value={questionText}
+                    onChange={(e) => setQuestionText(e.target.value)}
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-2">
+                  <Label htmlFor="sectionDescription">Description (optional)</Label>
+                  <Textarea
+                    id="sectionDescription"
+                    placeholder="Optional description or subtitle for this section..."
+                    value={hostNotes}
+                    onChange={(e) => setHostNotes(e.target.value)}
+                    rows={2}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    This description will be shown on the section slide.
+                  </p>
+                </div>
+
+                {/* Image Upload */}
+                <div className="space-y-2">
+                  <Label>
+                    <Image className="w-4 h-4 inline mr-2" />
+                    Image (optional)
+                  </Label>
+
+                  {imageUrl ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={imageUrl}
+                        alt="Section"
+                        className="max-h-40 rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={removeImage}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        id="sectionImageUpload"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1 h-20"
+                        onClick={() => document.getElementById('sectionImageUpload')?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <div className="flex flex-col items-center text-muted-foreground">
+                            <Loader2 className="w-5 h-5 animate-spin mb-1" />
+                            <span className="text-sm">Uploading...</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center text-muted-foreground">
+                            <Upload className="w-5 h-5 mb-1" />
+                            <span className="text-sm">Click to upload</span>
+                          </div>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-muted-foreground">Or paste URL:</span>
+                    <Input
+                      placeholder="https://example.com/image.jpg"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Actions */}
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setSectionDialogOpen(false);
+                      resetForm();
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                  <Button onClick={saveSection}>
+                    {editingQuestion ? "Save Changes" : "Add Section"}
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
@@ -587,78 +788,111 @@ export default function QuestionsPage({
         </Card>
       ) : (
         <div className="space-y-3">
-          {quiz.questions.map((question, index) => (
-            <Card key={question.id} className="group">
-              <CardHeader className="pb-2">
-                <div className="flex items-start gap-4">
-                  <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary/10 text-primary font-semibold text-sm">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base font-medium">
-                      {question.questionText}
-                    </CardTitle>
-                    <CardDescription className="flex items-center gap-3 mt-1">
-                      <span>
-                        {question.questionType === "MULTI_SELECT"
-                          ? "Multi Select"
-                          : "Single Select"}
-                      </span>
-                      <span>•</span>
-                      <span>{question.timeLimit}s</span>
-                      <span>•</span>
-                      <span>{question.points} pts</span>
-                      {question.imageUrl && (
-                        <>
-                          <span>•</span>
-                          <span className="flex items-center">
-                            <Image className="w-3 h-3 mr-1" />
-                            Image
-                          </span>
-                        </>
-                      )}
-                    </CardDescription>
-                  </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => openEditDialog(question)}
-                    >
-                      Edit
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteQuestion(question.id)}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </Button>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="pt-0 pl-16">
-                <div className="flex flex-wrap gap-2">
-                  {question.answers.map((answer, aIndex) => (
+          {quiz.questions.map((question, index) => {
+            const isSection = question.questionType === "SECTION";
+            // Count only questions (not sections) up to this index
+            const questionNumber = quiz.questions
+              .slice(0, index + 1)
+              .filter((q) => q.questionType !== "SECTION").length;
+
+            return (
+              <Card
+                key={question.id}
+                className={`group ${isSection ? "border-primary/50 bg-primary/5" : ""}`}
+              >
+                <CardHeader className="pb-2">
+                  <div className="flex items-start gap-4">
                     <div
-                      key={aIndex}
-                      className={`text-sm px-3 py-1 rounded-full ${
-                        answer.isCorrect
-                          ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                          : "bg-muted text-muted-foreground"
+                      className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
+                        isSection
+                          ? "bg-primary text-primary-foreground"
+                          : "bg-primary/10 text-primary"
                       }`}
                     >
-                      {answer.isCorrect && (
-                        <Check className="w-3 h-3 inline mr-1" />
-                      )}
-                      {answer.answerText}
+                      {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                    <div className="flex-1 min-w-0">
+                      <CardTitle className="text-base font-medium">
+                        {question.questionText}
+                      </CardTitle>
+                      <CardDescription className="flex items-center gap-3 mt-1">
+                        {isSection ? (
+                          <>
+                            <span className="text-primary font-medium">Section</span>
+                            {question.hostNotes && (
+                              <>
+                                <span>•</span>
+                                <span className="truncate max-w-[200px]">{question.hostNotes}</span>
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <>
+                            <span>
+                              {question.questionType === "MULTI_SELECT"
+                                ? "Multi Select"
+                                : "Single Select"}
+                            </span>
+                            <span>•</span>
+                            <span>{question.timeLimit}s</span>
+                            <span>•</span>
+                            <span>{question.points} pts</span>
+                          </>
+                        )}
+                        {question.imageUrl && (
+                          <>
+                            <span>•</span>
+                            <span className="flex items-center">
+                              <Image className="w-3 h-3 mr-1" />
+                              Image
+                            </span>
+                          </>
+                        )}
+                      </CardDescription>
+                    </div>
+                    <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => openEditDialog(question)}
+                      >
+                        Edit
+                      </Button>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => deleteQuestion(question.id)}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                {!isSection && question.answers.length > 0 && (
+                  <CardContent className="pt-0 pl-16">
+                    <div className="flex flex-wrap gap-2">
+                      {question.answers.map((answer, aIndex) => (
+                        <div
+                          key={aIndex}
+                          className={`text-sm px-3 py-1 rounded-full ${
+                            answer.isCorrect
+                              ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
+                              : "bg-muted text-muted-foreground"
+                          }`}
+                        >
+                          {answer.isCorrect && (
+                            <Check className="w-3 h-3 inline mr-1" />
+                          )}
+                          {answer.answerText}
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>

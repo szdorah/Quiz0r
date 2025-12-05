@@ -2,6 +2,7 @@
 export const QuestionType = {
   SINGLE_SELECT: "SINGLE_SELECT",
   MULTI_SELECT: "MULTI_SELECT",
+  SECTION: "SECTION",
 } as const;
 
 export type QuestionType = (typeof QuestionType)[keyof typeof QuestionType];
@@ -11,6 +12,7 @@ export const GameStatus = {
   WAITING: "WAITING",
   ACTIVE: "ACTIVE",
   QUESTION: "QUESTION",
+  SECTION: "SECTION",
   REVEALING: "REVEALING",
   SCOREBOARD: "SCOREBOARD",
   FINISHED: "FINISHED",

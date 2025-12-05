@@ -52,7 +52,9 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       );
     }
 
-    if (!Array.isArray(answers) || answers.length < 2) {
+    // Sections don't require answers, but regular questions do
+    const isSection = questionType === "SECTION";
+    if (!isSection && (!Array.isArray(answers) || answers.length < 2)) {
       return NextResponse.json(
         { error: "At least 2 answers are required" },
         { status: 400 }

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers } from "lucide-react";
 
 export default function PlayerGamePage({
   params,
@@ -469,6 +469,35 @@ export default function PlayerGamePage({
             </div>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  // Section view - players just see the section slide
+  if (gameState.status === "SECTION" && currentQuestion) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-indigo-600 to-purple-700 flex items-center justify-center p-4">
+        <div className="text-center text-white">
+          <Layers className="w-12 h-12 mx-auto mb-4 opacity-80" />
+          <h1 className="text-3xl font-bold mb-4">
+            {currentQuestion.questionText}
+          </h1>
+          {currentQuestion.hostNotes && (
+            <p className="text-lg opacity-90 mb-6">
+              {currentQuestion.hostNotes}
+            </p>
+          )}
+          {currentQuestion.imageUrl && (
+            <img
+              src={currentQuestion.imageUrl}
+              alt="Section"
+              className="max-h-48 mx-auto rounded-xl shadow-lg mb-6"
+            />
+          )}
+          <p className="text-sm opacity-70">
+            Waiting for host to continue...
+          </p>
+        </div>
       </div>
     );
   }

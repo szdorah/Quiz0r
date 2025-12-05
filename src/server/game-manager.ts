@@ -257,6 +257,7 @@ export class GameManager {
     // Clear any existing timer
     if (game.timerInterval) {
       clearInterval(game.timerInterval);
+      game.timerInterval = null;
     }
 
     game.currentQuestionIndex++;
@@ -268,36 +269,45 @@ export class GameManager {
     }
 
     const question = game.questions[game.currentQuestionIndex];
-    game.status = "QUESTION";
-    game.questionStartedAt = Date.now();
-    game.playerAnswers.set(question.id, new Set());
+    const isSection = question.questionType === "SECTION";
+
+    // For sections, use a special status; for questions, use QUESTION
+    game.status = isSection ? "SECTION" : "QUESTION";
+    game.questionStartedAt = isSection ? null : Date.now();
+
+    if (!isSection) {
+      game.playerAnswers.set(question.id, new Set());
+    }
 
     // Update database
     await prisma.gameSession.update({
       where: { gameCode },
       data: {
-        status: "QUESTION",
+        status: isSection ? "SECTION" : "QUESTION",
         currentQuestionIndex: game.currentQuestionIndex,
-        questionStartedAt: new Date(),
+        questionStartedAt: isSection ? null : new Date(),
       },
     });
 
-    // Send question to all clients
+    // Send question/section to all clients
     this.io.to(`game:${gameCode}`).emit("game:questionStart", {
       question,
       startTime: game.questionStartedAt,
     });
 
-    // Start timer
-    let remaining = question.timeLimit;
-    game.timerInterval = setInterval(() => {
-      remaining--;
-      this.io.to(`game:${gameCode}`).emit("game:timerTick", { remaining });
+    // Only start timer for actual questions, not sections
+    if (!isSection) {
+      let remaining = question.timeLimit;
+      game.timerInterval = setInterval(() => {
+        remaining--;
+        this.io.to(`game:${gameCode}`).emit("game:timerTick", { remaining });
 
-      if (remaining <= 0) {
-        this.endQuestion(gameCode);
-      }
-    }, 1000);
+        if (remaining <= 0) {
+          this.endQuestion(gameCode);
+        }
+      }, 1000);
+    }
+    // For sections, host will manually call nextQuestion to advance
   }
 
   private async handlePlayerAnswer(

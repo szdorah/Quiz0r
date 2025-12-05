@@ -24,6 +24,7 @@ import {
   StickyNote,
   X,
   Eye,
+  Layers,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -136,6 +137,7 @@ export default function HostControlPage({
     WAITING: "bg-yellow-500",
     ACTIVE: "bg-blue-500",
     QUESTION: "bg-green-500",
+    SECTION: "bg-indigo-500",
     REVEALING: "bg-purple-500",
     SCOREBOARD: "bg-orange-500",
     FINISHED: "bg-gray-500",
@@ -304,6 +306,41 @@ export default function HostControlPage({
                           </Button>
                         )}
                     </div>
+                  </div>
+                )}
+
+                {gameState.status === "SECTION" && (
+                  <div className="space-y-4">
+                    <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 rounded-lg">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Layers className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        <p className="font-medium text-indigo-800 dark:text-indigo-300">Section</p>
+                      </div>
+                      <p className="text-xl font-bold text-indigo-900 dark:text-indigo-100">
+                        {currentQuestion?.questionText}
+                      </p>
+                      {currentQuestion?.hostNotes && (
+                        <p className="text-indigo-700 dark:text-indigo-300 mt-2">
+                          {currentQuestion.hostNotes}
+                        </p>
+                      )}
+                    </div>
+                    {currentQuestion?.imageUrl && (
+                      <div className="rounded-lg overflow-hidden border">
+                        <img
+                          src={currentQuestion.imageUrl}
+                          alt="Section"
+                          className="max-h-48 mx-auto"
+                        />
+                      </div>
+                    )}
+                    <p className="text-sm text-muted-foreground">
+                      Players are seeing this section slide. Click &quot;Continue&quot; when ready to proceed.
+                    </p>
+                    <Button onClick={nextQuestion} size="lg" className="w-full">
+                      <SkipForward className="w-4 h-4 mr-2" />
+                      Continue
+                    </Button>
                   </div>
                 )}
 

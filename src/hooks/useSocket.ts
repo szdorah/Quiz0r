@@ -153,8 +153,10 @@ export function useSocket({
         newMap.set(question.id, []);
         return newMap;
       });
+      // Use SECTION status for sections, QUESTION for questions
+      const isSection = question.questionType === "SECTION";
       setGameState((prev) =>
-        prev ? { ...prev, status: "QUESTION", currentQuestion: question } : prev
+        prev ? { ...prev, status: isSection ? "SECTION" : "QUESTION", currentQuestion: question } : prev
       );
     });
 
