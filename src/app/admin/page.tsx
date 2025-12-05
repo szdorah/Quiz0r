@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Pencil, Trash2, Play } from "lucide-react";
+import { Plus, Pencil, Trash2, Play, Upload } from "lucide-react";
+import { toast } from "sonner";
 
 interface Quiz {
   id: string;
@@ -24,6 +25,8 @@ interface Quiz {
 export default function AdminDashboard() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
+  const [importing, setImporting] = useState(false);
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchQuizzes();
@@ -58,6 +61,40 @@ export default function AdminDashboard() {
     }
   }
 
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/quizzes/import", {
+        method: "POST",
+        body: formData,
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(data.message);
+        // Refresh the quiz list
+        fetchQuizzes();
+      } else {
+        toast.error(data.error || "Failed to import quiz");
+      }
+    } catch (error) {
+      console.error("Import error:", error);
+      toast.error("Failed to import quiz");
+    } finally {
+      setImporting(false);
+      if (importFileRef.current) {
+        importFileRef.current.value = "";
+      }
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -76,12 +113,30 @@ export default function AdminDashboard() {
             Create and manage your quiz collection
           </p>
         </div>
-        <Link href="/admin/quiz/new">
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Quiz
+        <div className="flex gap-2">
+          <input
+            ref={importFileRef}
+            type="file"
+            accept=".zip"
+            className="hidden"
+            onChange={handleImport}
+            disabled={importing}
+          />
+          <Button
+            variant="outline"
+            onClick={() => importFileRef.current?.click()}
+            disabled={importing}
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            {importing ? "Importing..." : "Import Quiz"}
           </Button>
-        </Link>
+          <Link href="/admin/quiz/new">
+            <Button>
+              <Plus className="w-4 h-4 mr-2" />
+              Create Quiz
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Quiz Grid */}

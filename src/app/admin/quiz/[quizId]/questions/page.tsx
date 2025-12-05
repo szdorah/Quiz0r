@@ -42,6 +42,7 @@ import {
   Loader2,
   Layers,
   Palette,
+  Download,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -341,6 +342,9 @@ export default function QuestionsPage({
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Export state
+  const [exporting, setExporting] = useState(false);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -389,6 +393,37 @@ export default function QuestionsPage({
       console.error("Failed to fetch quiz:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleExport() {
+    if (!quiz) return;
+
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/export`);
+
+      if (!res.ok) {
+        const data = await res.json();
+        alert(data.error || "Failed to export quiz");
+        return;
+      }
+
+      // Download the ZIP file
+      const blob = await res.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${quiz.title.replace(/[^a-z0-9_-]/gi, "_")}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error("Export error:", error);
+      alert("Failed to export quiz");
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -784,6 +819,10 @@ export default function QuestionsPage({
               Theme
             </Button>
           </Link>
+          <Button variant="outline" onClick={handleExport} disabled={exporting || !quiz}>
+            <Download className="w-4 h-4 mr-2" />
+            {exporting ? "Exporting..." : "Export"}
+          </Button>
           <Button variant="outline" onClick={openSectionDialog}>
             <Layers className="w-4 h-4 mr-2" />
             Add Section

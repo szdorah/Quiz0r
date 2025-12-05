@@ -1,0 +1,170 @@
+/**
+ * Quiz Import API
+ * Imports a quiz from a ZIP file containing quiz.json and images
+ */
+
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "@/lib/db";
+import JSZip from "jszip";
+import { writeFile, mkdir } from "fs/promises";
+import { existsSync } from "fs";
+import path from "path";
+import { randomUUID } from "crypto";
+import { ExportedQuiz } from "@/types/export";
+import { sanitizeQuizData } from "@/lib/sanitize";
+import { validateQuizStructure } from "@/lib/validate-import";
+
+export async function POST(request: NextRequest) {
+  try {
+    // 1. Parse uploaded file
+    const formData = await request.formData();
+    const file = formData.get("file") as File | null;
+
+    if (!file) {
+      return NextResponse.json(
+        { error: "No file provided" },
+        { status: 400 }
+      );
+    }
+
+    // Validate file type
+    if (!file.name.endsWith(".zip")) {
+      return NextResponse.json(
+        { error: "Invalid file type. Please upload a .zip file" },
+        { status: 400 }
+      );
+    }
+
+    // Validate file size (max 50MB)
+    const maxSize = 50 * 1024 * 1024;
+    if (file.size > maxSize) {
+      return NextResponse.json(
+        { error: "File too large. Maximum size is 50MB" },
+        { status: 400 }
+      );
+    }
+
+    // 2. Parse ZIP file
+    const arrayBuffer = await file.arrayBuffer();
+    const zip = await JSZip.loadAsync(arrayBuffer);
+
+    // 3. Extract and validate quiz.json
+    const quizJsonFile = zip.file("quiz.json");
+    if (!quizJsonFile) {
+      return NextResponse.json(
+        { error: "Invalid quiz file: missing quiz.json" },
+        { status: 400 }
+      );
+    }
+
+    const quizJsonContent = await quizJsonFile.async("string");
+    let quizData: ExportedQuiz;
+
+    try {
+      quizData = JSON.parse(quizJsonContent);
+    } catch {
+      return NextResponse.json(
+        { error: "Invalid quiz file: quiz.json is not valid JSON" },
+        { status: 400 }
+      );
+    }
+
+    // 4. Validate structure
+    const validation = validateQuizStructure(quizData);
+    if (!validation.valid) {
+      return NextResponse.json(
+        { error: `Validation failed: ${validation.error}` },
+        { status: 400 }
+      );
+    }
+
+    // 5. Sanitize all text fields
+    const sanitizedData = sanitizeQuizData(quizData);
+
+    // 6. Upload images and create mapping
+    const imageMapping = new Map<string, string>(); // ref -> new URL
+    const imageFiles = Object.keys(zip.files).filter(f => f.startsWith("images/") && !zip.files[f].dir);
+
+    for (const imagePath of imageFiles) {
+      const imageFile = zip.file(imagePath);
+      if (!imageFile) continue;
+
+      try {
+        const imageBuffer = await imageFile.async("nodebuffer");
+        const newUrl = await uploadImageToStorage(imageBuffer, imagePath);
+        imageMapping.set(imagePath, newUrl);
+      } catch (error) {
+        console.warn(`Failed to upload image ${imagePath}:`, error);
+        // Continue - image will be null in quiz
+      }
+    }
+
+    // 7. Create new quiz in database
+    const newQuiz = await prisma.quiz.create({
+      data: {
+        title: sanitizedData.title,
+        description: sanitizedData.description,
+        theme: sanitizedData.theme,
+        questions: {
+          create: sanitizedData.questions.map((q) => ({
+            questionText: q.questionText,
+            imageUrl: q.imageRef ? imageMapping.get(q.imageRef) || null : null,
+            hostNotes: q.hostNotes,
+            questionType: q.questionType,
+            timeLimit: q.timeLimit,
+            points: q.points,
+            orderIndex: q.orderIndex,
+            answers: {
+              create: q.answers.map((a) => ({
+                answerText: a.answerText,
+                imageUrl: a.imageRef ? imageMapping.get(a.imageRef) || null : null,
+                isCorrect: a.isCorrect,
+                orderIndex: a.orderIndex,
+              })),
+            },
+          })),
+        },
+      },
+      include: {
+        questions: {
+          include: {
+            answers: true,
+          },
+        },
+      },
+    });
+
+    return NextResponse.json({
+      success: true,
+      quizId: newQuiz.id,
+      message: `Quiz "${newQuiz.title}" imported successfully`,
+    });
+  } catch (error) {
+    console.error("Import error:", error);
+    return NextResponse.json(
+      { error: "Failed to import quiz" },
+      { status: 500 }
+    );
+  }
+}
+
+// Helper: Upload image buffer to storage
+async function uploadImageToStorage(
+  buffer: Buffer,
+  originalPath: string
+): Promise<string> {
+  const uploadsDir = path.join(process.cwd(), "public", "uploads");
+
+  if (!existsSync(uploadsDir)) {
+    await mkdir(uploadsDir, { recursive: true });
+  }
+
+  // Get extension from original path
+  const ext = path.extname(originalPath) || ".jpg";
+  const filename = `${randomUUID()}${ext}`;
+  const filepath = path.join(uploadsDir, filename);
+
+  await writeFile(filepath, buffer);
+
+  return `/uploads/${filename}`;
+}
