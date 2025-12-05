@@ -38,6 +38,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const {
       questionText,
       imageUrl,
+      hostNotes,
       questionType = "SINGLE_SELECT",
       timeLimit = 30,
       points = 100,
@@ -71,6 +72,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         quizId,
         questionText: questionText.trim(),
         imageUrl: imageUrl?.trim() || null,
+        hostNotes: hostNotes?.trim() || null,
         questionType,
         timeLimit,
         points,

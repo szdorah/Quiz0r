@@ -13,6 +13,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     const {
       questionText,
       imageUrl,
+      hostNotes,
       questionType,
       timeLimit,
       points,
@@ -25,6 +26,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (questionText !== undefined)
       updateData.questionText = questionText.trim();
     if (imageUrl !== undefined) updateData.imageUrl = imageUrl?.trim() || null;
+    if (hostNotes !== undefined) updateData.hostNotes = hostNotes?.trim() || null;
     if (questionType !== undefined) updateData.questionType = questionType;
     if (timeLimit !== undefined) updateData.timeLimit = timeLimit;
     if (points !== undefined) updateData.points = points;

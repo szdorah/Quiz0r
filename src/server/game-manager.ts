@@ -190,6 +190,7 @@ export class GameManager {
         id: q.id,
         questionText: q.questionText,
         imageUrl: q.imageUrl,
+        hostNotes: q.hostNotes,
         questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT",
         timeLimit: q.timeLimit,
         points: q.points,

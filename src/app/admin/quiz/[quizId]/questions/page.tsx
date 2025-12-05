@@ -53,6 +53,7 @@ interface Question {
   id: string;
   questionText: string;
   imageUrl?: string | null;
+  hostNotes?: string | null;
   questionType: string;
   timeLimit: number;
   points: number;
@@ -81,6 +82,7 @@ export default function QuestionsPage({
   // Form state
   const [questionText, setQuestionText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [hostNotes, setHostNotes] = useState("");
   const [questionType, setQuestionType] = useState("SINGLE_SELECT");
   const [timeLimit, setTimeLimit] = useState(30);
   const [points, setPoints] = useState(100);
@@ -115,6 +117,7 @@ export default function QuestionsPage({
   function resetForm() {
     setQuestionText("");
     setImageUrl("");
+    setHostNotes("");
     setQuestionType("SINGLE_SELECT");
     setTimeLimit(30);
     setPoints(100);
@@ -131,6 +134,7 @@ export default function QuestionsPage({
     setEditingQuestion(question);
     setQuestionText(question.questionText);
     setImageUrl(question.imageUrl || "");
+    setHostNotes(question.hostNotes || "");
     setQuestionType(question.questionType);
     setTimeLimit(question.timeLimit);
     setPoints(question.points);
@@ -221,6 +225,7 @@ export default function QuestionsPage({
     const questionData = {
       questionText,
       imageUrl: imageUrl || null,
+      hostNotes: hostNotes || null,
       questionType,
       timeLimit,
       points,
@@ -421,6 +426,22 @@ export default function QuestionsPage({
                       className="flex-1 h-8 text-sm"
                     />
                   </div>
+                </div>
+
+                {/* Host Notes */}
+                <div className="space-y-2">
+                  <Label htmlFor="hostNotes">Host Notes (optional)</Label>
+                  <Textarea
+                    id="hostNotes"
+                    placeholder="Notes visible only to the host during the quiz (e.g., talking points, fun facts, additional context)..."
+                    value={hostNotes}
+                    onChange={(e) => setHostNotes(e.target.value)}
+                    rows={2}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    These notes are shown to the host in the control panel during the question and when revealing answers.
+                  </p>
                 </div>
 
                 {/* Question Type & Settings */}

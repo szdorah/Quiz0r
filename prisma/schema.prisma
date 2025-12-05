@@ -29,6 +29,7 @@ model Question {
 
   questionText String
   imageUrl     String?
+  hostNotes    String?
   questionType String   @default("SINGLE_SELECT")
   timeLimit    Int      @default(30)
   points       Int      @default(100)

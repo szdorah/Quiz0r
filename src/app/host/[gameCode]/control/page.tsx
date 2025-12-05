@@ -21,6 +21,7 @@ import {
   CheckCircle2,
   XCircle,
   FastForward,
+  StickyNote,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -252,6 +253,15 @@ export default function HostControlPage({
                         {currentQuestion?.timeLimit}s
                       </p>
                     </div>
+                    {currentQuestion?.hostNotes && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <StickyNote className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          <p className="font-medium text-amber-800 dark:text-amber-300 text-sm">Host Notes</p>
+                        </div>
+                        <p className="text-amber-900 dark:text-amber-200 text-sm whitespace-pre-wrap">{currentQuestion.hostNotes}</p>
+                      </div>
+                    )}
                     <div className="flex items-center justify-between">
                       <div className="text-sm text-muted-foreground">
                         {gameState.players.filter((p) => p.hasAnswered).length} of{" "}
@@ -274,6 +284,15 @@ export default function HostControlPage({
                     <p className="text-muted-foreground">
                       Showing correct answer...
                     </p>
+                    {currentQuestion?.hostNotes && (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <div className="flex items-center gap-2 mb-2">
+                          <StickyNote className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                          <p className="font-medium text-amber-800 dark:text-amber-300 text-sm">Host Notes</p>
+                        </div>
+                        <p className="text-amber-900 dark:text-amber-200 text-sm whitespace-pre-wrap">{currentQuestion.hostNotes}</p>
+                      </div>
+                    )}
                     <div className="flex gap-4">
                       <Button
                         onClick={showScoreboard}

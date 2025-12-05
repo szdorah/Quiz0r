@@ -44,6 +44,7 @@ export interface QuestionData {
   id: string;
   questionText: string;
   imageUrl?: string | null;
+  hostNotes?: string | null;
   questionType: QuestionType;
   timeLimit: number;
   points: number;
