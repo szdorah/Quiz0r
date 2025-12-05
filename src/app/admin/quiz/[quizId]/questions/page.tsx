@@ -38,6 +38,8 @@ import {
   X,
   Play,
   Image,
+  Upload,
+  Loader2,
 } from "lucide-react";
 
 interface Answer {
@@ -88,6 +90,7 @@ export default function QuestionsPage({
     { answerText: "", isCorrect: false },
     { answerText: "", isCorrect: false },
   ]);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     fetchQuiz();
@@ -138,6 +141,39 @@ export default function QuestionsPage({
       }))
     );
     setDialogOpen(true);
+  }
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+
+      const res = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setImageUrl(data.url);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to upload image");
+      }
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Failed to upload image");
+    } finally {
+      setUploading(false);
+    }
+  }
+
+  function removeImage() {
+    setImageUrl("");
   }
 
   function addAnswer() {
@@ -317,18 +353,68 @@ export default function QuestionsPage({
                   />
                 </div>
 
-                {/* Image URL */}
+                {/* Image Upload */}
                 <div className="space-y-2">
-                  <Label htmlFor="imageUrl">
+                  <Label>
                     <Image className="w-4 h-4 inline mr-2" />
-                    Image URL (optional)
+                    Image (optional)
                   </Label>
-                  <Input
-                    id="imageUrl"
-                    placeholder="https://example.com/image.jpg"
-                    value={imageUrl}
-                    onChange={(e) => setImageUrl(e.target.value)}
-                  />
+
+                  {imageUrl ? (
+                    <div className="relative inline-block">
+                      <img
+                        src={imageUrl}
+                        alt="Question"
+                        className="max-h-40 rounded-lg border"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute top-2 right-2"
+                        onClick={removeImage}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <label className="flex-1">
+                        <div className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
+                          {uploading ? (
+                            <div className="flex flex-col items-center text-muted-foreground">
+                              <Loader2 className="w-8 h-8 animate-spin mb-2" />
+                              <span className="text-sm">Uploading...</span>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center text-muted-foreground">
+                              <Upload className="w-8 h-8 mb-2" />
+                              <span className="text-sm">Click to upload image</span>
+                              <span className="text-xs">JPEG, PNG, GIF, WebP (max 5MB)</span>
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp"
+                          className="hidden"
+                          onChange={handleImageUpload}
+                          disabled={uploading}
+                        />
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Or use URL */}
+                  <div className="flex items-center gap-2 pt-2">
+                    <span className="text-xs text-muted-foreground">Or paste URL:</span>
+                    <Input
+                      placeholder="https://example.com/image.jpg"
+                      value={imageUrl}
+                      onChange={(e) => setImageUrl(e.target.value)}
+                      className="flex-1 h-8 text-sm"
+                    />
+                  </div>
                 </div>
 
                 {/* Question Type & Settings */}
