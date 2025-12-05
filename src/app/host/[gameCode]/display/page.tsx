@@ -73,7 +73,15 @@ export default function HostDisplayPage({
     timeRemaining,
     scores,
     questionEnded,
+    gameCancelled,
   } = useSocket({ gameCode, role: "host" });
+
+  // Close window when game is cancelled
+  useEffect(() => {
+    if (gameCancelled) {
+      window.close();
+    }
+  }, [gameCancelled]);
 
   if (!connected) {
     return (

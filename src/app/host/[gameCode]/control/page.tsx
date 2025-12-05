@@ -22,6 +22,7 @@ import {
   XCircle,
   FastForward,
   StickyNote,
+  X,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -37,11 +38,13 @@ export default function HostControlPage({
     timeRemaining,
     scores,
     playerAnswers,
+    gameCancelled,
     startGame,
     nextQuestion,
     showScoreboard,
     endGame,
     skipTimer,
+    cancelGame,
   } = useSocket({ gameCode, role: "host" });
 
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
@@ -92,6 +95,21 @@ export default function HostControlPage({
           <div className="animate-pulse text-xl font-bold text-primary">
             Connecting to game...
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (gameCancelled) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-xl font-bold text-muted-foreground">
+            Game Cancelled
+          </div>
+          <Link href="/host">
+            <Button>Back to Host</Button>
+          </Link>
         </div>
       </div>
     );
@@ -236,6 +254,14 @@ export default function HostControlPage({
                     >
                       <Play className="w-4 h-4 mr-2" />
                       Start Game
+                    </Button>
+                    <Button
+                      onClick={cancelGame}
+                      variant="ghost"
+                      className="w-full text-destructive hover:text-destructive"
+                    >
+                      <X className="w-4 h-4 mr-2" />
+                      Cancel Game
                     </Button>
                   </div>
                 )}

@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Image as ImageIcon } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload } from "lucide-react";
 
 export default function PlayerGamePage({
   params,
@@ -87,6 +87,7 @@ export default function PlayerGamePage({
     answerResult,
     questionEnded,
     error,
+    gameCancelled,
     submitAnswer,
   } = useSocket({
     gameCode,
@@ -165,6 +166,24 @@ export default function PlayerGamePage({
     if (!currentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
     submitAnswer(currentQuestion.id, Array.from(selectedAnswers));
     setHasSubmitted(true);
+  }
+
+  // Game cancelled state
+  if (gameCancelled) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm">
+          <CardContent className="pt-6 text-center">
+            <X className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <p className="text-lg font-medium">Game Cancelled</p>
+            <p className="text-muted-foreground mt-2">The host has cancelled this game.</p>
+            <Button onClick={() => router.push("/play")} className="mt-4">
+              Join Another Game
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
   }
 
   // Error state

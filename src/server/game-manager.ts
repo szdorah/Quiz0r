@@ -53,6 +53,7 @@ export class GameManager {
     socket.on("host:showScoreboard", (data) => this.handleShowScoreboard(socket, data));
     socket.on("host:endGame", (data) => this.handleEndGame(socket, data));
     socket.on("host:skipTimer", (data) => this.handleSkipTimer(socket, data));
+    socket.on("host:cancelGame", (data) => this.handleCancelGame(socket, data));
 
     // Player events
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
@@ -525,6 +526,50 @@ export class GameManager {
 
     // Clean up
     this.activeGames.delete(gameCode);
+  }
+
+  private async handleCancelGame(socket: TypedSocket, data: { gameCode: string }) {
+    const upperCode = data.gameCode.toUpperCase();
+    console.log(`Received cancel game request for ${upperCode}`);
+
+    try {
+      // Find the game session
+      const gameSession = await prisma.gameSession.findUnique({
+        where: { gameCode: upperCode },
+      });
+
+      if (!gameSession) {
+        socket.emit("error", { message: "Game not found", code: "GAME_NOT_FOUND" });
+        return;
+      }
+
+      // Only allow cancelling if game is in WAITING status
+      if (gameSession.status !== "WAITING") {
+        socket.emit("error", { message: "Can only cancel games that haven't started", code: "GAME_STARTED" });
+        return;
+      }
+
+      // Delete all players first (due to foreign key constraints)
+      await prisma.player.deleteMany({
+        where: { gameSessionId: gameSession.id },
+      });
+
+      // Delete the game session
+      await prisma.gameSession.delete({
+        where: { gameCode: upperCode },
+      });
+
+      // Notify all clients that the game was cancelled
+      this.io.to(`game:${upperCode}`).emit("game:cancelled");
+
+      // Clean up any active game state
+      this.activeGames.delete(upperCode);
+
+      console.log(`Game ${upperCode} cancelled by host`);
+    } catch (error) {
+      console.error("Error cancelling game:", error);
+      socket.emit("error", { message: "Failed to cancel game", code: "CANCEL_FAILED" });
+    }
   }
 
   private async handleDisconnect(socket: TypedSocket) {

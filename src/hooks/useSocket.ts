@@ -32,12 +32,14 @@ interface UseSocketReturn {
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
   playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
   error: string | null;
+  gameCancelled: boolean;
   // Actions
   startGame: () => void;
   nextQuestion: () => void;
   showScoreboard: () => void;
   endGame: () => void;
   skipTimer: () => void;
+  cancelGame: () => void;
   submitAnswer: (questionId: string, answerIds: string[]) => void;
 }
 
@@ -65,6 +67,7 @@ export function useSocket({
     new Map()
   );
   const [error, setError] = useState<string | null>(null);
+  const [gameCancelled, setGameCancelled] = useState(false);
 
   useEffect(() => {
     // Initialize socket
@@ -194,6 +197,11 @@ export function useSocket({
       setGameState((prev) => (prev ? { ...prev, status: "FINISHED" } : prev));
     });
 
+    socket.on("game:cancelled", () => {
+      setGameCancelled(true);
+      setGameState(null);
+    });
+
     socket.on("player:answerResult", (result) => {
       setAnswerResult(result);
     });
@@ -228,6 +236,11 @@ export function useSocket({
     socketRef.current?.emit("host:skipTimer", { gameCode: gameCode.toUpperCase() });
   }, [gameCode]);
 
+  const cancelGame = useCallback(() => {
+    console.log("cancelGame called, emitting host:cancelGame for", gameCode.toUpperCase());
+    socketRef.current?.emit("host:cancelGame", { gameCode: gameCode.toUpperCase() });
+  }, [gameCode]);
+
   const submitAnswer = useCallback(
     (questionId: string, answerIds: string[]) => {
       socketRef.current?.emit("player:answer", {
@@ -250,11 +263,13 @@ export function useSocket({
     questionEnded,
     playerAnswers,
     error,
+    gameCancelled,
     startGame,
     nextQuestion,
     showScoreboard,
     endGame,
     skipTimer,
+    cancelGame,
     submitAnswer,
   };
 }

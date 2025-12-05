@@ -116,6 +116,7 @@ export interface ServerToClientEvents {
     finalScores: PlayerScore[];
     winners: PlayerInfo[];
   }) => void;
+  "game:cancelled": () => void;
   "player:answerResult": (data: {
     correct: boolean;
     points: number;
@@ -134,6 +135,7 @@ export interface ClientToServerEvents {
   "host:pauseGame": (data: { gameCode: string }) => void;
   "host:resumeGame": (data: { gameCode: string }) => void;
   "host:skipTimer": (data: { gameCode: string }) => void;
+  "host:cancelGame": (data: { gameCode: string }) => void;
   "player:join": (data: { gameCode: string; name: string }) => void;
   "player:answer": (data: {
     gameCode: string;
