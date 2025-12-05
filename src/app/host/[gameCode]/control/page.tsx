@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,6 +16,11 @@ import {
   Users,
   Monitor,
   ExternalLink,
+  Copy,
+  Check,
+  CheckCircle2,
+  XCircle,
+  FastForward,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -29,11 +35,41 @@ export default function HostControlPage({
     currentQuestion,
     timeRemaining,
     scores,
+    playerAnswers,
     startGame,
     nextQuestion,
     showScoreboard,
     endGame,
+    skipTimer,
   } = useSocket({ gameCode, role: "host" });
+
+  const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+
+  // Fetch tunnel URL on mount
+  useEffect(() => {
+    async function fetchTunnelUrl() {
+      try {
+        const res = await fetch("/api/settings");
+        const data = await res.json();
+        if (data.tunnelUrl) {
+          setTunnelUrl(data.tunnelUrl);
+        }
+      } catch (error) {
+        console.error("Failed to fetch tunnel URL:", error);
+      }
+    }
+    fetchTunnelUrl();
+  }, []);
+
+  function copyExternalUrl() {
+    if (tunnelUrl) {
+      const fullUrl = `${tunnelUrl}/play/${gameCode}`;
+      navigator.clipboard.writeText(fullUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
+  }
 
   function openDisplay() {
     window.open(
@@ -42,6 +78,11 @@ export default function HostControlPage({
       "width=1280,height=720"
     );
   }
+
+  // Get current question's answers for display
+  const currentAnswers = currentQuestion
+    ? playerAnswers.get(currentQuestion.id) || []
+    : [];
 
   if (!connected) {
     return (
@@ -105,11 +146,33 @@ export default function HostControlPage({
               </Badge>
             </div>
           </div>
-          <Button variant="outline" size="sm" onClick={openDisplay}>
-            <Monitor className="w-4 h-4 mr-2" />
-            Open Display
-            <ExternalLink className="w-3 h-3 ml-2" />
-          </Button>
+          <div className="flex items-center gap-2">
+            {tunnelUrl && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={copyExternalUrl}
+                className="gap-2"
+              >
+                {copied ? (
+                  <>
+                    <Check className="w-4 h-4 text-green-500" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy Join URL
+                  </>
+                )}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={openDisplay}>
+              <Monitor className="w-4 h-4 mr-2" />
+              Open Display
+              <ExternalLink className="w-3 h-3 ml-2" />
+            </Button>
+          </div>
         </div>
       </header>
 
@@ -189,9 +252,19 @@ export default function HostControlPage({
                         {currentQuestion?.timeLimit}s
                       </p>
                     </div>
-                    <div className="text-sm text-muted-foreground">
-                      {gameState.players.filter((p) => p.hasAnswered).length} of{" "}
-                      {gameState.players.length} players answered
+                    <div className="flex items-center justify-between">
+                      <div className="text-sm text-muted-foreground">
+                        {gameState.players.filter((p) => p.hasAnswered).length} of{" "}
+                        {gameState.players.length} players answered
+                      </div>
+                      {gameState.players.filter((p) => p.hasAnswered).length ===
+                        gameState.players.length &&
+                        gameState.players.length > 0 && (
+                          <Button onClick={skipTimer} variant="secondary" size="sm">
+                            <FastForward className="w-4 h-4 mr-2" />
+                            Skip Timer
+                          </Button>
+                        )}
                     </div>
                   </div>
                 )}
@@ -270,6 +343,75 @@ export default function HostControlPage({
                   )}
               </CardContent>
             </Card>
+
+            {/* Player Answers Card - shown during QUESTION and REVEALING */}
+            {(gameState.status === "QUESTION" ||
+              gameState.status === "REVEALING") &&
+              currentQuestion && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="flex items-center justify-between">
+                      <span>Player Answers</span>
+                      <Badge variant="secondary">
+                        {currentAnswers.length} / {gameState.players.length}
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-64 overflow-y-auto">
+                      {currentAnswers.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Waiting for answers...
+                        </p>
+                      ) : (
+                        currentAnswers
+                          .sort((a, b) => a.timeToAnswer - b.timeToAnswer)
+                          .map((answer) => (
+                            <div
+                              key={answer.playerId}
+                              className={`
+                                flex items-center gap-3 p-2 rounded-lg border
+                                ${answer.isCorrect ? "bg-green-50 dark:bg-green-900/10 border-green-200 dark:border-green-800" : "bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800"}
+                              `}
+                            >
+                              <Avatar className="w-8 h-8">
+                                <AvatarFallback
+                                  style={{ backgroundColor: answer.avatarColor }}
+                                  className="text-white text-xs"
+                                >
+                                  {answer.playerName.charAt(0).toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <p className="font-medium truncate">
+                                    {answer.playerName}
+                                  </p>
+                                  {answer.isCorrect ? (
+                                    <CheckCircle2 className="w-4 h-4 text-green-600 flex-shrink-0" />
+                                  ) : (
+                                    <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground">
+                                  {(answer.timeToAnswer / 1000).toFixed(1)}s
+                                </p>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-bold text-sm">
+                                  +{answer.pointsEarned}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  Total: {answer.totalScore} (#{answer.position})
+                                </p>
+                              </div>
+                            </div>
+                          ))
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
           </div>
 
           {/* Sidebar - Players/Scores */}

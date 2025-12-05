@@ -6,6 +6,7 @@ import {
   QuestionData,
   PlayerScore,
   GameStatus,
+  PlayerAnswerDetail,
   ClientToServerEvents,
   ServerToClientEvents,
 } from "@/types";
@@ -51,6 +52,7 @@ export class GameManager {
     socket.on("host:nextQuestion", (data) => this.handleNextQuestion(socket, data));
     socket.on("host:showScoreboard", (data) => this.handleShowScoreboard(socket, data));
     socket.on("host:endGame", (data) => this.handleEndGame(socket, data));
+    socket.on("host:skipTimer", (data) => this.handleSkipTimer(socket, data));
 
     // Player events
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
@@ -236,6 +238,15 @@ export class GameManager {
     await this.startNextQuestion(data.gameCode.toUpperCase());
   }
 
+  private async handleSkipTimer(socket: TypedSocket, data: { gameCode: string }) {
+    const upperCode = data.gameCode.toUpperCase();
+    const game = this.activeGames.get(upperCode);
+    if (!game || game.status !== "QUESTION") return;
+
+    // End the current question immediately
+    await this.endQuestion(upperCode);
+  }
+
   private async startNextQuestion(gameCode: string) {
     const game = this.activeGames.get(gameCode);
     if (!game) return;
@@ -366,6 +377,31 @@ export class GameManager {
         playerId,
         answered: true,
       });
+
+      // Get the player's name and color for the detailed answer
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+      });
+
+      if (player) {
+        // Send detailed answer info to host only
+        const answerDetail: PlayerAnswerDetail = {
+          playerId,
+          playerName: player.name,
+          avatarColor: player.avatarColor || "#8A2CF6",
+          selectedAnswerIds: answerIds,
+          isCorrect,
+          pointsEarned: points,
+          totalScore: player.totalScore,
+          position,
+          timeToAnswer: timeTaken,
+        };
+
+        this.io.to(`game:${upperCode}:host`).emit("game:playerAnswerDetail", {
+          questionId,
+          answer: answerDetail,
+        });
+      }
     } catch (error) {
       console.error("Error saving answer:", error);
     }

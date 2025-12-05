@@ -69,6 +69,18 @@ export interface AnswerStats {
   answerDistribution: Record<string, number>;
 }
 
+export interface PlayerAnswerDetail {
+  playerId: string;
+  playerName: string;
+  avatarColor: string;
+  selectedAnswerIds: string[];
+  isCorrect: boolean;
+  pointsEarned: number;
+  totalScore: number;
+  position: number;
+  timeToAnswer: number;
+}
+
 // Socket events - Server to Client
 export interface ServerToClientEvents {
   "game:state": (state: GameState) => void;
@@ -82,6 +94,10 @@ export interface ServerToClientEvents {
   "game:answerReceived": (data: {
     playerId: string;
     answered: boolean;
+  }) => void;
+  "game:playerAnswerDetail": (data: {
+    questionId: string;
+    answer: PlayerAnswerDetail;
   }) => void;
   "game:questionEnd": (data: {
     correctAnswerIds: string[];
@@ -113,6 +129,7 @@ export interface ClientToServerEvents {
   "host:endGame": (data: { gameCode: string }) => void;
   "host:pauseGame": (data: { gameCode: string }) => void;
   "host:resumeGame": (data: { gameCode: string }) => void;
+  "host:skipTimer": (data: { gameCode: string }) => void;
   "player:join": (data: { gameCode: string; name: string }) => void;
   "player:answer": (data: {
     gameCode: string;

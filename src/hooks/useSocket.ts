@@ -8,6 +8,7 @@ import {
   QuestionData,
   PlayerScore,
   AnswerStats,
+  PlayerAnswerDetail,
   ServerToClientEvents,
   ClientToServerEvents,
 } from "@/types";
@@ -29,12 +30,14 @@ interface UseSocketReturn {
   scores: PlayerScore[];
   answerResult: { correct: boolean; points: number; position: number } | null;
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
+  playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
   error: string | null;
   // Actions
   startGame: () => void;
   nextQuestion: () => void;
   showScoreboard: () => void;
   endGame: () => void;
+  skipTimer: () => void;
   submitAnswer: (questionId: string, answerIds: string[]) => void;
 }
 
@@ -58,6 +61,9 @@ export function useSocket({
     correctAnswerIds: string[];
     stats: AnswerStats;
   } | null>(null);
+  const [playerAnswers, setPlayerAnswers] = useState<Map<string, PlayerAnswerDetail[]>>(
+    new Map()
+  );
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -130,6 +136,12 @@ export function useSocket({
       setTimeRemaining(question.timeLimit);
       setAnswerResult(null);
       setQuestionEnded(null);
+      // Clear answers for new question (but keep old questions' answers)
+      setPlayerAnswers((prev) => {
+        const newMap = new Map(prev);
+        newMap.set(question.id, []);
+        return newMap;
+      });
       setGameState((prev) =>
         prev ? { ...prev, status: "QUESTION", currentQuestion: question } : prev
       );
@@ -148,6 +160,18 @@ export function useSocket({
             p.id === playerId ? { ...p, hasAnswered: answered } : p
           ),
         };
+      });
+    });
+
+    socket.on("game:playerAnswerDetail", ({ questionId, answer }) => {
+      setPlayerAnswers((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(questionId) || [];
+        // Check if we already have this player's answer (avoid duplicates)
+        if (!existing.some((a) => a.playerId === answer.playerId)) {
+          newMap.set(questionId, [...existing, answer]);
+        }
+        return newMap;
       });
     });
 
@@ -200,6 +224,10 @@ export function useSocket({
     socketRef.current?.emit("host:endGame", { gameCode: gameCode.toUpperCase() });
   }, [gameCode]);
 
+  const skipTimer = useCallback(() => {
+    socketRef.current?.emit("host:skipTimer", { gameCode: gameCode.toUpperCase() });
+  }, [gameCode]);
+
   const submitAnswer = useCallback(
     (questionId: string, answerIds: string[]) => {
       socketRef.current?.emit("player:answer", {
@@ -220,11 +248,13 @@ export function useSocket({
     scores,
     answerResult,
     questionEnded,
+    playerAnswers,
     error,
     startGame,
     nextQuestion,
     showScoreboard,
     endGame,
+    skipTimer,
     submitAnswer,
   };
 }

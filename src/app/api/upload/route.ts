@@ -4,6 +4,10 @@ import { existsSync } from "fs";
 import path from "path";
 import { randomUUID } from "crypto";
 
+// Configure body size limit for uploads
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
 // POST /api/upload - Upload an image
 export async function POST(request: Request) {
   try {

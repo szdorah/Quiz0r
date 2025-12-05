@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -91,6 +91,7 @@ export default function QuestionsPage({
     { answerText: "", isCorrect: false },
   ]);
   const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchQuiz();
@@ -379,29 +380,34 @@ export default function QuestionsPage({
                     </div>
                   ) : (
                     <div className="flex gap-2">
-                      <label className="flex-1">
-                        <div className="flex items-center justify-center w-full h-32 border-2 border-dashed rounded-lg cursor-pointer hover:bg-muted/50 transition-colors">
-                          {uploading ? (
-                            <div className="flex flex-col items-center text-muted-foreground">
-                              <Loader2 className="w-8 h-8 animate-spin mb-2" />
-                              <span className="text-sm">Uploading...</span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center text-muted-foreground">
-                              <Upload className="w-8 h-8 mb-2" />
-                              <span className="text-sm">Click to upload image</span>
-                              <span className="text-xs">JPEG, PNG, GIF, WebP (max 5MB)</span>
-                            </div>
-                          )}
-                        </div>
-                        <input
-                          type="file"
-                          accept="image/jpeg,image/png,image/gif,image/webp"
-                          className="hidden"
-                          onChange={handleImageUpload}
-                          disabled={uploading}
-                        />
-                      </label>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        accept="image/jpeg,image/png,image/gif,image/webp"
+                        className="hidden"
+                        onChange={handleImageUpload}
+                        disabled={uploading}
+                      />
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="flex-1 h-24"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={uploading}
+                      >
+                        {uploading ? (
+                          <div className="flex flex-col items-center text-muted-foreground">
+                            <Loader2 className="w-6 h-6 animate-spin mb-1" />
+                            <span className="text-sm">Uploading...</span>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center text-muted-foreground">
+                            <Upload className="w-6 h-6 mb-1" />
+                            <span className="text-sm">Click to upload image</span>
+                            <span className="text-xs">JPEG, PNG, GIF, WebP (max 5MB)</span>
+                          </div>
+                        )}
+                      </Button>
                     </div>
                   )}
 
