@@ -51,6 +51,7 @@ export async function startTunnel(authToken: string): Promise<string> {
 }
 
 export async function stopTunnel(): Promise<void> {
+  // Close the listener if it exists in this process
   if (listener) {
     try {
       await listener.close();
@@ -60,15 +61,23 @@ export async function stopTunnel(): Promise<void> {
     }
     listener = null;
     tunnelUrl = null;
+  }
 
-    // Clear URL from database
-    try {
-      await prisma.setting.deleteMany({
-        where: { key: "tunnel_url" },
-      });
-    } catch {
-      // Ignore errors
-    }
+  // Always clear URL from database (even if listener wasn't in this process)
+  try {
+    await prisma.setting.deleteMany({
+      where: { key: "tunnel_url" },
+    });
+    console.log("Tunnel URL cleared from database");
+  } catch (error) {
+    console.error("Error clearing tunnel URL from database:", error);
+  }
+
+  // Also try to disconnect any ngrok sessions
+  try {
+    await ngrok.disconnect();
+  } catch {
+    // Ignore - may not have any active sessions
   }
 }
 

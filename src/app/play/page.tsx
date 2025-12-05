@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -12,6 +12,14 @@ export default function JoinPage() {
   const router = useRouter();
   const [gameCode, setGameCode] = useState("");
   const [error, setError] = useState("");
+  const [isExternal, setIsExternal] = useState(true); // Default to external (hide back link)
+
+  useEffect(() => {
+    // Check if we're on localhost (not coming through ngrok)
+    const host = window.location.hostname;
+    const isLocal = host === "localhost" || host === "127.0.0.1" || host === "0.0.0.0";
+    setIsExternal(!isLocal);
+  }, []);
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -33,16 +41,18 @@ export default function JoinPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex flex-col">
-      {/* Header */}
-      <header className="p-4">
-        <Link
-          href="/"
-          className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          <ArrowLeft className="w-4 h-4 mr-2" />
-          Back
-        </Link>
-      </header>
+      {/* Header - only show back link for local users */}
+      {!isExternal && (
+        <header className="p-4">
+          <Link
+            href="/"
+            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Link>
+        </header>
+      )}
 
       {/* Main content */}
       <main className="flex-1 flex items-center justify-center p-4">
