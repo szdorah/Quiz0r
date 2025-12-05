@@ -84,7 +84,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           questionText: question.questionText,
           imageRef,
           hostNotes: question.hostNotes,
-          questionType: question.questionType,
+          questionType: question.questionType as "SINGLE_SELECT" | "MULTI_SELECT" | "SECTION",
           timeLimit: question.timeLimit,
           points: question.points,
           orderIndex: question.orderIndex,
