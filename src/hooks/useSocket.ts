@@ -197,6 +197,14 @@ export function useSocket({
         newMap.set(question.id, []);
         return newMap;
       });
+      // Reset hasAnswered for all players for the new question
+      setGameState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map((p) => ({ ...p, hasAnswered: false })),
+        };
+      });
       // Use SECTION status for sections, QUESTION for questions
       const isSection = question.questionType === "SECTION";
       setGameState((prev) =>

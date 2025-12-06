@@ -444,20 +444,26 @@ export default function HostControlPage({
                         <p className="text-amber-900 dark:text-amber-200 text-sm whitespace-pre-wrap">{currentQuestion.hostNotes}</p>
                       </div>
                     )}
-                    <div className="flex items-center justify-between">
-                      <div className="text-sm text-muted-foreground">
-                        {gameState.players.filter((p) => p.hasAnswered).length} of{" "}
-                        {gameState.players.length} players answered
-                      </div>
-                      {gameState.players.filter((p) => p.hasAnswered).length ===
-                        gameState.players.length &&
-                        gameState.players.length > 0 && (
-                          <Button onClick={skipTimer} variant="secondary" size="sm">
-                            <FastForward className="w-4 h-4 mr-2" />
-                            Skip Timer
-                          </Button>
-                        )}
-                    </div>
+                    {(() => {
+                      const activeAdmitted = gameState.players.filter(
+                        (p) => p.isActive && p.admissionStatus === "admitted"
+                      );
+                      const answeredCount = activeAdmitted.filter((p) => p.hasAnswered).length;
+                      const allAnswered = activeAdmitted.length > 0 && answeredCount === activeAdmitted.length;
+                      return (
+                        <div className="flex items-center justify-between">
+                          <div className="text-sm text-muted-foreground">
+                            {answeredCount} of {activeAdmitted.length} players answered
+                          </div>
+                          {allAnswered && (
+                            <Button onClick={skipTimer} variant="secondary" size="sm">
+                              <FastForward className="w-4 h-4 mr-2" />
+                              Skip Timer
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })()}
                   </div>
                 )}
 

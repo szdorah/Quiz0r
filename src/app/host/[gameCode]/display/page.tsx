@@ -449,12 +449,17 @@ export default function HostDisplayPage({
                 </div>
 
                 {/* Answer count */}
-                {!isRevealing && (
-                  <div className="text-center text-muted-foreground">
-                    {gameState.players.filter((p) => p.hasAnswered).length} of{" "}
-                    {gameState.players.length} players answered
-                  </div>
-                )}
+                {!isRevealing && (() => {
+                  const activeAdmitted = gameState.players.filter(
+                    (p) => p.isActive && p.admissionStatus === "admitted"
+                  );
+                  const answeredCount = activeAdmitted.filter((p) => p.hasAnswered).length;
+                  return (
+                    <div className="text-center text-muted-foreground">
+                      {answeredCount} of {activeAdmitted.length} players answered
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
