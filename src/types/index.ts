@@ -34,6 +34,7 @@ export interface GameState {
   players: PlayerInfo[];
   currentQuestion?: QuestionData | null;
   timeRemaining?: number;
+  autoAdmit?: boolean;
 }
 
 export interface PlayerInfo {
@@ -44,6 +45,7 @@ export interface PlayerInfo {
   score: number;
   isActive: boolean;
   hasAnswered?: boolean;
+  admissionStatus?: "admitted" | "pending" | "refused";
   downloadStatus?: {
     percentage: number;
     status: 'idle' | 'loading' | 'complete' | 'error';
@@ -154,6 +156,10 @@ export interface ServerToClientEvents {
     percentage: number;
     status: 'idle' | 'loading' | 'complete' | 'error';
   }) => void;
+  "game:playerRemoved": (data: { playerId: string }) => void;
+  "player:removed": (data: { reason: string }) => void;
+  "game:admissionRequest": (data: { playerId: string; playerName: string }) => void;
+  "player:admissionStatus": (data: { status: "admitted" | "refused" }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
@@ -183,4 +189,8 @@ export interface ClientToServerEvents {
     totalAssets: number;
     status: 'idle' | 'loading' | 'complete' | 'error';
   }) => void;
+  "host:removePlayer": (data: { gameCode: string; playerId: string }) => void;
+  "host:admitPlayer": (data: { gameCode: string; playerId: string }) => void;
+  "host:refusePlayer": (data: { gameCode: string; playerId: string }) => void;
+  "host:toggleAutoAdmit": (data: { gameCode: string; autoAdmit: boolean }) => void;
 }

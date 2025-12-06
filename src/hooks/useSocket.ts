@@ -39,6 +39,10 @@ interface UseSocketReturn {
   nextQuestionPreview: NextQuestionPreview | null;
   error: string | null;
   gameCancelled: boolean;
+  playerRemoved: boolean;
+  removalReason: string | null;
+  admissionRequests: Array<{playerId: string; playerName: string}>;
+  admissionStatus: "admitted" | "refused" | null;
   // Actions
   startGame: () => void;
   nextQuestion: () => void;
@@ -47,6 +51,10 @@ interface UseSocketReturn {
   skipTimer: () => void;
   cancelGame: () => void;
   submitAnswer: (questionId: string, answerIds: string[]) => void;
+  removePlayer: (playerId: string) => void;
+  admitPlayer: (playerId: string) => void;
+  refusePlayer: (playerId: string) => void;
+  toggleAutoAdmit: (autoAdmit: boolean) => void;
 }
 
 export function useSocket({
@@ -75,6 +83,10 @@ export function useSocket({
   const [nextQuestionPreview, setNextQuestionPreview] = useState<NextQuestionPreview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [gameCancelled, setGameCancelled] = useState(false);
+  const [playerRemoved, setPlayerRemoved] = useState(false);
+  const [removalReason, setRemovalReason] = useState<string | null>(null);
+  const [admissionRequests, setAdmissionRequests] = useState<Array<{playerId: string; playerName: string}>>([]);
+  const [admissionStatus, setAdmissionStatus] = useState<"admitted" | "refused" | null>(null);
 
   useEffect(() => {
     // Initialize socket
@@ -236,6 +248,33 @@ export function useSocket({
       setGameState(null);
     });
 
+    socket.on("game:playerRemoved", ({ playerId }) => {
+      setGameState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.filter((p) => p.id !== playerId),
+        };
+      });
+    });
+
+    socket.on("player:removed", ({ reason }) => {
+      setPlayerRemoved(true);
+      setRemovalReason(reason);
+      setGameState(null);
+    });
+
+    socket.on("game:admissionRequest", ({ playerId, playerName }) => {
+      setAdmissionRequests((prev) => [...prev, { playerId, playerName }]);
+    });
+
+    socket.on("player:admissionStatus", ({ status }) => {
+      setAdmissionStatus(status);
+      if (status === "refused") {
+        setGameState(null);
+      }
+    });
+
     socket.on("game:nextQuestionPreview", (data) => {
       setNextQuestionPreview(data);
     });
@@ -279,6 +318,36 @@ export function useSocket({
     socketRef.current?.emit("host:cancelGame", { gameCode: gameCode.toUpperCase() });
   }, [gameCode]);
 
+  const removePlayer = useCallback((playerId: string) => {
+    socketRef.current?.emit("host:removePlayer", {
+      gameCode: gameCode.toUpperCase(),
+      playerId
+    });
+  }, [gameCode]);
+
+  const admitPlayer = useCallback((playerId: string) => {
+    socketRef.current?.emit("host:admitPlayer", {
+      gameCode: gameCode.toUpperCase(),
+      playerId
+    });
+    setAdmissionRequests((prev) => prev.filter((req) => req.playerId !== playerId));
+  }, [gameCode]);
+
+  const refusePlayer = useCallback((playerId: string) => {
+    socketRef.current?.emit("host:refusePlayer", {
+      gameCode: gameCode.toUpperCase(),
+      playerId
+    });
+    setAdmissionRequests((prev) => prev.filter((req) => req.playerId !== playerId));
+  }, [gameCode]);
+
+  const toggleAutoAdmit = useCallback((autoAdmit: boolean) => {
+    socketRef.current?.emit("host:toggleAutoAdmit", {
+      gameCode: gameCode.toUpperCase(),
+      autoAdmit
+    });
+  }, [gameCode]);
+
   const submitAnswer = useCallback(
     (questionId: string, answerIds: string[]) => {
       socketRef.current?.emit("player:answer", {
@@ -303,6 +372,10 @@ export function useSocket({
     nextQuestionPreview,
     error,
     gameCancelled,
+    playerRemoved,
+    removalReason,
+    admissionRequests,
+    admissionStatus,
     startGame,
     nextQuestion,
     showScoreboard,
@@ -310,5 +383,9 @@ export function useSocket({
     skipTimer,
     cancelGame,
     submitAnswer,
+    removePlayer,
+    admitPlayer,
+    refusePlayer,
+    toggleAutoAdmit,
   };
 }

@@ -13,6 +13,7 @@ model Quiz {
   title       String
   description String?
   theme       String?       // JSON string containing QuizTheme
+  autoAdmit   Boolean       @default(true) // Auto-admit players by default
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   isActive    Boolean       @default(true)
@@ -70,6 +71,7 @@ model GameSession {
   status               String    @default("WAITING")
   currentQuestionIndex Int       @default(-1)
   questionStartedAt    DateTime?
+  autoAdmit            Boolean   @default(true)
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
@@ -95,8 +97,10 @@ model Player {
   totalScore    Int @default(0)
   currentStreak Int @default(0)
 
-  joinedAt DateTime @default(now())
-  isActive Boolean  @default(true)
+  joinedAt        DateTime  @default(now())
+  isActive        Boolean   @default(true)
+  admissionStatus String    @default("admitted")
+  removedAt       DateTime?
 
   answers PlayerAnswer[]
 

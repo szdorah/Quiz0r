@@ -28,7 +28,7 @@ export function useQuizPreloader({ gameCode, playerId, socket }: UseQuizPreloade
   const [quizData, setQuizData] = useState<QuizPreloadData | null>(null);
   const [isReady, setIsReady] = useState(false);
   const lastProgressReport = useRef(0);
-  const progressReportTimeout = useRef<NodeJS.Timeout>();
+  const progressReportTimeout = useRef<NodeJS.Timeout | undefined>(undefined);
   const playerIdRef = useRef(playerId);
 
   // Keep playerIdRef in sync with playerId prop

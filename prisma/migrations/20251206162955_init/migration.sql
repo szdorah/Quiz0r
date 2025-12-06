@@ -3,6 +3,8 @@ CREATE TABLE "Quiz" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "title" TEXT NOT NULL,
     "description" TEXT,
+    "theme" TEXT,
+    "autoAdmit" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true
@@ -14,6 +16,7 @@ CREATE TABLE "Question" (
     "quizId" TEXT NOT NULL,
     "questionText" TEXT NOT NULL,
     "imageUrl" TEXT,
+    "hostNotes" TEXT,
     "questionType" TEXT NOT NULL DEFAULT 'SINGLE_SELECT',
     "timeLimit" INTEGER NOT NULL DEFAULT 30,
     "points" INTEGER NOT NULL DEFAULT 100,
@@ -42,6 +45,7 @@ CREATE TABLE "GameSession" (
     "status" TEXT NOT NULL DEFAULT 'WAITING',
     "currentQuestionIndex" INTEGER NOT NULL DEFAULT -1,
     "questionStartedAt" DATETIME,
+    "autoAdmit" BOOLEAN NOT NULL DEFAULT true,
     "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" DATETIME NOT NULL,
     "endedAt" DATETIME,
@@ -55,10 +59,13 @@ CREATE TABLE "Player" (
     "name" TEXT NOT NULL,
     "socketId" TEXT,
     "avatarColor" TEXT,
+    "avatarEmoji" TEXT,
     "totalScore" INTEGER NOT NULL DEFAULT 0,
     "currentStreak" INTEGER NOT NULL DEFAULT 0,
     "joinedAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
+    "admissionStatus" TEXT NOT NULL DEFAULT 'admitted',
+    "removedAt" DATETIME,
     CONSTRAINT "Player_gameSessionId_fkey" FOREIGN KEY ("gameSessionId") REFERENCES "GameSession" ("id") ON DELETE CASCADE ON UPDATE CASCADE
 );
 
@@ -74,6 +81,12 @@ CREATE TABLE "PlayerAnswer" (
     "answeredAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "PlayerAnswer_playerId_fkey" FOREIGN KEY ("playerId") REFERENCES "Player" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
     CONSTRAINT "PlayerAnswer_questionId_fkey" FOREIGN KEY ("questionId") REFERENCES "Question" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
+CREATE TABLE "Setting" (
+    "key" TEXT NOT NULL PRIMARY KEY,
+    "value" TEXT NOT NULL
 );
 
 -- CreateIndex

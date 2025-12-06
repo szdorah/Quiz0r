@@ -59,37 +59,61 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     });
 
     if (existingPlayer) {
-      if (existingPlayer.isActive) {
+      // Check admission status for existing players
+      if (existingPlayer.admissionStatus === "refused") {
+        return NextResponse.json(
+          { error: "You have been refused admission to this game" },
+          { status: 403 }
+        );
+      }
+
+      if (existingPlayer.admissionStatus === "pending") {
+        return NextResponse.json(
+          {
+            error: "Your admission is pending host approval",
+            playerId: existingPlayer.id,
+            status: "pending"
+          },
+          { status: 403 }
+        );
+      }
+
+      if (existingPlayer.isActive && existingPlayer.admissionStatus === "admitted") {
         return NextResponse.json(
           { error: "Name is already taken" },
           { status: 400 }
         );
       }
 
-      // Reactivate inactive player
-      const player = await prisma.player.update({
-        where: { id: existingPlayer.id },
-        data: {
-          isActive: true,
-          avatarEmoji: avatarEmoji || existingPlayer.avatarEmoji,
-        },
-      });
+      // Reactivate inactive player (only if admitted)
+      if (existingPlayer.admissionStatus === "admitted") {
+        const player = await prisma.player.update({
+          where: { id: existingPlayer.id },
+          data: {
+            isActive: true,
+            avatarEmoji: avatarEmoji || existingPlayer.avatarEmoji,
+          },
+        });
 
-      return NextResponse.json({
-        playerId: player.id,
-        name: player.name,
-        avatarColor: player.avatarColor,
-        avatarEmoji: player.avatarEmoji,
-      });
+        return NextResponse.json({
+          playerId: player.id,
+          name: player.name,
+          avatarColor: player.avatarColor,
+          avatarEmoji: player.avatarEmoji,
+        });
+      }
     }
 
-    // Create new player
+    // Create new player with appropriate admission status
+    const admissionStatus = gameSession.autoAdmit ? "admitted" : "pending";
+    console.log(`[API Join] Creating new player "${trimmedName}" in game ${gameCode} with autoAdmit=${gameSession.autoAdmit}, admissionStatus=${admissionStatus}`);
     const player = await prisma.player.create({
       data: {
         gameSessionId: gameSession.id,
         name: trimmedName,
         avatarColor: generateAvatarColor(),
         avatarEmoji: avatarEmoji || null,
+        admissionStatus,
       },
     });
 

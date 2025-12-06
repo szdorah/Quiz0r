@@ -45,6 +45,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Use quiz's autoAdmit setting
+    const autoAdmit = quiz.autoAdmit;
+
     // Generate unique game code
     let gameCode: string;
     let attempts = 0;
@@ -70,6 +73,7 @@ export async function POST(request: NextRequest) {
         gameCode,
         quizId,
         status: "WAITING",
+        autoAdmit,
       },
       include: {
         quiz: {

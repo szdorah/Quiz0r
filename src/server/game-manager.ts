@@ -57,6 +57,10 @@ export class GameManager {
     socket.on("host:endGame", (data) => this.handleEndGame(socket, data));
     socket.on("host:skipTimer", (data) => this.handleSkipTimer(socket, data));
     socket.on("host:cancelGame", (data) => this.handleCancelGame(socket, data));
+    socket.on("host:removePlayer", (data) => this.handleRemovePlayer(socket, data));
+    socket.on("host:admitPlayer", (data) => this.handleAdmitPlayer(socket, data));
+    socket.on("host:refusePlayer", (data) => this.handleRefusePlayer(socket, data));
+    socket.on("host:toggleAutoAdmit", (data) => this.handleToggleAutoAdmit(socket, data));
 
     // Player events
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
@@ -95,6 +99,10 @@ export class GameManager {
         where: { gameCode: upperCode },
       });
 
+      if (gameSession) {
+        console.log(`[PlayerJoin] Game ${upperCode} found with autoAdmit = ${gameSession.autoAdmit}`);
+      }
+
       if (!gameSession) {
         socket.emit("error", { message: "Game not found", code: "GAME_NOT_FOUND" });
         return;
@@ -119,23 +127,88 @@ export class GameManager {
       });
 
       if (player) {
-        // Update socket ID
+        // EXISTING PLAYER - handle based on admission status
+        console.log(`[PlayerJoin] Existing player "${name}" found with admissionStatus = ${player.admissionStatus}`);
+
+        if (player.admissionStatus === "refused") {
+          socket.emit("error", {
+            message: "You have been refused admission to this game",
+            code: "ADMISSION_REFUSED",
+          });
+          return;
+        }
+
+        if (player.admissionStatus === "pending") {
+          // Update socket ID for pending player
+          await prisma.player.update({
+            where: { id: player.id },
+            data: { socketId: socket.id },
+          });
+
+          // Store player context on socket
+          (socket as unknown as { playerId: string }).playerId = player.id;
+          (socket as unknown as { gameCode: string }).gameCode = upperCode;
+
+          // Notify host of admission request
+          this.io.to(`game:${upperCode}:host`).emit("game:admissionRequest", {
+            playerId: player.id,
+            playerName: player.name,
+          });
+
+          // Send game state to player (they'll see waiting screen)
+          const state = await this.getGameState(upperCode);
+          if (state) {
+            socket.emit("game:state", state);
+          }
+
+          console.log(`[PlayerJoin] Player "${name}" is pending admission for game ${upperCode}`);
+          return;
+        }
+
+        // Player is admitted - normal reconnection
         player = await prisma.player.update({
           where: { id: player.id },
           data: { socketId: socket.id, isActive: true },
         });
       } else {
-        // Create new player
+        // NEW PLAYER - create with appropriate admission status
+        console.log(`[PlayerJoin] Game ${upperCode} autoAdmit setting:`, gameSession.autoAdmit);
+        const admissionStatus = gameSession.autoAdmit ? "admitted" : "pending";
+        console.log(`[PlayerJoin] New player "${name}" will have admission status: ${admissionStatus}`);
+
         player = await prisma.player.create({
           data: {
             gameSessionId: gameSession.id,
             name: name.trim(),
             socketId: socket.id,
             avatarColor: generateAvatarColor(),
+            admissionStatus,
           },
         });
+
+        if (admissionStatus === "pending") {
+          // Store player context on socket
+          (socket as unknown as { playerId: string }).playerId = player.id;
+          (socket as unknown as { gameCode: string }).gameCode = upperCode;
+
+          // Notify host of admission request
+          this.io.to(`game:${upperCode}:host`).emit("game:admissionRequest", {
+            playerId: player.id,
+            playerName: player.name,
+          });
+
+          // Send game state to player
+          const state = await this.getGameState(upperCode);
+          if (state) {
+            socket.emit("game:state", state);
+          }
+
+          console.log(`[PlayerJoin] New player "${name}" awaiting admission for game ${upperCode}`);
+          return;
+        }
       }
 
+      // If we reach here, player is admitted - continue with normal join flow
       // Join rooms
       socket.join(`game:${upperCode}`);
       socket.join(`game:${upperCode}:players`);
@@ -152,6 +225,7 @@ export class GameManager {
         avatarEmoji: player.avatarEmoji,
         score: player.totalScore,
         isActive: true,
+        admissionStatus: player.admissionStatus as "admitted" | "pending" | "refused",
       };
 
       this.io.to(`game:${upperCode}`).emit("game:playerJoined", { player: playerInfo });
@@ -646,6 +720,183 @@ export class GameManager {
     console.log(`Client disconnected: ${socket.id}`);
   }
 
+  private async handleRemovePlayer(
+    socket: TypedSocket,
+    data: { gameCode: string; playerId: string }
+  ) {
+    const { gameCode, playerId } = data;
+    const upperCode = gameCode.toUpperCase();
+
+    try {
+      // Validate game and player exist
+      const gameSession = await prisma.gameSession.findUnique({
+        where: { gameCode: upperCode },
+      });
+
+      if (!gameSession) {
+        socket.emit("error", { message: "Game not found", code: "GAME_NOT_FOUND" });
+        return;
+      }
+
+      const player = await prisma.player.findUnique({ where: { id: playerId } });
+
+      if (!player || player.gameSessionId !== gameSession.id) {
+        socket.emit("error", { message: "Player not found", code: "PLAYER_NOT_FOUND" });
+        return;
+      }
+
+      if (player.admissionStatus === "pending") {
+        socket.emit("error", { message: "Player already pending admission", code: "ALREADY_PENDING" });
+        return;
+      }
+
+      // Set player to pending admission status
+      await prisma.player.update({
+        where: { id: playerId },
+        data: {
+          admissionStatus: "pending",
+          isActive: false,
+          removedAt: new Date(),
+        },
+      });
+
+      // Notify the removed player if connected
+      if (player.socketId) {
+        const playerSocket = this.io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+          playerSocket.emit("player:removed", {
+            reason: "You have been removed from the game by the host."
+          });
+          playerSocket.leave(`game:${upperCode}`);
+          playerSocket.leave(`game:${upperCode}:players`);
+        }
+      }
+
+      // Notify all clients
+      this.io.to(`game:${upperCode}`).emit("game:playerRemoved", { playerId });
+
+      console.log(`[RemovePlayer] Player ${player.name} (${playerId}) removed from game ${upperCode}`);
+    } catch (error) {
+      console.error("Error removing player:", error);
+      socket.emit("error", { message: "Failed to remove player", code: "REMOVE_FAILED" });
+    }
+  }
+
+  private async handleAdmitPlayer(
+    socket: TypedSocket,
+    data: { gameCode: string; playerId: string }
+  ) {
+    const { gameCode, playerId } = data;
+    const upperCode = gameCode.toUpperCase();
+
+    try {
+      // Update player to admitted status
+      const player = await prisma.player.update({
+        where: { id: playerId },
+        data: {
+          admissionStatus: "admitted",
+          isActive: true,
+        },
+      });
+
+      // Add player to game rooms if they have a socket
+      if (player.socketId) {
+        const playerSocket = this.io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+          playerSocket.join(`game:${upperCode}`);
+          playerSocket.join(`game:${upperCode}:players`);
+
+          // Notify the player they're admitted
+          playerSocket.emit("player:admissionStatus", { status: "admitted" });
+
+          // Send quiz preload data
+          await this.sendQuizPreloadData(playerSocket, upperCode, player.id);
+        }
+      }
+
+      // Broadcast player joined to all clients
+      const playerInfo: PlayerInfo = {
+        id: player.id,
+        name: player.name,
+        avatarColor: player.avatarColor || "#8A2CF6",
+        avatarEmoji: player.avatarEmoji,
+        score: player.totalScore,
+        isActive: true,
+        admissionStatus: "admitted",
+      };
+
+      this.io.to(`game:${upperCode}`).emit("game:playerJoined", { player: playerInfo });
+
+      console.log(`[AdmitPlayer] Player ${player.name} (${playerId}) admitted to game ${upperCode}`);
+    } catch (error) {
+      console.error("Error admitting player:", error);
+      socket.emit("error", { message: "Failed to admit player", code: "ADMIT_FAILED" });
+    }
+  }
+
+  private async handleRefusePlayer(
+    socket: TypedSocket,
+    data: { gameCode: string; playerId: string }
+  ) {
+    const { gameCode, playerId } = data;
+    const upperCode = gameCode.toUpperCase();
+
+    try {
+      // Update player to refused status
+      const player = await prisma.player.update({
+        where: { id: playerId },
+        data: {
+          admissionStatus: "refused",
+          isActive: false,
+        },
+      });
+
+      // Notify the player they're refused
+      if (player.socketId) {
+        const playerSocket = this.io.sockets.sockets.get(player.socketId);
+        if (playerSocket) {
+          playerSocket.emit("player:admissionStatus", { status: "refused" });
+
+          // Remove from game rooms
+          playerSocket.leave(`game:${upperCode}`);
+          playerSocket.leave(`game:${upperCode}:players`);
+        }
+      }
+
+      console.log(`[RefusePlayer] Player ${player.name} (${playerId}) refused admission to game ${upperCode}`);
+    } catch (error) {
+      console.error("Error refusing player:", error);
+      socket.emit("error", { message: "Failed to refuse player", code: "REFUSE_FAILED" });
+    }
+  }
+
+  private async handleToggleAutoAdmit(
+    socket: TypedSocket,
+    data: { gameCode: string; autoAdmit: boolean }
+  ) {
+    const { gameCode, autoAdmit } = data;
+    const upperCode = gameCode.toUpperCase();
+
+    try {
+      // Update game session
+      await prisma.gameSession.update({
+        where: { gameCode: upperCode },
+        data: { autoAdmit },
+      });
+
+      // Broadcast updated game state to all clients
+      const state = await this.getGameState(upperCode);
+      if (state) {
+        this.io.to(`game:${upperCode}`).emit("game:state", state);
+      }
+
+      console.log(`[ToggleAutoAdmit] Game ${upperCode} autoAdmit set to ${autoAdmit}`);
+    } catch (error) {
+      console.error("Error toggling auto-admit:", error);
+      socket.emit("error", { message: "Failed to toggle auto-admit", code: "TOGGLE_FAILED" });
+    }
+  }
+
   private async getGameState(gameCode: string): Promise<GameState | null> {
     const gameSession = await prisma.gameSession.findUnique({
       where: { gameCode },
@@ -659,7 +910,10 @@ export class GameManager {
           },
         },
         players: {
-          where: { isActive: true },
+          where: {
+            isActive: true,
+            admissionStatus: "admitted",
+          },
           orderBy: { totalScore: "desc" },
         },
       },
@@ -692,6 +946,7 @@ export class GameManager {
       currentQuestionIndex: gameSession.currentQuestionIndex,
       currentQuestionNumber,
       totalQuestions,
+      autoAdmit: gameSession.autoAdmit,
       players: gameSession.players.map((p) => ({
         id: p.id,
         name: p.name,
@@ -699,6 +954,7 @@ export class GameManager {
         avatarEmoji: p.avatarEmoji,
         score: p.totalScore,
         isActive: p.isActive,
+        admissionStatus: p.admissionStatus as "admitted" | "pending" | "refused",
       })),
       currentQuestion: activeGame?.questions[activeGame.currentQuestionIndex] || null,
       timeRemaining: activeGame?.questionStartedAt
@@ -717,6 +973,7 @@ export class GameManager {
       where: {
         gameSession: { gameCode },
         isActive: true,
+        admissionStatus: "admitted",
       },
       orderBy: { totalScore: "desc" },
     });
@@ -802,7 +1059,7 @@ export class GameManager {
         totalQuestions: allQuestions.filter((q) => q.questionType !== "SECTION").length,
         questions,
         theme,
-        imageUrls: [...new Set(imageUrls)], // Remove duplicates
+        imageUrls: Array.from(new Set(imageUrls)), // Remove duplicates
         startIndex,
       };
       console.log(`[Preload] Emitting quiz data: ${questions.length} questions, ${preloadData.imageUrls.length} images`);

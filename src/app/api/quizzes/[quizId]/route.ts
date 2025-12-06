@@ -65,6 +65,30 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
+// PATCH /api/quizzes/[quizId] - Partially update quiz (e.g., autoAdmit)
+export async function PATCH(request: NextRequest, { params }: RouteParams) {
+  try {
+    const { quizId } = await params;
+    const body = await request.json();
+    const { autoAdmit } = body;
+
+    const quiz = await prisma.quiz.update({
+      where: { id: quizId },
+      data: {
+        ...(autoAdmit !== undefined && { autoAdmit }),
+      },
+    });
+
+    return NextResponse.json(quiz);
+  } catch (error) {
+    console.error("Error updating quiz:", error);
+    return NextResponse.json(
+      { error: "Failed to update quiz" },
+      { status: 500 }
+    );
+  }
+}
+
 // DELETE /api/quizzes/[quizId] - Soft delete quiz
 export async function DELETE(request: NextRequest, { params }: RouteParams) {
   try {

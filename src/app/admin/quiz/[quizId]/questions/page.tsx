@@ -43,6 +43,7 @@ import {
   Layers,
   Palette,
   Download,
+  Shield,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -89,6 +90,7 @@ interface Quiz {
   id: string;
   title: string;
   description?: string | null;
+  autoAdmit: boolean;
   questions: Question[];
 }
 
@@ -636,6 +638,21 @@ export default function QuestionsPage({
     } catch (error) {
       console.error("Failed to save question:", error);
       alert("Failed to save question");
+    }
+  }
+
+  async function updateAutoAdmit(autoAdmit: boolean) {
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ autoAdmit }),
+      });
+      if (res.ok) {
+        setQuiz((prev) => prev ? { ...prev, autoAdmit } : null);
+      }
+    } catch (error) {
+      console.error("Failed to update auto-admit:", error);
     }
   }
 
@@ -1211,6 +1228,36 @@ export default function QuestionsPage({
           </Dialog>
         </div>
       </div>
+
+      {/* Player Admission Control */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="w-4 h-4" />
+            Player Admission
+          </CardTitle>
+          <CardDescription>
+            Control how players join games using this quiz
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5">
+              <Label htmlFor="auto-admit">Auto-Admit Players</Label>
+              <p className="text-sm text-muted-foreground">
+                {quiz.autoAdmit
+                  ? "New players join automatically"
+                  : "New players require host approval"}
+              </p>
+            </div>
+            <Switch
+              id="auto-admit"
+              checked={quiz.autoAdmit ?? true}
+              onCheckedChange={updateAutoAdmit}
+            />
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Questions List with Drag and Drop */}
       {quiz.questions.length === 0 ? (

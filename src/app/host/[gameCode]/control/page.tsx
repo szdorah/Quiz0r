@@ -9,6 +9,16 @@ import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { Progress } from "@/components/ui/progress";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Play,
   SkipForward,
@@ -26,6 +36,11 @@ import {
   X,
   Eye,
   Layers,
+  Trash2,
+  UserCheck,
+  UserX,
+  Bell,
+  Shield,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -43,17 +58,24 @@ export default function HostControlPage({
     playerAnswers,
     nextQuestionPreview,
     gameCancelled,
+    admissionRequests,
     startGame,
     nextQuestion,
     showScoreboard,
     endGame,
     skipTimer,
     cancelGame,
+    removePlayer,
+    admitPlayer,
+    refusePlayer,
+    toggleAutoAdmit,
   } = useSocket({ gameCode, role: "host" });
 
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [playerToRemove, setPlayerToRemove] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch tunnel URL on mount
   useEffect(() => {
@@ -154,6 +176,31 @@ export default function HostControlPage({
       "quiz-display",
       "width=1280,height=720"
     );
+  }
+
+  function handleRemovePlayer(playerId: string, playerName: string) {
+    setPlayerToRemove({ id: playerId, name: playerName });
+    setRemoveDialogOpen(true);
+  }
+
+  function confirmRemovePlayer() {
+    if (playerToRemove) {
+      removePlayer(playerToRemove.id);
+      setRemoveDialogOpen(false);
+      setPlayerToRemove(null);
+    }
+  }
+
+  function handleAdmitPlayer(playerId: string) {
+    admitPlayer(playerId);
+  }
+
+  function handleRefusePlayer(playerId: string) {
+    refusePlayer(playerId);
+  }
+
+  function handleToggleAutoAdmit(checked: boolean) {
+    toggleAutoAdmit(checked);
   }
 
   // Get current question's answers for display
@@ -632,6 +679,83 @@ export default function HostControlPage({
 
           {/* Sidebar - Players/Scores */}
           <div className="space-y-6">
+            {/* Admission Control Status */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Shield className="w-4 h-4" />
+                  Admission Control
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">Player Admission:</span>
+                    <span className={`text-sm px-2 py-1 rounded-md ${
+                      gameState.autoAdmit
+                        ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
+                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400"
+                    }`}>
+                      {gameState.autoAdmit ? "Automatic" : "Requires Approval"}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {gameState.autoAdmit
+                      ? "New players join automatically"
+                      : "New players require host approval before joining"}
+                  </p>
+                  <p className="text-xs text-muted-foreground italic">
+                    Configure this setting when creating the quiz
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Admission Requests */}
+            {admissionRequests.length > 0 && (
+              <Card className="border-yellow-500">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="w-4 h-4 text-yellow-500" />
+                    Admission Requests ({admissionRequests.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-2">
+                    {admissionRequests.map((request) => (
+                      <div
+                        key={request.playerId}
+                        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 p-3 bg-yellow-50 dark:bg-yellow-900/10 rounded-lg border-2 border-yellow-200 dark:border-yellow-800"
+                      >
+                        <p className="font-medium text-lg">{request.playerName}</p>
+                        <div className="flex gap-2 w-full sm:w-auto">
+                          <Button
+                            size="sm"
+                            onClick={() => handleAdmitPlayer(request.playerId)}
+                            className="bg-green-600 hover:bg-green-700 text-white flex-1 sm:flex-initial"
+                            title="Admit player to game"
+                          >
+                            <UserCheck className="w-4 h-4 mr-1" />
+                            Admit
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="destructive"
+                            onClick={() => handleRefusePlayer(request.playerId)}
+                            title="Refuse player admission"
+                            className="flex-1 sm:flex-initial"
+                          >
+                            <UserX className="w-4 h-4 mr-1" />
+                            Refuse
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -699,9 +823,18 @@ export default function HostControlPage({
                           <Check className="w-4 h-4 text-green-500 mr-2" />
                         )}
 
-                        <span className="font-bold text-primary">
+                        <span className="font-bold text-primary mr-2">
                           {player.score}
                         </span>
+
+                        {/* Remove Player Button */}
+                        <button
+                          onClick={() => handleRemovePlayer(player.playerId, player.name)}
+                          className="text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                          title="Remove player"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
                       </div>
                     );
                   })}
@@ -716,6 +849,33 @@ export default function HostControlPage({
           </div>
         </div>
       </main>
+
+      {/* Remove Player Confirmation Dialog */}
+      <Dialog open={removeDialogOpen} onOpenChange={setRemoveDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Player?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove <strong>{playerToRemove?.name}</strong> from the game?
+              They will be able to request to rejoin.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setRemoveDialogOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemovePlayer}
+            >
+              Remove Player
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

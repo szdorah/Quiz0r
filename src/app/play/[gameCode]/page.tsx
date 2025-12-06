@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
@@ -127,6 +127,9 @@ export default function PlayerGamePage({
     questionEnded,
     error,
     gameCancelled,
+    playerRemoved,
+    removalReason,
+    admissionStatus,
     submitAnswer,
   } = useSocket({
     gameCode,
@@ -193,7 +196,12 @@ export default function PlayerGamePage({
         setJoined(true);
       } else {
         const data = await res.json();
-        setJoinError(data.error || "Failed to join game");
+        // If admission is pending, still proceed to join (socket will handle waiting state)
+        if (data.status === "pending") {
+          setJoined(true);
+        } else {
+          setJoinError(data.error || "Failed to join game");
+        }
       }
     } catch {
       setJoinError("Failed to join game");
@@ -230,6 +238,107 @@ export default function PlayerGamePage({
     if (!effectiveCurrentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
     submitAnswer(effectiveCurrentQuestion.id, Array.from(selectedAnswers));
     setHasSubmitted(true);
+  }
+
+  // Player waiting for admission (pending status)
+  if (joined && gameState && !gameState.players.some(p => p.name.toLowerCase() === playerName.toLowerCase())) {
+    const theme = gameState?.quizTheme || joinTheme;
+    return (
+      <ThemeProvider theme={theme}>
+        <div
+          className="min-h-screen flex items-center justify-center p-4 relative"
+          style={{
+            background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
+          }}
+        >
+          <BackgroundEffects theme={theme} />
+          <Card className="w-full max-w-sm relative z-10 shadow-2xl border-2 border-yellow-500">
+            <CardContent className="pt-6 text-center">
+              <Bell className="w-12 h-12 mx-auto text-yellow-500 mb-4" />
+              <p className="text-lg font-bold mb-2">Waiting for Admission</p>
+              <p className="text-muted-foreground">
+                {playerRemoved
+                  ? "You were removed from this game. Your request to rejoin is pending host approval."
+                  : "Your request to join is pending host approval."}
+              </p>
+              <div className="mt-4 flex items-center justify-center gap-2">
+                <div className="animate-pulse flex gap-1">
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full"></div>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animation-delay-200"></div>
+                  <div className="w-2 h-2 bg-yellow-500 rounded-full animation-delay-400"></div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  // Admission refused
+  if (admissionStatus === "refused") {
+    const theme = gameState?.quizTheme || joinTheme;
+    return (
+      <ThemeProvider theme={theme}>
+        <div
+          className="min-h-screen flex items-center justify-center p-4 relative"
+          style={{
+            background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
+          }}
+        >
+          <BackgroundEffects theme={theme} />
+          <Card className="w-full max-w-sm relative z-10 shadow-2xl border-2 border-destructive">
+            <CardContent className="pt-6 text-center">
+              <UserX className="w-12 h-12 mx-auto text-destructive mb-4" />
+              <p className="text-lg font-bold text-destructive mb-2">Admission Refused</p>
+              <p className="text-muted-foreground">
+                The host has refused your request to join this game. Please contact the game host.
+              </p>
+              <Button
+                onClick={() => router.push("/play")}
+                className="mt-6"
+                variant="outline"
+              >
+                Join Another Game
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </ThemeProvider>
+    );
+  }
+
+  // Player removed (initial removal screen)
+  if (playerRemoved && admissionStatus !== "admitted") {
+    const theme = gameState?.quizTheme || joinTheme;
+    return (
+      <ThemeProvider theme={theme}>
+        <div
+          className="min-h-screen flex items-center justify-center p-4 relative"
+          style={{
+            background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
+          }}
+        >
+          <BackgroundEffects theme={theme} />
+          <Card className="w-full max-w-sm relative z-10 shadow-2xl border-2 border-destructive">
+            <CardContent className="pt-6 text-center">
+              <X className="w-12 h-12 mx-auto text-destructive mb-4" />
+              <p className="text-lg font-bold text-destructive mb-2">Removed from Game</p>
+              <p className="text-muted-foreground">
+                {removalReason || "You have been removed from the game. Please contact the game host."}
+              </p>
+              <Button
+                onClick={() => router.push("/play")}
+                className="mt-6"
+                variant="outline"
+              >
+                Join Another Game
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </ThemeProvider>
+    );
   }
 
   // Game cancelled state
