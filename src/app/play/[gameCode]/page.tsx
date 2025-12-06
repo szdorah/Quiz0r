@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
+import { useQuizPreloader } from "@/hooks/useQuizPreloader";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -116,6 +117,7 @@ export default function PlayerGamePage({
   }
 
   const {
+    socket,
     connected,
     gameState,
     currentQuestion,
@@ -132,11 +134,33 @@ export default function PlayerGamePage({
     playerName: joined ? playerName : undefined,
   });
 
+  // Get player ID from game state
+  const playerId = gameState?.players.find(
+    (p) => p.name.toLowerCase() === playerName.toLowerCase()
+  )?.id;
+
+  // Initialize quiz preloader
+  const { quizData } = useQuizPreloader({
+    gameCode,
+    playerId,
+    socket,
+  });
+
+  // Use preloaded question if available, otherwise fall back to socket-provided question
+  const effectiveCurrentQuestion = useMemo(() => {
+    if (quizData && gameState?.currentQuestionIndex !== undefined) {
+      // Use preloaded question data
+      return quizData.questions[gameState.currentQuestionIndex];
+    }
+    // Fall back to socket-provided question
+    return currentQuestion;
+  }, [quizData, gameState?.currentQuestionIndex, currentQuestion]);
+
   // Reset selected answers when question changes
   useEffect(() => {
     setSelectedAnswers(new Set());
     setHasSubmitted(false);
-  }, [currentQuestion?.id]);
+  }, [effectiveCurrentQuestion?.id]);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -183,12 +207,12 @@ export default function PlayerGamePage({
 
     const newSelected = new Set(selectedAnswers);
 
-    if (currentQuestion?.questionType === "SINGLE_SELECT") {
+    if (effectiveCurrentQuestion?.questionType === "SINGLE_SELECT") {
       // Single select - replace selection
       newSelected.clear();
       newSelected.add(answerId);
       // Auto-submit for single select
-      submitAnswer(currentQuestion.id, [answerId]);
+      submitAnswer(effectiveCurrentQuestion.id, [answerId]);
       setHasSubmitted(true);
     } else {
       // Multi select - toggle
@@ -203,8 +227,8 @@ export default function PlayerGamePage({
   }
 
   function handleSubmitMultiSelect() {
-    if (!currentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
-    submitAnswer(currentQuestion.id, Array.from(selectedAnswers));
+    if (!effectiveCurrentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
+    submitAnswer(effectiveCurrentQuestion.id, Array.from(selectedAnswers));
     setHasSubmitted(true);
   }
 
@@ -553,7 +577,7 @@ export default function PlayerGamePage({
   }
 
   // Section view - players just see the section slide
-  if (gameState.status === "SECTION" && currentQuestion) {
+  if (gameState.status === "SECTION" && effectiveCurrentQuestion) {
     const theme = gameState.quizTheme;
     return (
       <ThemeProvider theme={theme}>
@@ -567,16 +591,16 @@ export default function PlayerGamePage({
           <div className="text-center text-white relative z-10 px-4 max-w-2xl mx-auto">
             <Layers className="w-12 h-12 mx-auto mb-4 opacity-80" />
             <h1 className="text-3xl font-bold mb-4">
-              {currentQuestion.questionText}
+              {effectiveCurrentQuestion.questionText}
             </h1>
-            {currentQuestion.hostNotes && (
+            {effectiveCurrentQuestion.hostNotes && (
               <p className="text-lg opacity-90 mb-6">
-                {currentQuestion.hostNotes}
+                {effectiveCurrentQuestion.hostNotes}
               </p>
             )}
-            {currentQuestion.imageUrl && (
+            {effectiveCurrentQuestion.imageUrl && (
               <img
-                src={currentQuestion.imageUrl}
+                src={effectiveCurrentQuestion.imageUrl}
                 alt="Section"
                 className="max-h-48 mx-auto rounded-xl shadow-lg mb-6"
               />
@@ -593,7 +617,7 @@ export default function PlayerGamePage({
   // Question view
   if (
     gameState.status === "QUESTION" ||
-    (gameState.status === "REVEALING" && currentQuestion)
+    (gameState.status === "REVEALING" && effectiveCurrentQuestion)
   ) {
     const isRevealing = gameState.status === "REVEALING";
     const correctIds = questionEnded?.correctAnswerIds || [];
@@ -609,7 +633,7 @@ export default function PlayerGamePage({
           }}
         >
           {/* Timer */}
-          {!isRevealing && currentQuestion && (
+          {!isRevealing && effectiveCurrentQuestion && (
             <div className="px-8 py-4">
               <div className="flex justify-between items-center mb-2">
                 <span className="text-sm text-muted-foreground">
@@ -620,7 +644,7 @@ export default function PlayerGamePage({
                 </span>
               </div>
               <Progress
-                value={(timeRemaining / currentQuestion.timeLimit) * 100}
+                value={(timeRemaining / effectiveCurrentQuestion.timeLimit) * 100}
                 className="h-2"
               />
             </div>
@@ -629,16 +653,16 @@ export default function PlayerGamePage({
           {/* Question */}
           <div className="px-8 py-4">
             <h2 className="text-xl font-bold text-center mb-2">
-              {currentQuestion?.questionText}
+              {effectiveCurrentQuestion?.questionText}
             </h2>
-            {currentQuestion?.imageUrl && (
+            {effectiveCurrentQuestion?.imageUrl && (
               <img
-                src={currentQuestion.imageUrl}
+                src={effectiveCurrentQuestion.imageUrl}
                 alt="Question"
                 className="max-h-32 mx-auto rounded-lg mb-4"
               />
             )}
-            {currentQuestion?.questionType === "MULTI_SELECT" && !hasSubmitted && (
+            {effectiveCurrentQuestion?.questionType === "MULTI_SELECT" && !hasSubmitted && (
               <p className="text-sm text-center text-muted-foreground mb-2">
                 Select all that apply
               </p>
@@ -664,7 +688,7 @@ export default function PlayerGamePage({
 
           {/* Answers */}
           <div className="flex-1 px-8 py-4 space-y-4">
-            {currentQuestion?.answers.map((answer, index) => {
+            {effectiveCurrentQuestion?.answers.map((answer, index) => {
               const isSelected = selectedAnswers.has(answer.id);
               const isCorrect = correctIds.includes(answer.id);
               const wasSelected = isSelected;
@@ -757,7 +781,7 @@ export default function PlayerGamePage({
           </div>
 
           {/* Submit button for multi-select */}
-          {currentQuestion?.questionType === "MULTI_SELECT" &&
+          {effectiveCurrentQuestion?.questionType === "MULTI_SELECT" &&
             !hasSubmitted &&
             !isRevealing && (
               <div className="px-8 py-4 border-t">

@@ -86,17 +86,22 @@ export function useSocket({
 
     socket.on("connect", () => {
       console.log("Socket connected");
+      console.log(`[Socket] Role: ${role}, PlayerName: ${playerName}`);
       setConnected(true);
       setError(null);
 
       // Join room based on role
       if (role === "host") {
+        console.log(`[Socket] Emitting host:joinRoom for ${gameCode}`);
         socket.emit("host:joinRoom", { gameCode: gameCode.toUpperCase() });
       } else if (role === "player" && playerName) {
+        console.log(`[Socket] Emitting player:join for ${playerName} in game ${gameCode}`);
         socket.emit("player:join", {
           gameCode: gameCode.toUpperCase(),
           name: playerName,
         });
+      } else if (role === "player" && !playerName) {
+        console.log(`[Socket] Player role but no playerName yet, not emitting player:join`);
       }
     });
 
@@ -177,6 +182,19 @@ export function useSocket({
           ...prev,
           players: prev.players.map((p) =>
             p.id === playerId ? { ...p, hasAnswered: answered } : p
+          ),
+        };
+      });
+    });
+
+    socket.on("game:playerPreloadUpdate", ({ playerId, percentage, status }) => {
+      console.log(`[Socket] Received preload update for ${playerId}: ${percentage}% (${status})`);
+      setGameState((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          players: prev.players.map((p) =>
+            p.id === playerId ? { ...p, downloadStatus: { percentage, status } } : p
           ),
         };
       });

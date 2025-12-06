@@ -9,6 +9,7 @@ import {
   PlayerAnswerDetail,
   ClientToServerEvents,
   ServerToClientEvents,
+  QuizPreloadData,
 } from "@/types";
 import { QuizTheme } from "@/types/theme";
 import {
@@ -60,6 +61,7 @@ export class GameManager {
     // Player events
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
     socket.on("player:answer", (data) => this.handlePlayerAnswer(socket, data));
+    socket.on("player:preloadProgress", (data) => this.handlePreloadProgress(socket, data));
 
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
@@ -85,7 +87,9 @@ export class GameManager {
     const { gameCode, name } = data;
     const upperCode = gameCode.toUpperCase();
 
-    try {
+    console.log(`[PlayerJoin] Player "${name}" attempting to join game ${upperCode}`);
+
+    try{
       // Find game session
       const gameSession = await prisma.gameSession.findUnique({
         where: { gameCode: upperCode },
@@ -157,6 +161,9 @@ export class GameManager {
       if (state) {
         socket.emit("game:state", state);
       }
+
+      // Send quiz data for preloading
+      await this.sendQuizPreloadData(socket, upperCode, player.id);
     } catch (error) {
       console.error("Error joining game:", error);
       socket.emit("error", { message: "Failed to join game", code: "JOIN_FAILED" });
@@ -725,6 +732,107 @@ export class GameManager {
         position: index + 1,
         change: previousPosition - (index + 1),
       };
+    });
+  }
+
+  private async sendQuizPreloadData(socket: TypedSocket, gameCode: string, playerId: string) {
+    try {
+      console.log(`[Preload] Sending quiz data to player ${playerId} in game ${gameCode}`);
+      const gameSession = await prisma.gameSession.findUnique({
+        where: { gameCode },
+        include: {
+          quiz: {
+            include: {
+              questions: {
+                include: { answers: { orderBy: { orderIndex: "asc" } } },
+                orderBy: { orderIndex: "asc" },
+              },
+            },
+          },
+        },
+      });
+
+      if (!gameSession) {
+        console.log(`[Preload] Game session not found for ${gameCode}`);
+        return;
+      }
+
+      // Get active game to determine which questions to send
+      const activeGame = this.activeGames.get(gameCode);
+      const startIndex = activeGame?.currentQuestionIndex || 0;
+
+      // Get questions (all if waiting, or remaining if mid-game)
+      const allQuestions = gameSession.quiz.questions;
+      const questionsToSend = activeGame ? allQuestions.slice(startIndex) : allQuestions;
+
+      // Convert questions to QuestionData format (without correct answer info)
+      const questions: QuestionData[] = questionsToSend.map((q) => ({
+        id: q.id,
+        questionText: q.questionText,
+        imageUrl: q.imageUrl,
+        hostNotes: q.hostNotes,
+        questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT" | "SECTION",
+        timeLimit: q.timeLimit,
+        points: q.points,
+        answers: q.answers.map((a) => ({
+          id: a.id,
+          answerText: a.answerText,
+          imageUrl: a.imageUrl,
+        })),
+      }));
+
+      // Extract all unique image URLs
+      const imageUrls: string[] = [];
+      questions.forEach((q) => {
+        if (q.imageUrl) imageUrls.push(q.imageUrl);
+        q.answers.forEach((a) => {
+          if (a.imageUrl) imageUrls.push(a.imageUrl);
+        });
+      });
+
+      // Parse theme
+      let theme: QuizTheme | null = null;
+      if (gameSession.quiz.theme) {
+        theme = parseTheme(gameSession.quiz.theme);
+      }
+
+      // Send preload data
+      const preloadData = {
+        quizTitle: gameSession.quiz.title,
+        totalQuestions: allQuestions.filter((q) => q.questionType !== "SECTION").length,
+        questions,
+        theme,
+        imageUrls: [...new Set(imageUrls)], // Remove duplicates
+        startIndex,
+      };
+      console.log(`[Preload] Emitting quiz data: ${questions.length} questions, ${preloadData.imageUrls.length} images`);
+      socket.emit("game:quizDataPreload", preloadData);
+    } catch (error) {
+      console.error("Error sending quiz preload data:", error);
+    }
+  }
+
+  private handlePreloadProgress(
+    socket: TypedSocket,
+    data: {
+      gameCode: string;
+      playerId: string;
+      percentage: number;
+      loadedAssets: number;
+      totalAssets: number;
+      status: 'idle' | 'loading' | 'complete' | 'error';
+    }
+  ) {
+    const { gameCode, playerId, percentage, status } = data;
+    const upperCode = gameCode.toUpperCase();
+
+    console.log(`[Preload] Received progress from ${playerId}: ${percentage}% (${status})`);
+
+    // Broadcast progress update to all clients in game room
+    this.io.to(`game:${upperCode}`).emit("game:playerPreloadUpdate", {
+      playerId,
+      percentage,
+      status,
     });
   }
 }

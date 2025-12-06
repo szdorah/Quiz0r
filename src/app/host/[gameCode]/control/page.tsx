@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import {
   Play,
   SkipForward,
@@ -640,6 +641,23 @@ export default function HostControlPage({
                             </p>
                           )}
                         </div>
+
+                        {/* Download Progress Indicator */}
+                        {playerInfo?.downloadStatus?.status === 'loading' && (
+                          <div className="flex items-center gap-2 mr-2">
+                            <Progress
+                              value={playerInfo.downloadStatus.percentage}
+                              className="w-16 h-2"
+                            />
+                            <span className="text-xs text-muted-foreground w-10 text-right">
+                              {Math.round(playerInfo.downloadStatus.percentage)}%
+                            </span>
+                          </div>
+                        )}
+                        {playerInfo?.downloadStatus?.status === 'complete' && (
+                          <Check className="w-4 h-4 text-green-500 mr-2" />
+                        )}
+
                         <span className="font-bold text-primary">
                           {player.score}
                         </span>

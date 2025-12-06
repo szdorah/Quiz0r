@@ -44,6 +44,10 @@ export interface PlayerInfo {
   score: number;
   isActive: boolean;
   hasAnswered?: boolean;
+  downloadStatus?: {
+    percentage: number;
+    status: 'idle' | 'loading' | 'complete' | 'error';
+  };
 }
 
 export interface QuestionData {
@@ -91,6 +95,15 @@ export interface PlayerAnswerDetail {
   timeToAnswer: number;
 }
 
+export interface QuizPreloadData {
+  quizTitle: string;
+  totalQuestions: number;
+  questions: QuestionData[];
+  theme: QuizTheme | null;
+  imageUrls: string[];
+  startIndex?: number;
+}
+
 // Socket events - Server to Client
 export interface ServerToClientEvents {
   "game:state": (state: GameState) => void;
@@ -135,6 +148,12 @@ export interface ServerToClientEvents {
     points: number;
     position: number;
   }) => void;
+  "game:quizDataPreload": (data: QuizPreloadData) => void;
+  "game:playerPreloadUpdate": (data: {
+    playerId: string;
+    percentage: number;
+    status: 'idle' | 'loading' | 'complete' | 'error';
+  }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
@@ -156,4 +175,12 @@ export interface ClientToServerEvents {
     answerIds: string[];
   }) => void;
   "player:reconnect": (data: { gameCode: string; playerId: string }) => void;
+  "player:preloadProgress": (data: {
+    gameCode: string;
+    playerId: string;
+    percentage: number;
+    loadedAssets: number;
+    totalAssets: number;
+    status: 'idle' | 'loading' | 'complete' | 'error';
+  }) => void;
 }
