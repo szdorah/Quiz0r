@@ -56,6 +56,7 @@ export default function HostControlPage({
     timeRemaining,
     scores,
     playerAnswers,
+    easterEggClicks,
     nextQuestionPreview,
     gameCancelled,
     admissionRequests,
@@ -390,7 +391,14 @@ export default function HostControlPage({
                 {gameState.status === "QUESTION" && (
                   <div className="space-y-4">
                     <div className="p-4 bg-muted rounded-lg">
-                      <p className="font-medium mb-2">Current Question:</p>
+                      <p className="font-medium mb-2 flex items-center gap-2">
+                        Current Question:
+                        {currentQuestion?.easterEggEnabled && (
+                          <span className="text-lg" title="This question has an easter egg">
+                            🥚
+                          </span>
+                        )}
+                      </p>
                       <p className="text-lg">{currentQuestion?.questionText}</p>
                       <p className="text-sm text-muted-foreground mt-2">
                         {currentQuestion?.questionType === "MULTI_SELECT"
@@ -655,6 +663,11 @@ export default function HostControlPage({
                                   ) : (
                                     <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
                                   )}
+                                  {easterEggClicks.get(currentQuestion.id)?.some((click) => click.playerId === answer.playerId) && (
+                                    <span className="text-base" title="Clicked easter egg">
+                                      🥚
+                                    </span>
+                                  )}
                                 </div>
                                 <p className="text-xs text-muted-foreground">
                                   {(answer.timeToAnswer / 1000).toFixed(1)}s
@@ -822,6 +835,14 @@ export default function HostControlPage({
                         {playerInfo?.downloadStatus?.status === 'complete' && (
                           <Check className="w-4 h-4 text-green-500 mr-2" />
                         )}
+
+                        {/* Easter Egg Indicator */}
+                        {currentQuestion?.easterEggEnabled &&
+                          easterEggClicks.get(currentQuestion.id)?.some((click) => click.playerId === player.playerId) && (
+                            <span className="text-sm mr-2" title="Clicked easter egg">
+                              🥚
+                            </span>
+                          )}
 
                         <span className="font-bold text-primary mr-2">
                           {player.score}

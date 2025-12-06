@@ -37,8 +37,15 @@ model Question {
   points       Int      @default(100)
   orderIndex   Int
 
+  // Easter Egg Configuration
+  easterEggEnabled          Boolean  @default(false)
+  easterEggButtonText       String?
+  easterEggUrl              String?
+  easterEggDisablesScoring  Boolean  @default(false)
+
   answers       Answer[]
   playerAnswers PlayerAnswer[]
+  easterEggClicks EasterEggClick[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -103,6 +110,7 @@ model Player {
   removedAt       DateTime?
 
   answers PlayerAnswer[]
+  easterEggClicks EasterEggClick[]
 
   @@unique([gameSessionId, name])
   @@index([gameSessionId])
@@ -123,6 +131,21 @@ model PlayerAnswer {
   pointsEarned      Int
 
   answeredAt DateTime @default(now())
+
+  @@unique([playerId, questionId])
+  @@index([playerId])
+  @@index([questionId])
+}
+
+// Easter egg click tracking
+model EasterEggClick {
+  id         String   @id @default(cuid())
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  clickedAt  DateTime @default(now())
 
   @@unique([playerId, questionId])
   @@index([playerId])

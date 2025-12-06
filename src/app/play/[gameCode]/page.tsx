@@ -31,6 +31,7 @@ export default function PlayerGamePage({
   const [joinError, setJoinError] = useState("");
   const [selectedAnswers, setSelectedAnswers] = useState<Set<string>>(new Set());
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [easterEggClicked, setEasterEggClicked] = useState<Set<string>>(new Set());
   const [gameStatus, setGameStatus] = useState<"loading" | "valid" | "not_found" | "ended">("loading");
   const [joinTheme, setJoinTheme] = useState<any>(null);
 
@@ -238,6 +239,31 @@ export default function PlayerGamePage({
     if (!effectiveCurrentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
     submitAnswer(effectiveCurrentQuestion.id, Array.from(selectedAnswers));
     setHasSubmitted(true);
+  }
+
+  function handleEasterEggClick() {
+    if (!effectiveCurrentQuestion || !socket) return;
+
+    const questionId = effectiveCurrentQuestion.id;
+    if (easterEggClicked.has(questionId)) return; // Already clicked
+
+    // Emit socket event
+    socket.emit("player:easterEggClick", {
+      gameCode: gameCode.toUpperCase(),
+      questionId,
+    });
+
+    // Open URL in new tab
+    if (effectiveCurrentQuestion.easterEggUrl) {
+      window.open(
+        effectiveCurrentQuestion.easterEggUrl,
+        "_blank",
+        "noopener,noreferrer"
+      );
+    }
+
+    // Mark as clicked
+    setEasterEggClicked((prev) => new Set(prev).add(questionId));
   }
 
   // Player waiting for admission (pending status)
@@ -901,6 +927,33 @@ export default function PlayerGamePage({
                   className="w-full"
                 >
                   Submit Answer ({selectedAnswers.size} selected)
+                </Button>
+              </div>
+            )}
+
+          {/* Easter Egg Button */}
+          {!isRevealing &&
+            gameState.status === "QUESTION" &&
+            effectiveCurrentQuestion?.easterEggEnabled &&
+            effectiveCurrentQuestion.easterEggButtonText &&
+            effectiveCurrentQuestion.easterEggUrl && (
+              <div className="px-8 py-3">
+                <Button
+                  onClick={handleEasterEggClick}
+                  disabled={easterEggClicked.has(effectiveCurrentQuestion.id)}
+                  variant="outline"
+                  className="w-full border-2 border-dashed"
+                >
+                  {easterEggClicked.has(effectiveCurrentQuestion.id) ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Clicked!
+                    </>
+                  ) : (
+                    <>
+                      {effectiveCurrentQuestion.easterEggButtonText}
+                    </>
+                  )}
                 </Button>
               </div>
             )}

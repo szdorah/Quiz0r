@@ -19,6 +19,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       points,
       orderIndex,
       answers,
+      easterEggEnabled,
+      easterEggButtonText,
+      easterEggUrl,
+      easterEggDisablesScoring,
     } = body;
 
     // Update question
@@ -31,6 +35,17 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (timeLimit !== undefined) updateData.timeLimit = timeLimit;
     if (points !== undefined) updateData.points = points;
     if (orderIndex !== undefined) updateData.orderIndex = orderIndex;
+
+    // Easter egg fields
+    if (easterEggEnabled !== undefined) {
+      updateData.easterEggEnabled = easterEggEnabled;
+      updateData.easterEggButtonText = easterEggEnabled ?
+        easterEggButtonText?.trim() || null : null;
+      updateData.easterEggUrl = easterEggEnabled ?
+        easterEggUrl?.trim() || null : null;
+      updateData.easterEggDisablesScoring = easterEggEnabled ?
+        (easterEggDisablesScoring ?? false) : false;
+    }
 
     // If answers are provided, update them
     if (answers && Array.isArray(answers)) {

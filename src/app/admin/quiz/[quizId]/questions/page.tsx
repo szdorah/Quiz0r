@@ -341,6 +341,10 @@ export default function QuestionsPage({
     { answerText: "", isCorrect: false },
     { answerText: "", isCorrect: false },
   ]);
+  const [easterEggEnabled, setEasterEggEnabled] = useState(false);
+  const [easterEggButtonText, setEasterEggButtonText] = useState("Click for a surprise!");
+  const [easterEggUrl, setEasterEggUrl] = useState("");
+  const [easterEggDisablesScoring, setEasterEggDisablesScoring] = useState(false);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -442,6 +446,10 @@ export default function QuestionsPage({
       { answerText: "", isCorrect: false },
       { answerText: "", isCorrect: false },
     ]);
+    setEasterEggEnabled(false);
+    setEasterEggButtonText("Click for a surprise!");
+    setEasterEggUrl("");
+    setEasterEggDisablesScoring(false);
     setEditingQuestion(null);
   }
 
@@ -460,6 +468,10 @@ export default function QuestionsPage({
         isCorrect: a.isCorrect,
       }))
     );
+    setEasterEggEnabled((question as any).easterEggEnabled || false);
+    setEasterEggButtonText((question as any).easterEggButtonText || "Click for a surprise!");
+    setEasterEggUrl((question as any).easterEggUrl || "");
+    setEasterEggDisablesScoring((question as any).easterEggDisablesScoring || false);
     // Open the appropriate dialog based on type
     if (question.questionType === "SECTION") {
       setSectionDialogOpen(true);
@@ -598,6 +610,18 @@ export default function QuestionsPage({
       return;
     }
 
+    // Easter egg validation
+    if (easterEggEnabled) {
+      if (!easterEggButtonText.trim()) {
+        alert("Easter egg button text is required");
+        return;
+      }
+      if (!easterEggUrl.trim() || !easterEggUrl.match(/^https?:\/\/.+/)) {
+        alert("Easter egg URL must be a valid HTTP/HTTPS URL");
+        return;
+      }
+    }
+
     const questionData = {
       questionText,
       imageUrl: imageUrl || null,
@@ -606,6 +630,10 @@ export default function QuestionsPage({
       timeLimit,
       points,
       answers: validAnswers,
+      easterEggEnabled,
+      easterEggButtonText: easterEggEnabled ? easterEggButtonText.trim() : null,
+      easterEggUrl: easterEggEnabled ? easterEggUrl.trim() : null,
+      easterEggDisablesScoring: easterEggEnabled ? easterEggDisablesScoring : false,
     };
 
     try {
@@ -1072,6 +1100,69 @@ export default function QuestionsPage({
                       Multiple answers can be marked as correct. Players get partial
                       credit for each correct answer selected.
                     </p>
+                  )}
+                </div>
+
+                {/* Easter Egg Configuration */}
+                <div className="space-y-3 pt-4 border-t">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="easterEgg">Easter Egg Button</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Add a special button that opens a web page
+                      </p>
+                    </div>
+                    <Switch
+                      id="easterEgg"
+                      checked={easterEggEnabled}
+                      onCheckedChange={setEasterEggEnabled}
+                    />
+                  </div>
+
+                  {easterEggEnabled && (
+                    <div className="space-y-3 pl-4 border-l-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="easterEggButtonText">Button Text</Label>
+                        <Input
+                          id="easterEggButtonText"
+                          placeholder="Click for a surprise!"
+                          value={easterEggButtonText}
+                          onChange={(e) => setEasterEggButtonText(e.target.value)}
+                          maxLength={50}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          {easterEggButtonText.length}/50 characters
+                        </p>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="easterEggUrl">URL</Label>
+                        <Input
+                          id="easterEggUrl"
+                          type="url"
+                          placeholder="https://example.com"
+                          value={easterEggUrl}
+                          onChange={(e) => setEasterEggUrl(e.target.value)}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Opens in a new tab when clicked. Must start with http:// or https://
+                        </p>
+                      </div>
+
+                      <div className="flex items-center justify-between">
+                        <div className="space-y-0.5">
+                          <Label htmlFor="disableScoring">Disable Scoring</Label>
+                          <p className="text-xs text-muted-foreground">
+                            Players who click won&apos;t earn points for this question
+                          </p>
+                        </div>
+                        <Switch
+                          id="disableScoring"
+                          checked={easterEggDisablesScoring}
+                          onCheckedChange={setEasterEggDisablesScoring}
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
 

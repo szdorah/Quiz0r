@@ -43,6 +43,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       timeLimit = 30,
       points = 100,
       answers = [],
+      easterEggEnabled = false,
+      easterEggButtonText,
+      easterEggUrl,
+      easterEggDisablesScoring = false,
     } = body;
 
     if (!questionText || typeof questionText !== "string") {
@@ -50,6 +54,28 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         { error: "Question text is required" },
         { status: 400 }
       );
+    }
+
+    // Easter egg validation
+    if (easterEggEnabled) {
+      if (!easterEggButtonText || typeof easterEggButtonText !== "string") {
+        return NextResponse.json(
+          { error: "Easter egg button text is required when enabled" },
+          { status: 400 }
+        );
+      }
+      if (!easterEggUrl || typeof easterEggUrl !== "string") {
+        return NextResponse.json(
+          { error: "Easter egg URL is required when enabled" },
+          { status: 400 }
+        );
+      }
+      if (!easterEggUrl.match(/^https?:\/\/.+/)) {
+        return NextResponse.json(
+          { error: "Easter egg URL must be a valid HTTP/HTTPS URL" },
+          { status: 400 }
+        );
+      }
     }
 
     // Sections don't require answers, but regular questions do
@@ -79,6 +105,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         timeLimit,
         points,
         orderIndex: nextOrderIndex,
+        easterEggEnabled,
+        easterEggButtonText: easterEggEnabled ? easterEggButtonText.trim() : null,
+        easterEggUrl: easterEggEnabled ? easterEggUrl.trim() : null,
+        easterEggDisablesScoring: easterEggEnabled ? easterEggDisablesScoring : false,
         answers: {
           create: answers.map(
             (

@@ -61,6 +61,10 @@ export interface QuestionData {
   timeLimit: number;
   points: number;
   answers: AnswerOption[];
+  easterEggEnabled?: boolean;
+  easterEggButtonText?: string | null;
+  easterEggUrl?: string | null;
+  easterEggDisablesScoring?: boolean;
 }
 
 export interface AnswerOption {
@@ -95,6 +99,14 @@ export interface PlayerAnswerDetail {
   totalScore: number;
   position: number;
   timeToAnswer: number;
+}
+
+export interface EasterEggClickDetail {
+  playerId: string;
+  playerName: string;
+  avatarColor: string;
+  avatarEmoji?: string | null;
+  clickedAt: number;
 }
 
 export interface QuizPreloadData {
@@ -160,6 +172,10 @@ export interface ServerToClientEvents {
   "player:removed": (data: { reason: string }) => void;
   "game:admissionRequest": (data: { playerId: string; playerName: string }) => void;
   "player:admissionStatus": (data: { status: "admitted" | "refused" }) => void;
+  "game:easterEggClick": (data: {
+    questionId: string;
+    click: EasterEggClickDetail;
+  }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
@@ -193,4 +209,8 @@ export interface ClientToServerEvents {
   "host:admitPlayer": (data: { gameCode: string; playerId: string }) => void;
   "host:refusePlayer": (data: { gameCode: string; playerId: string }) => void;
   "host:toggleAutoAdmit": (data: { gameCode: string; autoAdmit: boolean }) => void;
+  "player:easterEggClick": (data: {
+    gameCode: string;
+    questionId: string;
+  }) => void;
 }

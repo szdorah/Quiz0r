@@ -8,6 +8,7 @@ import {
   PlayerScore,
   AnswerStats,
   PlayerAnswerDetail,
+  EasterEggClickDetail,
   ServerToClientEvents,
   ClientToServerEvents,
 } from "@/types";
@@ -36,6 +37,7 @@ interface UseSocketReturn {
   answerResult: { correct: boolean; points: number; position: number } | null;
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
   playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
+  easterEggClicks: Map<string, EasterEggClickDetail[]>; // questionId -> clicks
   nextQuestionPreview: NextQuestionPreview | null;
   error: string | null;
   gameCancelled: boolean;
@@ -78,6 +80,9 @@ export function useSocket({
     stats: AnswerStats;
   } | null>(null);
   const [playerAnswers, setPlayerAnswers] = useState<Map<string, PlayerAnswerDetail[]>>(
+    new Map()
+  );
+  const [easterEggClicks, setEasterEggClicks] = useState<Map<string, EasterEggClickDetail[]>>(
     new Map()
   );
   const [nextQuestionPreview, setNextQuestionPreview] = useState<NextQuestionPreview | null>(null);
@@ -219,6 +224,18 @@ export function useSocket({
         // Check if we already have this player's answer (avoid duplicates)
         if (!existing.some((a) => a.playerId === answer.playerId)) {
           newMap.set(questionId, [...existing, answer]);
+        }
+        return newMap;
+      });
+    });
+
+    socket.on("game:easterEggClick", ({ questionId, click }) => {
+      setEasterEggClicks((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(questionId) || [];
+        // Check if we already have this player's click (avoid duplicates)
+        if (!existing.some((c) => c.playerId === click.playerId)) {
+          newMap.set(questionId, [...existing, click]);
         }
         return newMap;
       });
@@ -369,6 +386,7 @@ export function useSocket({
     answerResult,
     questionEnded,
     playerAnswers,
+    easterEggClicks,
     nextQuestionPreview,
     error,
     gameCancelled,

@@ -7,6 +7,7 @@ import {
   PlayerScore,
   GameStatus,
   PlayerAnswerDetail,
+  EasterEggClickDetail,
   ClientToServerEvents,
   ServerToClientEvents,
   QuizPreloadData,
@@ -66,6 +67,7 @@ export class GameManager {
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
     socket.on("player:answer", (data) => this.handlePlayerAnswer(socket, data));
     socket.on("player:preloadProgress", (data) => this.handlePreloadProgress(socket, data));
+    socket.on("player:easterEggClick", (data) => this.handleEasterEggClick(socket, data));
 
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
@@ -283,6 +285,10 @@ export class GameManager {
           answerText: a.answerText,
           imageUrl: a.imageUrl,
         })),
+        easterEggEnabled: q.easterEggEnabled,
+        easterEggButtonText: q.easterEggButtonText,
+        easterEggUrl: q.easterEggUrl,
+        easterEggDisablesScoring: q.easterEggDisablesScoring,
       }));
 
       const correctAnswerIds = new Map<string, string[]>();
@@ -444,6 +450,23 @@ export class GameManager {
         answerIds,
         correctIds
       );
+    }
+
+    // Check if player clicked easter egg and scoring is disabled
+    if (question.easterEggDisablesScoring) {
+      const easterEggClick = await prisma.easterEggClick.findUnique({
+        where: {
+          playerId_questionId: {
+            playerId,
+            questionId,
+          },
+        },
+      });
+
+      if (easterEggClick) {
+        // Player clicked easter egg and scoring is disabled - give 0 points
+        points = 0;
+      }
     }
 
     // Save answer to database
@@ -1036,6 +1059,10 @@ export class GameManager {
           answerText: a.answerText,
           imageUrl: a.imageUrl,
         })),
+        easterEggEnabled: q.easterEggEnabled,
+        easterEggButtonText: q.easterEggButtonText,
+        easterEggUrl: q.easterEggUrl,
+        easterEggDisablesScoring: q.easterEggDisablesScoring,
       }));
 
       // Extract all unique image URLs
@@ -1091,5 +1118,69 @@ export class GameManager {
       percentage,
       status,
     });
+  }
+
+  private async handleEasterEggClick(
+    socket: TypedSocket,
+    data: { gameCode: string; questionId: string }
+  ) {
+    const { gameCode, questionId } = data;
+    const upperCode = gameCode.toUpperCase();
+    const game = this.activeGames.get(upperCode);
+
+    if (!game || game.status !== "QUESTION") return;
+
+    const playerId = (socket as any).playerId;
+    if (!playerId) return;
+
+    try {
+      // Check for duplicate
+      const existing = await prisma.easterEggClick.findUnique({
+        where: {
+          playerId_questionId: {
+            playerId,
+            questionId,
+          },
+        },
+      });
+
+      if (existing) {
+        console.log(`[EasterEgg] Player ${playerId} already clicked for question ${questionId}`);
+        return;
+      }
+
+      // Record click
+      await prisma.easterEggClick.create({
+        data: {
+          playerId,
+          questionId,
+        },
+      });
+
+      // Get player details
+      const player = await prisma.player.findUnique({
+        where: { id: playerId },
+      });
+
+      if (player) {
+        const clickDetail: EasterEggClickDetail = {
+          playerId,
+          playerName: player.name,
+          avatarColor: player.avatarColor || "#8A2CF6",
+          avatarEmoji: player.avatarEmoji,
+          clickedAt: Date.now(),
+        };
+
+        // Notify host only
+        this.io.to(`game:${upperCode}:host`).emit("game:easterEggClick", {
+          questionId,
+          click: clickDetail,
+        });
+
+        console.log(`[EasterEgg] Player ${player.name} clicked easter egg for question ${questionId}`);
+      }
+    } catch (error) {
+      console.error("Error handling easter egg click:", error);
+    }
   }
 }
