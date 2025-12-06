@@ -135,6 +135,16 @@ export class GameManager {
       });
 
       if (player) {
+        // If another active connection is already using this exact name, block the join
+        // (allow if the existing record has no socketId or is inactive).
+        if (player.isActive && player.socketId) {
+          socket.emit("error", {
+            message: "That name is already taken in this game. Please choose a different name.",
+            code: "NAME_TAKEN",
+          });
+          return;
+        }
+
         // EXISTING PLAYER - handle based on admission status
         console.log(`[PlayerJoin] Existing player "${name}" found with admissionStatus = ${player.admissionStatus}`);
 
