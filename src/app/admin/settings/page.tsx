@@ -43,6 +43,8 @@ interface SettingsData {
   shortioApiKey: string | null;
   hasShortioApiKey: boolean;
   shortioDomain: string | null;
+  openaiApiKey: string | null;
+  hasOpenaiApiKey: boolean;
 }
 
 export default function SettingsPage() {
@@ -59,6 +61,10 @@ export default function SettingsPage() {
   const [showShortio, setShowShortio] = useState(false);
   const [savingShortio, setSavingShortio] = useState(false);
   const [showRemoveDialog, setShowRemoveDialog] = useState(false);
+  const [openaiApiKeyInput, setOpenaiApiKeyInput] = useState("");
+  const [showOpenai, setShowOpenai] = useState(false);
+  const [savingOpenai, setSavingOpenai] = useState(false);
+  const [showRemoveOpenaiDialog, setShowRemoveOpenaiDialog] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -234,6 +240,58 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to remove Short.io settings" });
     } finally {
       setSavingShortio(false);
+    }
+  }
+
+  async function saveOpenaiSettings() {
+    setSavingOpenai(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          openaiApiKey: openaiApiKeyInput,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "OpenAI API key saved successfully!" });
+        setOpenaiApiKeyInput("");
+        setShowOpenai(false);
+        fetchSettings();
+      } else {
+        const data = await res.json();
+        setMessage({ type: "error", text: data.error || "Failed to save OpenAI API key" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to save OpenAI API key" });
+    } finally {
+      setSavingOpenai(false);
+    }
+  }
+
+  async function confirmRemoveOpenaiSettings() {
+    setSavingOpenai(true);
+    setMessage(null);
+    setShowRemoveOpenaiDialog(false);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ openaiApiKey: "" }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "OpenAI API key removed" });
+        fetchSettings();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to remove OpenAI API key" });
+    } finally {
+      setSavingOpenai(false);
     }
   }
 
@@ -521,7 +579,100 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
-      {/* Remove Confirmation Dialog */}
+      {/* OpenAI Translation Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Globe className="w-5 h-5" />
+            OpenAI Translation
+          </CardTitle>
+          <CardDescription>
+            Enable quiz translation to multiple languages using OpenAI GPT-4o.
+            Get an API key at{" "}
+            <a
+              href="https://platform.openai.com/api-keys"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              platform.openai.com
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* API Key Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-muted-foreground" />
+              <Label>OpenAI API Key</Label>
+            </div>
+
+            {settings?.hasOpenaiApiKey ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
+                    {settings.openaiApiKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRemoveOpenaiDialog(true)}
+                    disabled={savingOpenai}
+                  >
+                    Remove
+                  </Button>
+                </div>
+              </div>
+            ) : showOpenai ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Paste your OpenAI API key..."
+                    value={openaiApiKeyInput}
+                    onChange={(e) => setOpenaiApiKeyInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your API key is stored securely and never exposed to clients
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={saveOpenaiSettings}
+                    disabled={!openaiApiKeyInput || savingOpenai}
+                  >
+                    {savingOpenai ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowOpenai(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => setShowOpenai(true)}>
+                <Key className="w-4 h-4 mr-2" />
+                Add OpenAI API Key
+              </Button>
+            )}
+          </div>
+
+          {settings?.hasOpenaiApiKey && (
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                With OpenAI translation enabled, you can translate quizzes to 10+ languages
+                including Spanish, French, German, Hebrew, Japanese, Chinese, Arabic, Portuguese,
+                Russian, and Italian. Players can select their preferred language when joining.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Remove Short.io Confirmation Dialog */}
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
         <DialogContent>
           <DialogHeader>
@@ -548,6 +699,39 @@ export default function SettingsPage() {
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 "Remove Settings"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Remove OpenAI Confirmation Dialog */}
+      <Dialog open={showRemoveOpenaiDialog} onOpenChange={setShowRemoveOpenaiDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove OpenAI API Key?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove your OpenAI API key?
+              You will no longer be able to translate quizzes.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveOpenaiDialog(false)}
+              disabled={savingOpenai}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveOpenaiSettings}
+              disabled={savingOpenai}
+            >
+              {savingOpenai ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Remove API Key"
               )}
             </Button>
           </DialogFooter>

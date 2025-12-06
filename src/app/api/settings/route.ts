@@ -27,6 +27,11 @@ export async function GET() {
       where: { key: "shortio_domain" },
     });
 
+    // Get OpenAI settings
+    const openaiApiKeySetting = await prisma.setting.findUnique({
+      where: { key: "openai_api_key" },
+    });
+
     const hasToken = !!tokenSetting?.value;
     const maskedToken = tokenSetting?.value
       ? `${tokenSetting.value.slice(0, 8)}...${tokenSetting.value.slice(-4)}`
@@ -39,6 +44,11 @@ export async function GET() {
       : null;
     const shortioDomain = shortioDomainSetting?.value || null;
 
+    const hasOpenaiApiKey = !!openaiApiKeySetting?.value;
+    const maskedOpenaiApiKey = openaiApiKeySetting?.value
+      ? `${openaiApiKeySetting.value.slice(0, 8)}...${openaiApiKeySetting.value.slice(-4)}`
+      : null;
+
     return NextResponse.json({
       ngrokToken: maskedToken,
       hasToken,
@@ -47,6 +57,8 @@ export async function GET() {
       shortioApiKey: maskedShortioApiKey,
       hasShortioApiKey,
       shortioDomain,
+      openaiApiKey: maskedOpenaiApiKey,
+      hasOpenaiApiKey,
     });
   } catch (error) {
     console.error("Failed to get settings:", error);
@@ -61,7 +73,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { ngrokToken, shortioApiKey, shortioDomain } = body;
+    const { ngrokToken, shortioApiKey, shortioDomain, openaiApiKey } = body;
 
     if (ngrokToken !== undefined) {
       if (ngrokToken) {
@@ -115,6 +127,22 @@ export async function POST(request: Request) {
         // Remove Short.io domain
         await prisma.setting.deleteMany({
           where: { key: "shortio_domain" },
+        });
+      }
+    }
+
+    if (openaiApiKey !== undefined) {
+      if (openaiApiKey) {
+        // Save OpenAI API key
+        await prisma.setting.upsert({
+          where: { key: "openai_api_key" },
+          update: { value: openaiApiKey },
+          create: { key: "openai_api_key", value: openaiApiKey },
+        });
+      } else {
+        // Remove OpenAI API key
+        await prisma.setting.deleteMany({
+          where: { key: "openai_api_key" },
         });
       }
     }

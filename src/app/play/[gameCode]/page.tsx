@@ -10,6 +10,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -17,8 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PowerUpType, PlayerPowerUpState } from "@/types";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles } from "lucide-react";
+import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode, type QuestionDataWithTranslations } from "@/types";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
@@ -43,6 +50,8 @@ export default function PlayerGamePage({
   const [easterEggClicked, setEasterEggClicked] = useState<Set<string>>(new Set());
   const [gameStatus, setGameStatus] = useState<"loading" | "valid" | "not_found" | "ended">("loading");
   const [joinTheme, setJoinTheme] = useState<any>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("en");
+  const [availableLanguages, setAvailableLanguages] = useState<LanguageCode[]>(["en"]);
 
   // Power-up state
   const [powerUpState, setPowerUpState] = useState<PlayerPowerUpState>({
@@ -66,6 +75,12 @@ export default function PlayerGamePage({
         if (res.ok) {
           const data = await res.json();
           setJoinTheme(data.quizTheme);
+          if (data.availableLanguages) {
+            const langs = data.availableLanguages.includes("en")
+              ? data.availableLanguages
+              : ["en", ...data.availableLanguages];
+            setAvailableLanguages(Array.from(new Set(langs)));
+          }
           if (data.status === "WAITING") {
             setGameStatus("valid");
           } else if (data.status === "FINISHED") {
@@ -85,6 +100,21 @@ export default function PlayerGamePage({
     }
     checkGame();
   }, [gameCode]);
+
+  // Load language preference from localStorage on mount
+  useEffect(() => {
+    const savedLanguage = localStorage.getItem(`quiz_language_${gameCode}`);
+    if (savedLanguage && savedLanguage in SupportedLanguages) {
+      setSelectedLanguage(savedLanguage as LanguageCode);
+    }
+  }, [gameCode]);
+
+  // Save language preference to localStorage when it changes
+  useEffect(() => {
+    if (selectedLanguage) {
+      localStorage.setItem(`quiz_language_${gameCode}`, selectedLanguage);
+    }
+  }, [selectedLanguage, gameCode]);
 
   // Common emojis for avatar selection
   const avatarEmojis = [
@@ -157,6 +187,7 @@ export default function PlayerGamePage({
     gameCode,
     role: "player",
     playerName: joined ? playerName : undefined,
+    languageCode: joined ? selectedLanguage : undefined,
   });
 
   // Get player ID from game state
@@ -171,14 +202,26 @@ export default function PlayerGamePage({
     socket,
   });
 
+  // Extract available languages from quiz data
+  useEffect(() => {
+    if (quizData?.availableLanguages) {
+      setAvailableLanguages(quizData.availableLanguages);
+
+      // If selected language is not available, reset to English
+      if (!quizData.availableLanguages.includes(selectedLanguage)) {
+        setSelectedLanguage("en");
+      }
+    }
+  }, [quizData, selectedLanguage]);
+
   // Use preloaded question if available, otherwise fall back to socket-provided question
-  const effectiveCurrentQuestion = useMemo(() => {
+  const effectiveCurrentQuestion = useMemo<QuestionDataWithTranslations | null>(() => {
     if (quizData && gameState?.currentQuestionIndex !== undefined) {
-      // Use preloaded question data
+      // Use preloaded question data (with translations)
       return quizData.questions[gameState.currentQuestionIndex];
     }
-    // Fall back to socket-provided question
-    return currentQuestion;
+    // Fall back to socket-provided question (cast to include potential translations)
+    return currentQuestion as QuestionDataWithTranslations | null;
   }, [quizData, gameState?.currentQuestionIndex, currentQuestion]);
 
   // Reset selected answers when question changes
@@ -207,6 +250,28 @@ export default function PlayerGamePage({
       setCopiedPlayerId(null);
     }
   }, [gameState?.currentQuestionIndex, gameState?.status]);
+
+  // Translation utility function
+  const getTranslatedContent = (
+    content: string | null | undefined,
+    translations?: Record<string, any>,
+    field?: string
+  ): string => {
+    // If no content, return empty string
+    if (!content) return "";
+
+    // If English is selected or no translations available, return original content
+    if (selectedLanguage === "en" || !translations) return content;
+
+    // Try to get translation for the selected language
+    const translation = translations[selectedLanguage];
+    if (translation && field && translation[field]) {
+      return translation[field];
+    }
+
+    // Fallback to original content (English)
+    return content;
+  };
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -730,6 +795,37 @@ export default function PlayerGamePage({
                     ))}
                   </div>
                 </div>
+
+                {/* Language Selector */}
+                {availableLanguages.length > 1 && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium flex items-center gap-2">
+                      <LanguagesIcon className="w-4 h-4" />
+                      Select Language
+                    </label>
+                    <Select
+                      value={selectedLanguage}
+                      onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
+                      disabled={joining}
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue>
+                          {SupportedLanguages[selectedLanguage].flag} {SupportedLanguages[selectedLanguage].nativeName}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLanguages.map((langCode) => (
+                          <SelectItem key={langCode} value={langCode}>
+                            <span className="flex items-center gap-2">
+                              {SupportedLanguages[langCode].flag} {SupportedLanguages[langCode].nativeName}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
                 {joinError && (
                   <p className="text-sm text-destructive text-center">
                     {joinError}
@@ -832,23 +928,31 @@ export default function PlayerGamePage({
     const theme = gameState.quizTheme;
     return (
       <ThemeProvider theme={theme}>
-        <div
-          className="min-h-screen flex items-center justify-center p-4 relative"
-          style={{
-            background: theme?.gradients?.sectionSlide || 'linear-gradient(135deg, hsl(0 0% 35%) 0%, hsl(0 0% 25%) 100%)',
-          }}
-        >
-          <BackgroundEffects theme={theme} />
-          <div className="text-center text-white relative z-10 px-4 max-w-2xl mx-auto">
-            <Layers className="w-12 h-12 mx-auto mb-4 opacity-80" />
-            <h1 className="text-3xl font-bold mb-4">
-              {effectiveCurrentQuestion.questionText}
-            </h1>
-            {effectiveCurrentQuestion.hostNotes && (
-              <p className="text-lg opacity-90 mb-6">
-                {effectiveCurrentQuestion.hostNotes}
-              </p>
-            )}
+            <div
+              className="min-h-screen flex items-center justify-center p-4 relative"
+              style={{
+                background: theme?.gradients?.sectionSlide || 'linear-gradient(135deg, hsl(0 0% 35%) 0%, hsl(0 0% 25%) 100%)',
+              }}
+            >
+              <BackgroundEffects theme={theme} />
+              <div className="text-center text-white relative z-10 px-4 max-w-2xl mx-auto">
+                <Layers className="w-12 h-12 mx-auto mb-4 opacity-80" />
+                <h1 className="text-3xl font-bold mb-4">
+                  {getTranslatedContent(
+                    effectiveCurrentQuestion.questionText,
+                    effectiveCurrentQuestion.translations,
+                    "questionText"
+                  )}
+                </h1>
+                {effectiveCurrentQuestion.hostNotes && (
+                  <p className="text-lg opacity-90 mb-6">
+                    {getTranslatedContent(
+                      effectiveCurrentQuestion.hostNotes,
+                      effectiveCurrentQuestion.translations,
+                      "hostNotes"
+                    )}
+                  </p>
+                )}
             {effectiveCurrentQuestion.imageUrl && (
               <img
                 src={effectiveCurrentQuestion.imageUrl}
@@ -883,28 +987,63 @@ export default function PlayerGamePage({
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
           }}
         >
-          {/* Timer */}
-          {!isRevealing && effectiveCurrentQuestion && (
-            <div className="px-8 py-4">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-muted-foreground">
-                  Question {gameState.currentQuestionIndex + 1}
-                </span>
-                <span className="text-2xl font-bold text-primary">
-                  {timeRemaining}s
-                </span>
+          {/* Top bar: language and timer */}
+          <div className="px-4 sm:px-8 pt-4">
+            <div className="flex flex-col gap-2 rounded-xl bg-card/70 backdrop-blur-sm border border-border/60 px-3 py-3 shadow-sm">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {availableLanguages.length > 1 ? (
+                  <div className="flex items-center gap-2">
+                    <LanguagesIcon className="w-4 h-4 text-muted-foreground" />
+                    <Select
+                      value={selectedLanguage}
+                      onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
+                    >
+                      <SelectTrigger className="w-[170px] bg-background/80">
+                        <SelectValue>
+                          <span className="flex items-center gap-1.5 text-sm">
+                            {SupportedLanguages[selectedLanguage].flag} {SupportedLanguages[selectedLanguage].nativeName}
+                          </span>
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableLanguages.map((langCode) => (
+                          <SelectItem key={langCode} value={langCode}>
+                            <span className="flex items-center gap-2">
+                              {SupportedLanguages[langCode].flag} {SupportedLanguages[langCode].nativeName}
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <LanguagesIcon className="w-4 h-4" />
+                    English only
+                  </div>
+                )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span>Question {gameState.currentQuestionIndex + 1}</span>
+                  <span className="text-base font-semibold text-primary">{timeRemaining}s</span>
+                </div>
               </div>
-              <Progress
-                value={(timeRemaining / effectiveCurrentQuestion.timeLimit) * 100}
-                className="h-2"
-              />
+              {effectiveCurrentQuestion && (
+                <Progress
+                  value={(timeRemaining / effectiveCurrentQuestion.timeLimit) * 100}
+                  className="h-2 bg-muted"
+                />
+              )}
             </div>
-          )}
+          </div>
 
           {/* Question */}
           <div className="px-8 py-4">
             <h2 className="text-xl font-bold text-center mb-2">
-              {effectiveCurrentQuestion?.questionText}
+              {getTranslatedContent(
+                effectiveCurrentQuestion?.questionText,
+                effectiveCurrentQuestion?.translations,
+                "questionText"
+              )}
             </h2>
             {effectiveCurrentQuestion?.imageUrl && (
               <img
@@ -1124,7 +1263,13 @@ export default function PlayerGamePage({
                   <span className="font-bold text-xl">
                     {String.fromCharCode(65 + index)}
                   </span>
-                    <span className="flex-1 text-left">{answer.answerText}</span>
+                    <span className="flex-1 text-left">
+                      {getTranslatedContent(
+                        answer.answerText,
+                        answer.translations,
+                        "answerText"
+                      )}
+                    </span>
                     {isRevealing && isCorrect && <Check className="w-6 h-6" />}
                     {isRevealing && wasSelected && !isCorrect && (
                       <X className="w-6 h-6" />
@@ -1171,7 +1316,11 @@ export default function PlayerGamePage({
                     </>
                   ) : (
                     <>
-                      {effectiveCurrentQuestion.easterEggButtonText}
+                      {getTranslatedContent(
+                        effectiveCurrentQuestion.easterEggButtonText,
+                        effectiveCurrentQuestion.translations,
+                        "easterEggButtonText"
+                      )}
                     </>
                   )}
                 </Button>
@@ -1197,7 +1346,13 @@ export default function PlayerGamePage({
               </DialogTitle>
             </DialogHeader>
             <div className="py-6">
-              <p className="text-lg">{effectiveCurrentQuestion?.hint}</p>
+              <p className="text-lg">
+                {getTranslatedContent(
+                  effectiveCurrentQuestion?.hint,
+                  effectiveCurrentQuestion?.translations,
+                  "hint"
+                )}
+              </p>
             </div>
             <DialogFooter>
               <Button onClick={() => setShowHintModal(false)}>Close</Button>

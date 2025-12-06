@@ -12,6 +12,9 @@ import {
   ServerToClientEvents,
   QuizPreloadData,
   PowerUpType,
+  LanguageCode,
+  SupportedLanguages,
+  QuestionDataWithTranslations,
 } from "@/types";
 import { QuizTheme } from "@/types/theme";
 import {
@@ -70,6 +73,7 @@ export class GameManager {
     socket.on("player:preloadProgress", (data) => this.handlePreloadProgress(socket, data));
     socket.on("player:easterEggClick", (data) => this.handleEasterEggClick(socket, data));
     socket.on("player:usePowerUp", (data) => this.handlePowerUpUsage(socket, data));
+    socket.on("player:updateLanguage", (data) => this.handlePlayerLanguageUpdate(socket, data));
 
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
@@ -90,9 +94,9 @@ export class GameManager {
 
   private async handlePlayerJoin(
     socket: TypedSocket,
-    data: { gameCode: string; name: string }
+    data: { gameCode: string; name: string; languageCode?: LanguageCode }
   ) {
-    const { gameCode, name } = data;
+    const { gameCode, name, languageCode } = data;
     const upperCode = gameCode.toUpperCase();
 
     console.log(`[PlayerJoin] Player "${name}" attempting to join game ${upperCode}`);
@@ -172,7 +176,11 @@ export class GameManager {
         // Player is admitted - normal reconnection
         player = await prisma.player.update({
           where: { id: player.id },
-          data: { socketId: socket.id, isActive: true },
+          data: {
+            socketId: socket.id,
+            isActive: true,
+            languageCode: languageCode || player.languageCode || "en",
+          },
         });
       } else {
         // NEW PLAYER - create with appropriate admission status
@@ -187,6 +195,7 @@ export class GameManager {
             socketId: socket.id,
             avatarColor: generateAvatarColor(),
             admissionStatus,
+            languageCode: languageCode || "en",
           },
         });
 
@@ -1038,6 +1047,7 @@ export class GameManager {
         score: p.totalScore,
         isActive: p.isActive,
         admissionStatus: p.admissionStatus as "admitted" | "pending" | "refused",
+        languageCode: (p.languageCode as LanguageCode) || "en",
       })),
       currentQuestion: activeGame?.questions[activeGame.currentQuestionIndex] || null,
       timeRemaining: activeGame?.questionStartedAt
@@ -1096,6 +1106,7 @@ export class GameManager {
         name: p.name,
         avatarColor: p.avatarColor || "#8A2CF6",
         avatarEmoji: p.avatarEmoji,
+        languageCode: (p.languageCode as LanguageCode) || "en",
         score: p.totalScore,
         position: index + 1,
         change: previousPosition - (index + 1),
@@ -1113,7 +1124,15 @@ export class GameManager {
           quiz: {
             include: {
               questions: {
-                include: { answers: { orderBy: { orderIndex: "asc" } } },
+                include: {
+                  answers: {
+                    include: {
+                      translations: true,
+                    },
+                    orderBy: { orderIndex: "asc" },
+                  },
+                  translations: true,
+                },
                 orderBy: { orderIndex: "asc" },
               },
             },
@@ -1134,25 +1153,71 @@ export class GameManager {
       const allQuestions = gameSession.quiz.questions;
       const questionsToSend = activeGame ? allQuestions.slice(startIndex) : allQuestions;
 
-      // Convert questions to QuestionData format (without correct answer info)
-      const questions: QuestionData[] = questionsToSend.map((q) => ({
-        id: q.id,
-        questionText: q.questionText,
-        imageUrl: q.imageUrl,
-        hostNotes: q.hostNotes,
-        questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT" | "SECTION",
-        timeLimit: q.timeLimit,
-        points: q.points,
-        answers: q.answers.map((a) => ({
-          id: a.id,
-          answerText: a.answerText,
-          imageUrl: a.imageUrl,
-        })),
-        easterEggEnabled: q.easterEggEnabled,
-        easterEggButtonText: q.easterEggButtonText,
-        easterEggUrl: q.easterEggUrl,
-        easterEggDisablesScoring: q.easterEggDisablesScoring,
-      }));
+      // Convert questions to QuestionDataWithTranslations format (without correct answer info)
+      const questions: QuestionDataWithTranslations[] = questionsToSend.map((q) => {
+        // Build question translations object
+        const questionTranslations: Record<LanguageCode, any> = {} as any;
+        q.translations.forEach((t) => {
+          questionTranslations[t.languageCode as LanguageCode] = {
+            questionText: t.questionText,
+            hostNotes: t.hostNotes,
+            hint: t.hint,
+            easterEggButtonText: t.easterEggButtonText,
+          };
+        });
+
+        // Build answers with translations
+        const answers = q.answers.map((a) => {
+          const answerTranslations: Record<LanguageCode, any> = {} as any;
+          a.translations.forEach((t) => {
+            answerTranslations[t.languageCode as LanguageCode] = {
+              answerText: t.answerText,
+            };
+          });
+
+          return {
+            id: a.id,
+            answerText: a.answerText,
+            imageUrl: a.imageUrl,
+            translations: Object.keys(answerTranslations).length > 0 ? answerTranslations : undefined,
+          };
+        });
+
+        return {
+          id: q.id,
+          questionText: q.questionText,
+          imageUrl: q.imageUrl,
+          hostNotes: q.hostNotes,
+          hint: q.hint,
+          questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT" | "SECTION",
+          timeLimit: q.timeLimit,
+          points: q.points,
+          answers,
+          easterEggEnabled: q.easterEggEnabled,
+          easterEggButtonText: q.easterEggButtonText,
+          easterEggUrl: q.easterEggUrl,
+          easterEggDisablesScoring: q.easterEggDisablesScoring,
+          translations: Object.keys(questionTranslations).length > 0 ? questionTranslations : undefined,
+        };
+      });
+
+      // Determine available languages (languages with at least some translations)
+      // Always include English as base language
+      const availableLanguages = new Set<LanguageCode>(["en"]);
+      questions.forEach((q) => {
+        if (q.translations) {
+          Object.keys(q.translations).forEach((lang) => {
+            availableLanguages.add(lang as LanguageCode);
+          });
+        }
+        q.answers.forEach((a) => {
+          if (a.translations) {
+            Object.keys(a.translations).forEach((lang) => {
+              availableLanguages.add(lang as LanguageCode);
+            });
+          }
+        });
+      });
 
       // Extract all unique image URLs
       const imageUrls: string[] = [];
@@ -1170,15 +1235,16 @@ export class GameManager {
       }
 
       // Send preload data
-      const preloadData = {
+      const preloadData: QuizPreloadData = {
         quizTitle: gameSession.quiz.title,
         totalQuestions: allQuestions.filter((q) => q.questionType !== "SECTION").length,
         questions,
         theme,
         imageUrls: Array.from(new Set(imageUrls)), // Remove duplicates
         startIndex,
+        availableLanguages: Array.from(availableLanguages),
       };
-      console.log(`[Preload] Emitting quiz data: ${questions.length} questions, ${preloadData.imageUrls.length} images`);
+      console.log(`[Preload] Emitting quiz data: ${questions.length} questions, ${preloadData.imageUrls.length} images, ${preloadData.availableLanguages.length} languages`);
       socket.emit("game:quizDataPreload", preloadData);
     } catch (error) {
       console.error("Error sending quiz preload data:", error);
@@ -1207,6 +1273,43 @@ export class GameManager {
       percentage,
       status,
     });
+  }
+
+  private async handlePlayerLanguageUpdate(
+    socket: TypedSocket,
+    data: { gameCode: string; languageCode: LanguageCode }
+  ) {
+    try {
+      const { gameCode, languageCode } = data;
+      const upperCode = gameCode.toUpperCase();
+      const playerId = (socket as unknown as { playerId?: string }).playerId;
+      if (!playerId) {
+        console.warn("[LanguageUpdate] No playerId on socket, ignoring");
+        return;
+      }
+
+      const updated = await prisma.player.update({
+        where: { id: playerId },
+        data: { languageCode },
+      });
+
+      const playerInfo: PlayerInfo = {
+        id: updated.id,
+        name: updated.name,
+        avatarColor: updated.avatarColor || "#8A2CF6",
+        avatarEmoji: updated.avatarEmoji,
+        score: updated.totalScore,
+        isActive: updated.isActive,
+        admissionStatus: updated.admissionStatus as "admitted" | "pending" | "refused",
+        languageCode: updated.languageCode as LanguageCode,
+      };
+
+      // Notify host and players about the updated language
+      this.io.to(`game:${upperCode}:host`).emit("game:playerJoined", { player: playerInfo });
+      this.io.to(`game:${upperCode}`).emit("game:playerJoined", { player: playerInfo });
+    } catch (error) {
+      console.error("Failed to update player language:", error);
+    }
   }
 
   private async handleEasterEggClick(

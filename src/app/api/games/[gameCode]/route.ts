@@ -47,6 +47,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       );
     }
 
+    // Determine available languages (base English + any question/answer translations)
+    const questionLanguages = await prisma.questionTranslation.findMany({
+      where: { question: { quizId: gameSession.quizId } },
+      distinct: ["languageCode"],
+      select: { languageCode: true },
+    });
+
+    const answerLanguages = await prisma.answerTranslation.findMany({
+      where: { answer: { question: { quizId: gameSession.quizId } } },
+      distinct: ["languageCode"],
+      select: { languageCode: true },
+    });
+
+    const availableLanguages = Array.from(
+      new Set<string>([
+        "en",
+        ...questionLanguages.map((q) => q.languageCode),
+        ...answerLanguages.map((a) => a.languageCode),
+      ])
+    );
+
     // Parse theme JSON string to object
     const parsedTheme = parseTheme(gameSession.quiz.theme);
 
@@ -57,6 +78,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       quizTheme: parsedTheme,
       currentQuestionIndex: gameSession.currentQuestionIndex,
       totalQuestions: gameSession.quiz.questions.length,
+      availableLanguages,
       players: gameSession.players.map((p) => ({
         id: p.id,
         name: p.name,

@@ -12,6 +12,7 @@ import {
   ServerToClientEvents,
   ClientToServerEvents,
   PowerUpType,
+  LanguageCode,
 } from "@/types";
 
 interface NextQuestionPreview {
@@ -26,6 +27,7 @@ interface UseSocketOptions {
   gameCode: string;
   role: "host" | "player";
   playerName?: string;
+  languageCode?: LanguageCode;
 }
 
 interface UseSocketReturn {
@@ -65,8 +67,12 @@ export function useSocket({
   gameCode,
   role,
   playerName,
+  languageCode,
 }: UseSocketOptions): UseSocketReturn {
   const socketRef = useRef<TypedSocket | null>(null);
+  const latestPlayerName = useRef(playerName);
+  const latestLanguageCode = useRef(languageCode);
+  const [hasJoined, setHasJoined] = useState(false);
   const [connected, setConnected] = useState(false);
   const [gameState, setGameState] = useState<GameState | null>(null);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionData | null>(null);
@@ -98,6 +104,15 @@ export function useSocket({
   const [admissionRequests, setAdmissionRequests] = useState<Array<{playerId: string; playerName: string}>>([]);
   const [admissionStatus, setAdmissionStatus] = useState<"admitted" | "refused" | null>(null);
 
+  // Keep latest join data without recreating socket
+  useEffect(() => {
+    latestPlayerName.current = playerName;
+  }, [playerName]);
+
+  useEffect(() => {
+    latestLanguageCode.current = languageCode;
+  }, [languageCode]);
+
   useEffect(() => {
     // Initialize socket
     const socket: TypedSocket = io({
@@ -108,7 +123,7 @@ export function useSocket({
 
     socket.on("connect", () => {
       console.log("Socket connected");
-      console.log(`[Socket] Role: ${role}, PlayerName: ${playerName}`);
+      console.log(`[Socket] Role: ${role}, PlayerName: ${latestPlayerName.current}`);
       setConnected(true);
       setError(null);
 
@@ -116,12 +131,14 @@ export function useSocket({
       if (role === "host") {
         console.log(`[Socket] Emitting host:joinRoom for ${gameCode}`);
         socket.emit("host:joinRoom", { gameCode: gameCode.toUpperCase() });
-      } else if (role === "player" && playerName) {
-        console.log(`[Socket] Emitting player:join for ${playerName} in game ${gameCode}`);
+      } else if (role === "player" && latestPlayerName.current) {
+        console.log(`[Socket] Emitting player:join for ${latestPlayerName.current} in game ${gameCode}${latestLanguageCode.current ? ` with language ${latestLanguageCode.current}` : ''}`);
         socket.emit("player:join", {
           gameCode: gameCode.toUpperCase(),
-          name: playerName,
+          name: latestPlayerName.current,
+          languageCode: latestLanguageCode.current,
         });
+        setHasJoined(true);
       } else if (role === "player" && !playerName) {
         console.log(`[Socket] Player role but no playerName yet, not emitting player:join`);
       }
@@ -322,7 +339,42 @@ export function useSocket({
     return () => {
       socket.disconnect();
     };
-  }, [gameCode, role, playerName]);
+  }, [gameCode, role]);
+
+  // Emit language change without reconnecting
+  useEffect(() => {
+    if (
+      role === "player" &&
+      socketRef.current &&
+      socketRef.current.connected &&
+      !hasJoined &&
+      latestPlayerName.current
+    ) {
+      socketRef.current.emit("player:join", {
+        gameCode: gameCode.toUpperCase(),
+        name: latestPlayerName.current,
+        languageCode: latestLanguageCode.current,
+      });
+      setHasJoined(true);
+    }
+  }, [role, gameCode, hasJoined, playerName, languageCode]);
+
+  // Emit language change without reconnecting
+  useEffect(() => {
+    if (
+      role === "player" &&
+      socketRef.current &&
+      socketRef.current.connected &&
+      hasJoined &&
+      latestPlayerName.current &&
+      languageCode
+    ) {
+      socketRef.current.emit("player:updateLanguage", {
+        gameCode: gameCode.toUpperCase(),
+        languageCode,
+      });
+    }
+  }, [languageCode, role, gameCode, hasJoined]);
 
   const startGame = useCallback(() => {
     socketRef.current?.emit("host:startGame", { gameCode: gameCode.toUpperCase() });

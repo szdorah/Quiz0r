@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
-import { PowerUpType } from "@/types";
+import { PowerUpType, SupportedLanguages } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -839,7 +839,17 @@ export default function HostControlPage({
                           </Avatar>
                         )}
                         <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate">{player.name}</p>
+                          <p className="font-medium truncate flex items-center gap-1.5">
+                            {player.name}
+                            {player.languageCode && player.languageCode !== "en" && (
+                              <span
+                                className="text-sm"
+                                title={SupportedLanguages[player.languageCode]?.nativeName || player.languageCode}
+                              >
+                                {SupportedLanguages[player.languageCode]?.flag || ""}
+                              </span>
+                            )}
+                          </p>
                           {!isActive && (
                             <p className="text-xs text-muted-foreground">
                               Disconnected

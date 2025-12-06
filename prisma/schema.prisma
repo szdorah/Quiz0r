@@ -56,6 +56,7 @@ model Question {
   playerAnswers   PlayerAnswer[]
   easterEggClicks EasterEggClick[]
   powerUpUsages   PowerUpUsage[]
+  translations    QuestionTranslation[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -73,6 +74,8 @@ model Answer {
   imageUrl   String?
   isCorrect  Boolean  @default(false)
   orderIndex Int
+
+  translations AnswerTranslation[]
 
   @@index([questionId])
 }
@@ -106,10 +109,11 @@ model Player {
   gameSessionId String
   gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
 
-  name        String
-  socketId    String?
-  avatarColor String?
-  avatarEmoji String?
+  name         String
+  socketId     String?
+  avatarColor  String?
+  avatarEmoji  String?
+  languageCode String? @default("en")  // Player's selected language
 
   totalScore    Int @default(0)
   currentStreak Int @default(0)
@@ -178,6 +182,45 @@ model PowerUpUsage {
   @@unique([playerId, questionId, powerUpType]) // Prevent using same type twice per question
   @@index([playerId])
   @@index([questionId])
+}
+
+// Translation for question text, host notes, hint, and easter egg button text
+model QuestionTranslation {
+  id         String   @id @default(cuid())
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  languageCode        String  // ISO 639-1 code: 'es', 'fr', 'de', etc.
+  questionText        String
+  hostNotes           String?
+  hint                String?
+  easterEggButtonText String?
+
+  isAutoTranslated Boolean  @default(true) // false if manually edited
+  translatedAt     DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([questionId, languageCode])
+  @@index([questionId])
+  @@index([languageCode])
+}
+
+// Translation for answer text
+model AnswerTranslation {
+  id       String @id @default(cuid())
+  answerId String
+  answer   Answer @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  languageCode String // ISO 639-1 code
+  answerText   String
+
+  isAutoTranslated Boolean  @default(true) // false if manually edited
+  translatedAt     DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@unique([answerId, languageCode])
+  @@index([answerId])
+  @@index([languageCode])
 }
 
 // App settings (key-value store)

@@ -13,6 +13,7 @@ import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { AspectRatioHelper } from "@/components/display/AspectRatioHelper";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
 import { getContrastingTextColor } from "@/lib/color-utils";
+import { SupportedLanguages } from "@/types";
 
 export default function HostDisplayPage({
   params,
@@ -261,11 +262,11 @@ export default function HostDisplayPage({
                 Players ({gameState.players.length})
               </h2>
               <div className="flex flex-wrap justify-center gap-3">
-                {gameState.players.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-sm"
-                  >
+                    {gameState.players.map((player) => (
+                      <div
+                        key={player.id}
+                        className="flex items-center gap-2 bg-card rounded-full px-4 py-2 shadow-sm"
+                      >
                     {player.avatarEmoji?.startsWith("/") ? (
                       <img
                         src={player.avatarEmoji}
@@ -282,9 +283,11 @@ export default function HostDisplayPage({
                         </AvatarFallback>
                       </Avatar>
                     )}
-                    <span className="font-medium">{player.name}</span>
-                  </div>
-                ))}
+                        <span className="font-medium flex items-center gap-1.5">
+                          {player.name}
+                        </span>
+                      </div>
+                    ))}
                 {gameState.players.length === 0 && (
                   <p className="text-muted-foreground">
                     Waiting for players to scan the QR code...
@@ -598,7 +601,17 @@ export default function HostDisplayPage({
                       </AvatarFallback>
                     </Avatar>
                   )}
-                  <span className="font-medium flex-1">{player.name}</span>
+                  <span className="font-medium flex-1 flex items-center gap-1.5">
+                    {player.name}
+                    {player.languageCode && player.languageCode !== "en" && (
+                      <span
+                        className="text-sm"
+                        title={SupportedLanguages[player.languageCode]?.nativeName || player.languageCode}
+                      >
+                        {SupportedLanguages[player.languageCode]?.flag || ""}
+                      </span>
+                    )}
+                  </span>
 
                   {/* Power-up indicators */}
                   {"powerUpsUsed" in player && player.powerUpsUsed && player.powerUpsUsed.length > 0 && (

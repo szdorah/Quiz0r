@@ -30,6 +30,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -46,6 +52,7 @@ import {
   Shield,
   Zap,
   AlertCircle,
+  Languages,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -68,6 +75,7 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { SupportedLanguages, type LanguageCode } from "@/types";
 
 interface Answer {
   id?: string;
@@ -358,6 +366,19 @@ export default function QuestionsPage({
   // Export state
   const [exporting, setExporting] = useState(false);
 
+  // Translation state
+  const [questionTranslations, setQuestionTranslations] = useState<Record<LanguageCode, any>>({} as Record<LanguageCode, any>);
+  const [answerTranslations, setAnswerTranslations] = useState<Record<string, Record<LanguageCode, string>>>({});
+  const [activeTranslationTab, setActiveTranslationTab] = useState<string>("en");
+  const [availableTranslationLanguages, setAvailableTranslationLanguages] = useState<LanguageCode[]>(["en"]);
+  const [savingTranslation, setSavingTranslation] = useState<LanguageCode | null>(null);
+
+  // Translations dialog state
+  const [translationsDialogOpen, setTranslationsDialogOpen] = useState(false);
+  const [translationStatuses, setTranslationStatuses] = useState<any[]>([]);
+  const [loadingTranslations, setLoadingTranslations] = useState(false);
+  const [translatingLanguage, setTranslatingLanguage] = useState<string | null>(null);
+
   // DnD sensors
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -461,6 +482,155 @@ export default function QuestionsPage({
     setEditingQuestion(null);
   }
 
+  async function fetchTranslationStatus() {
+    setLoadingTranslations(true);
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/translations`);
+      if (res.ok) {
+        const data = await res.json();
+        setTranslationStatuses(data.statuses || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch translation status:", error);
+    } finally {
+      setLoadingTranslations(false);
+    }
+  }
+
+  async function handleTranslateQuiz(targetLanguage: LanguageCode) {
+    if (!confirm(`Translate entire quiz to ${SupportedLanguages[targetLanguage].name}? This may take a few minutes and will use OpenAI API credits.`)) {
+      return;
+    }
+
+    setTranslatingLanguage(targetLanguage);
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/translate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetLanguage }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert(`Success! Translated ${data.translated} question(s) to ${SupportedLanguages[targetLanguage].name}`);
+        await fetchTranslationStatus();
+      } else {
+        alert(data.error || "Translation failed");
+      }
+    } catch (error) {
+      console.error("Translation error:", error);
+      alert("Failed to translate quiz");
+    } finally {
+      setTranslatingLanguage(null);
+    }
+  }
+
+  async function handleDeleteLanguage(targetLanguage: LanguageCode) {
+    if (!confirm(`Delete all ${SupportedLanguages[targetLanguage].name} translations? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/translations/${targetLanguage}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        alert(`Successfully deleted ${SupportedLanguages[targetLanguage].name} translations`);
+        await fetchTranslationStatus();
+      } else {
+        alert("Failed to delete translations");
+      }
+    } catch (error) {
+      console.error("Delete error:", error);
+      alert("Failed to delete translations");
+    }
+  }
+
+  function openTranslationsDialog() {
+    setTranslationsDialogOpen(true);
+    fetchTranslationStatus();
+  }
+
+  async function saveTranslationForLanguage(lang: LanguageCode) {
+    if (!editingQuestion?.id) {
+      alert("Save the question before editing translations.");
+      return;
+    }
+
+    setSavingTranslation(lang);
+
+    try {
+      const translatedQuestion = questionTranslations[lang] || {};
+
+      const answersPayload = answers
+        .filter((a) => a.id)
+        .map((a, index) => {
+          const key = a.id || `answer-${index}`;
+          return {
+            id: a.id!,
+            answerText:
+              answerTranslations[key]?.[lang] ??
+              a.answerText,
+          };
+        });
+
+      const res = await fetch(
+        `/api/quizzes/${quizId}/questions/${editingQuestion.id}/translations/${lang}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            questionText: translatedQuestion.questionText ?? "",
+            hostNotes: translatedQuestion.hostNotes ?? null,
+            hint: translatedQuestion.hint ?? null,
+            easterEggButtonText: translatedQuestion.easterEggButtonText ?? null,
+            answers: answersPayload,
+          }),
+        }
+      );
+
+      if (res.ok) {
+        alert(`Saved ${SupportedLanguages[lang].name} translation`);
+        await loadQuestionTranslations(editingQuestion.id);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to save translation");
+      }
+    } catch (error) {
+      console.error("Failed to save translation:", error);
+      alert("Failed to save translation");
+    } finally {
+      setSavingTranslation((current) => (current === lang ? null : current));
+    }
+  }
+
+  async function loadQuestionTranslations(questionId: string) {
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}/questions/${questionId}/translations`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.translations) {
+          setQuestionTranslations(data.translations.questionTranslations || {});
+          setAnswerTranslations(data.translations.answerTranslations || {});
+
+          // Get available languages
+          const langs = new Set<LanguageCode>(["en"]);
+          Object.keys(data.translations.questionTranslations || {}).forEach((lang) => {
+            langs.add(lang as LanguageCode);
+          });
+          Object.values(data.translations.answerTranslations || {}).forEach((answerMap: Record<string, string>) => {
+            Object.keys(answerMap || {}).forEach((lang) => langs.add(lang as LanguageCode));
+          });
+          setAvailableTranslationLanguages(Array.from(langs));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to load translations:", error);
+    }
+  }
+
   function openEditDialog(question: Question) {
     setEditingQuestion(question);
     setQuestionText(question.questionText);
@@ -472,6 +642,7 @@ export default function QuestionsPage({
     setPoints(question.points);
     setAnswers(
       question.answers.map((a) => ({
+        id: a.id,
         answerText: a.answerText,
         imageUrl: a.imageUrl,
         isCorrect: a.isCorrect,
@@ -481,6 +652,18 @@ export default function QuestionsPage({
     setEasterEggButtonText((question as any).easterEggButtonText || "Click for a surprise!");
     setEasterEggUrl((question as any).easterEggUrl || "");
     setEasterEggDisablesScoring((question as any).easterEggDisablesScoring || false);
+
+    // Reset translation state
+    setQuestionTranslations({} as Record<LanguageCode, any>);
+    setAnswerTranslations({});
+    setActiveTranslationTab("en");
+    setAvailableTranslationLanguages(["en"]);
+
+    // Load translations if editing existing question
+    if (question.id) {
+      loadQuestionTranslations(question.id);
+    }
+
     // Open the appropriate dialog based on type
     if (question.questionType === "SECTION") {
       setSectionDialogOpen(true);
@@ -899,6 +1082,10 @@ export default function QuestionsPage({
               Theme
             </Button>
           </Link>
+          <Button variant="outline" onClick={openTranslationsDialog}>
+            <Languages className="w-4 h-4 mr-2" />
+            Translations
+          </Button>
           <Button variant="outline" onClick={handleExport} disabled={exporting || !quiz}>
             <Download className="w-4 h-4 mr-2" />
             {exporting ? "Exporting..." : "Export"}
@@ -930,8 +1117,21 @@ export default function QuestionsPage({
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6 py-4">
-                {/* Question Text */}
+              <Tabs value={activeTranslationTab} onValueChange={setActiveTranslationTab} className="py-4">
+                {/* Show translation tabs only when editing and translations exist */}
+                {editingQuestion && availableTranslationLanguages.length > 1 && (
+                  <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${availableTranslationLanguages.length}, minmax(0, 1fr))` }}>
+                    {availableTranslationLanguages.map((lang) => (
+                      <TabsTrigger key={lang} value={lang}>
+                        {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                )}
+
+                {/* English (original) tab */}
+                <TabsContent value="en" className="space-y-6 mt-4">
+                  {/* Question Text */}
                 <div className="space-y-2">
                   <Label htmlFor="questionText">Question</Label>
                   <Textarea
@@ -1243,7 +1443,120 @@ export default function QuestionsPage({
                     {editingQuestion ? "Save Changes" : "Add Question"}
                   </Button>
                 </div>
-              </div>
+                </TabsContent>
+
+                {/* Translation tabs for other languages */}
+                {availableTranslationLanguages
+                  .filter((lang) => lang !== "en")
+                  .map((lang) => (
+                    <TabsContent key={lang} value={lang} className="space-y-6 mt-4">
+                      <div className="p-4 bg-muted/50 rounded-lg space-y-4">
+                        <p className="text-sm text-muted-foreground mb-4">
+                          {SupportedLanguages[lang].flag} Editing {SupportedLanguages[lang].nativeName} translation
+                        </p>
+
+                        {/* Question Text Translation */}
+                        <div className="space-y-2">
+                          <Label>Question</Label>
+                          <Textarea
+                            placeholder={`Enter question in ${SupportedLanguages[lang].nativeName}...`}
+                            value={questionTranslations[lang]?.questionText || ""}
+                            onChange={(e) => {
+                              setQuestionTranslations((prev) => ({
+                                ...prev,
+                                [lang]: {
+                                  ...prev[lang],
+                                  questionText: e.target.value,
+                                },
+                              }));
+                            }}
+                            rows={2}
+                          />
+                        </div>
+
+                        {/* Host Notes Translation */}
+                        <div className="space-y-2">
+                          <Label>Host Notes (optional)</Label>
+                          <Textarea
+                            placeholder={`Enter host notes in ${SupportedLanguages[lang].nativeName}...`}
+                            value={questionTranslations[lang]?.hostNotes || ""}
+                            onChange={(e) => {
+                              setQuestionTranslations((prev) => ({
+                                ...prev,
+                                [lang]: {
+                                  ...prev[lang],
+                                  hostNotes: e.target.value,
+                                },
+                              }));
+                            }}
+                            rows={2}
+                          />
+                        </div>
+
+                        {/* Hint Translation */}
+                        <div className="space-y-2">
+                          <Label>Hint (optional)</Label>
+                          <Textarea
+                            placeholder={`Enter hint in ${SupportedLanguages[lang].nativeName}...`}
+                            value={questionTranslations[lang]?.hint || ""}
+                            onChange={(e) => {
+                              setQuestionTranslations((prev) => ({
+                                ...prev,
+                                [lang]: {
+                                  ...prev[lang],
+                                  hint: e.target.value,
+                                },
+                              }));
+                            }}
+                            rows={2}
+                          />
+                        </div>
+
+                        {/* Answer Translations */}
+                        <div className="space-y-2">
+                          <Label>Answers</Label>
+                          {answers.map((answer, index) => (
+                            <div key={index} className="space-y-1">
+                              <Label className="text-xs text-muted-foreground">Answer {index + 1}</Label>
+                              <Input
+                                placeholder={`Enter answer in ${SupportedLanguages[lang].nativeName}...`}
+                                value={answerTranslations[answer.id || `answer-${index}`]?.[lang] || ""}
+                                onChange={(e) => {
+                                  const key = answer.id || `answer-${index}`;
+                                  setAnswerTranslations((prev) => ({
+                                    ...prev,
+                                    [key]: {
+                                      ...(prev[key] || {}),
+                                      [lang]: e.target.value,
+                                    },
+                                  }));
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => saveTranslationForLanguage(lang)}
+                            disabled={savingTranslation === lang}
+                          >
+                            {savingTranslation === lang ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Saving...
+                              </>
+                            ) : (
+                              "Save translation"
+                            )}
+                          </Button>
+                        </div>
+                      </div>
+                    </TabsContent>
+                  ))}
+              </Tabs>
             </DialogContent>
           </Dialog>
 
@@ -1554,6 +1867,125 @@ export default function QuestionsPage({
           </DragOverlay>
         </DndContext>
       )}
+
+      {/* Translations Dialog */}
+      <Dialog open={translationsDialogOpen} onOpenChange={setTranslationsDialogOpen}>
+        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Quiz Translations</DialogTitle>
+            <DialogDescription>
+              Translate your quiz into multiple languages using AI. Players can select their preferred language when joining.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            {loadingTranslations ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <div className="grid gap-3">
+                {(Object.keys(SupportedLanguages) as LanguageCode[])
+                  .filter((code) => code !== "en")
+                  .map((languageCode) => {
+                    const languageInfo = SupportedLanguages[languageCode];
+                    const status = translationStatuses.find((s) => s.languageCode === languageCode);
+                    const isTranslating = translatingLanguage === languageCode;
+                    const isComplete = status?.isComplete || false;
+                    const progress = status
+                      ? `${status.translatedFields}/${status.totalFields}`
+                      : "0/0";
+
+                    return (
+                      <Card key={languageCode}>
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3 flex-1">
+                              <span className="text-3xl">{languageInfo.flag}</span>
+                              <div className="flex-1">
+                                <h3 className="font-medium">
+                                  {languageInfo.name}
+                                  <span className="text-muted-foreground ml-2 text-sm">
+                                    {languageInfo.nativeName}
+                                  </span>
+                                </h3>
+                                {status && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <div className="text-sm text-muted-foreground">
+                                      {progress} fields
+                                    </div>
+                                    {isComplete && (
+                                      <span className="text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 px-2 py-0.5 rounded-full">
+                                        Complete
+                                      </span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex gap-2">
+                              {status && isComplete ? (
+                                <>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleTranslateQuiz(languageCode)}
+                                    disabled={isTranslating}
+                                  >
+                                    {isTranslating ? (
+                                      <>
+                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                        Translating...
+                                      </>
+                                    ) : (
+                                      "Re-translate"
+                                    )}
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteLanguage(languageCode)}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </>
+                              ) : (
+                                <Button
+                                  onClick={() => handleTranslateQuiz(languageCode)}
+                                  disabled={isTranslating}
+                                  size="sm"
+                                >
+                                  {isTranslating ? (
+                                    <>
+                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                      Translating...
+                                    </>
+                                  ) : (
+                                    "Translate"
+                                  )}
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+              </div>
+            )}
+
+            <div className="border-t pt-4 mt-4">
+              <p className="text-sm text-muted-foreground">
+                <strong>Note:</strong> Translations use OpenAI GPT-4o. Make sure you have configured your API key in{" "}
+                <Link href="/admin/settings" className="text-primary hover:underline">
+                  Settings
+                </Link>
+                .
+              </p>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

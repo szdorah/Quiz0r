@@ -18,6 +18,23 @@ export const PowerUpType = {
 
 export type PowerUpType = (typeof PowerUpType)[keyof typeof PowerUpType];
 
+// Supported languages
+export const SupportedLanguages = {
+  en: { code: 'en', name: 'English', flag: '🇺🇸', nativeName: 'English' },
+  es: { code: 'es', name: 'Spanish', flag: '🇪🇸', nativeName: 'Español' },
+  fr: { code: 'fr', name: 'French', flag: '🇫🇷', nativeName: 'Français' },
+  de: { code: 'de', name: 'German', flag: '🇩🇪', nativeName: 'Deutsch' },
+  he: { code: 'he', name: 'Hebrew', flag: '🇮🇱', nativeName: 'עברית' },
+  ja: { code: 'ja', name: 'Japanese', flag: '🇯🇵', nativeName: '日本語' },
+  'zh-CN': { code: 'zh-CN', name: 'Chinese (Simplified)', flag: '🇨🇳', nativeName: '简体中文' },
+  ar: { code: 'ar', name: 'Arabic', flag: '🇸🇦', nativeName: 'العربية' },
+  pt: { code: 'pt', name: 'Portuguese', flag: '🇵🇹', nativeName: 'Português' },
+  ru: { code: 'ru', name: 'Russian', flag: '🇷🇺', nativeName: 'Русский' },
+  it: { code: 'it', name: 'Italian', flag: '🇮🇹', nativeName: 'Italiano' },
+} as const;
+
+export type LanguageCode = keyof typeof SupportedLanguages;
+
 // Game status types
 export const GameStatus = {
   WAITING: "WAITING",
@@ -60,6 +77,7 @@ export interface PlayerInfo {
   isActive: boolean;
   hasAnswered?: boolean;
   admissionStatus?: "admitted" | "pending" | "refused";
+  languageCode?: LanguageCode;
   downloadStatus?: {
     percentage: number;
     status: 'idle' | 'loading' | 'complete' | 'error';
@@ -88,11 +106,36 @@ export interface AnswerOption {
   imageUrl?: string | null;
 }
 
+export interface AnswerOptionWithTranslations extends AnswerOption {
+  translations?: Record<LanguageCode, {
+    answerText: string;
+  }>;
+}
+
+export interface QuestionDataWithTranslations extends QuestionData {
+  translations?: Record<LanguageCode, {
+    questionText: string;
+    hostNotes?: string | null;
+    hint?: string | null;
+    easterEggButtonText?: string | null;
+  }>;
+  answers: AnswerOptionWithTranslations[];
+}
+
+export interface TranslationStatus {
+  languageCode: LanguageCode;
+  isComplete: boolean;
+  totalFields: number;
+  translatedFields: number;
+  lastUpdated: string;
+}
+
 export interface PlayerScore {
   playerId: string;
   name: string;
   avatarColor: string;
   avatarEmoji?: string | null;
+  languageCode?: LanguageCode;
   score: number;
   position: number;
   change: number;
@@ -144,10 +187,11 @@ export interface PlayerPowerUpState {
 export interface QuizPreloadData {
   quizTitle: string;
   totalQuestions: number;
-  questions: QuestionData[];
+  questions: QuestionDataWithTranslations[];
   theme: QuizTheme | null;
   imageUrls: string[];
   startIndex?: number;
+  availableLanguages: LanguageCode[];
 }
 
 // Socket events - Server to Client
@@ -231,7 +275,7 @@ export interface ClientToServerEvents {
   "host:resumeGame": (data: { gameCode: string }) => void;
   "host:skipTimer": (data: { gameCode: string }) => void;
   "host:cancelGame": (data: { gameCode: string }) => void;
-  "player:join": (data: { gameCode: string; name: string }) => void;
+  "player:join": (data: { gameCode: string; name: string; languageCode?: LanguageCode }) => void;
   "player:answer": (data: {
     gameCode: string;
     questionId: string;
