@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, Trophy, Medal, Award, Layers, Loader2 } from "lucide-react";
+import { Check, Trophy, Medal, Award, Layers, Loader2, AlarmClock } from "lucide-react";
 import { ThemeProvider, getAnswerColor } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { AspectRatioHelper } from "@/components/display/AspectRatioHelper";
@@ -123,6 +123,7 @@ export default function HostDisplayPage({
     timeRemaining,
     scores,
     questionEnded,
+    awaitingReveal,
     gameCancelled,
   } = useSocket({ gameCode, role: "host" });
 
@@ -346,6 +347,29 @@ export default function HostDisplayPage({
     const isRevealing = gameState.status === "REVEALING";
     const correctIds = questionEnded?.correctAnswerIds || [];
     const theme = gameState.quizTheme;
+
+    if (isRevealing && awaitingReveal) {
+      return (
+        <ThemeProvider theme={theme}>
+          <BackgroundEffects theme={theme} />
+          <div
+            className="min-h-screen flex flex-col items-center justify-center text-center px-6"
+            style={{
+              background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
+            }}
+          >
+            <div className="flex flex-col items-center gap-4 text-amber-200">
+              <AlarmClock className="w-14 h-14 animate-bounce" />
+              <h2 className="text-4xl font-bold text-white">Time&apos;s up!</h2>
+              <p className="text-lg text-amber-100/80 max-w-xl">
+                The host will reveal the answers shortly.
+              </p>
+            </div>
+          </div>
+          <AspectRatioHelper />
+        </ThemeProvider>
+      );
+    }
 
     return (
       <ThemeProvider theme={theme}>

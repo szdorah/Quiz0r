@@ -38,6 +38,13 @@ interface ActiveGame {
   correctAnswerIds: Map<string, string[]>; // questionId -> correctAnswerIds
   playerAnswers: Map<string, Set<string>>; // questionId -> Set of playerIds who answered
   previousPositions: Map<string, number>; // playerId -> previous position
+  pendingReveal?: {
+    correctAnswerIds: string[];
+    stats: {
+      totalAnswered: number;
+      answerDistribution: Record<string, number>;
+    };
+  };
 }
 
 type TypedServer = Server<ClientToServerEvents, ServerToClientEvents>;
@@ -61,6 +68,7 @@ export class GameManager {
     socket.on("host:showScoreboard", (data) => this.handleShowScoreboard(socket, data));
     socket.on("host:endGame", (data) => this.handleEndGame(socket, data));
     socket.on("host:skipTimer", (data) => this.handleSkipTimer(socket, data));
+    socket.on("host:revealAnswers", (data) => this.handleRevealAnswers(socket, data));
     socket.on("host:cancelGame", (data) => this.handleCancelGame(socket, data));
     socket.on("host:removePlayer", (data) => this.handleRemovePlayer(socket, data));
     socket.on("host:admitPlayer", (data) => this.handleAdmitPlayer(socket, data));
@@ -348,7 +356,13 @@ export class GameManager {
   }
 
   private async handleNextQuestion(socket: TypedSocket, data: { gameCode: string }) {
-    await this.startNextQuestion(data.gameCode.toUpperCase());
+    const upperCode = data.gameCode.toUpperCase();
+    const game = this.activeGames.get(upperCode);
+    if (game?.pendingReveal) {
+      socket.emit("error", { message: "Reveal answers before moving to the next question", code: "REVEAL_REQUIRED" });
+      return;
+    }
+    await this.startNextQuestion(upperCode);
   }
 
   private async handleSkipTimer(socket: TypedSocket, data: { gameCode: string }) {
@@ -360,9 +374,27 @@ export class GameManager {
     await this.endQuestion(upperCode);
   }
 
+  private async handleRevealAnswers(socket: TypedSocket, data: { gameCode: string }) {
+    const upperCode = data.gameCode.toUpperCase();
+    const game = this.activeGames.get(upperCode);
+    if (!game || game.status !== "REVEALING") return;
+    if (!game.pendingReveal) {
+      // Already revealed or nothing to reveal
+      return;
+    }
+
+    const payload = game.pendingReveal;
+    game.pendingReveal = undefined;
+
+    this.io.to(`game:${upperCode}`).emit("game:questionEnd", payload);
+  }
+
   private async startNextQuestion(gameCode: string) {
     const game = this.activeGames.get(gameCode);
     if (!game) return;
+
+    // Clear any pending reveal from previous question
+    game.pendingReveal = undefined;
 
     // Clear any existing timer
     if (game.timerInterval) {
@@ -648,16 +680,19 @@ export class GameManager {
       data: { status: "REVEALING" },
     });
 
-    // Send correct answers and stats
-    this.io.to(`game:${gameCode}`).emit("game:questionEnd", {
+    // Cache reveal payload
+    game.pendingReveal = {
       correctAnswerIds: correctIds,
       stats: {
         totalAnswered: answeredPlayers?.size || 0,
         answerDistribution: distribution,
       },
-    });
+    };
 
-    // Send updated scores
+    // Notify clients that time is up; reveal will be host-controlled
+    this.io.to(`game:${gameCode}`).emit("game:timeUp");
+
+    // Send updated scores (already accounted in submissions)
     const scores = await this.getPlayerScores(gameCode);
     this.io.to(`game:${gameCode}`).emit("game:scoreUpdate", { scores });
 
@@ -711,6 +746,10 @@ export class GameManager {
     const upperCode = data.gameCode.toUpperCase();
     const game = this.activeGames.get(upperCode);
     if (!game) return;
+    if (game.pendingReveal) {
+      socket.emit("error", { message: "Reveal answers before showing the scoreboard", code: "REVEAL_REQUIRED" });
+      return;
+    }
 
     game.status = "SCOREBOARD";
 

@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode, type QuestionDataWithTranslations } from "@/types";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
@@ -177,6 +177,7 @@ export default function PlayerGamePage({
     scores,
     answerResult,
     questionEnded,
+    awaitingReveal,
     error,
     gameCancelled,
     playerRemoved,
@@ -977,6 +978,28 @@ export default function PlayerGamePage({
     const isRevealing = gameState.status === "REVEALING";
     const correctIds = questionEnded?.correctAnswerIds || [];
     const theme = gameState.quizTheme;
+
+    if (isRevealing && awaitingReveal) {
+      return (
+        <ThemeProvider theme={theme}>
+          <BackgroundEffects theme={theme} />
+          <div
+            className="min-h-screen flex flex-col items-center justify-center text-center px-6"
+            style={{
+              background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
+            }}
+          >
+            <div className="flex flex-col items-center gap-4 text-amber-200">
+              <AlarmClock className="w-14 h-14 animate-bounce" />
+              <h2 className="text-3xl font-bold text-white">Time&apos;s up!</h2>
+              <p className="text-lg text-amber-100/80 max-w-xl">
+                The host will reveal the answers shortly. Sit tight!
+              </p>
+            </div>
+          </div>
+        </ThemeProvider>
+      );
+    }
 
     return (
       <ThemeProvider theme={theme}>

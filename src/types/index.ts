@@ -199,6 +199,7 @@ export interface ServerToClientEvents {
   "game:state": (state: GameState) => void;
   "game:playerJoined": (data: { player: PlayerInfo }) => void;
   "game:playerLeft": (data: { playerId: string }) => void;
+  "game:timeUp": () => void;
   "game:questionStart": (data: {
     question: QuestionData;
     questionIndex: number;
@@ -275,6 +276,7 @@ export interface ClientToServerEvents {
   "host:pauseGame": (data: { gameCode: string }) => void;
   "host:resumeGame": (data: { gameCode: string }) => void;
   "host:skipTimer": (data: { gameCode: string }) => void;
+  "host:revealAnswers": (data: { gameCode: string }) => void;
   "host:cancelGame": (data: { gameCode: string }) => void;
   "player:join": (data: { gameCode: string; name: string; languageCode?: LanguageCode }) => void;
   "player:answer": (data: {

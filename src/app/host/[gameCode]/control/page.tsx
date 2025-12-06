@@ -62,6 +62,7 @@ export default function HostControlPage({
     easterEggClicks,
     powerUpUsages,
     nextQuestionPreview,
+    awaitingReveal,
     gameCancelled,
     admissionRequests,
     startGame,
@@ -69,6 +70,7 @@ export default function HostControlPage({
     showScoreboard,
     endGame,
     skipTimer,
+    revealAnswers,
     cancelGame,
     removePlayer,
     admitPlayer,
@@ -504,9 +506,22 @@ export default function HostControlPage({
 
                 {gameState.status === "REVEALING" && (
                   <div className="space-y-4">
-                    <p className="text-muted-foreground">
-                      Showing correct answer...
-                    </p>
+                    {awaitingReveal ? (
+                      <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg flex items-center justify-between">
+                        <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200">
+                          <Bell className="w-4 h-4" />
+                          <span className="font-medium">Time&apos;s up! Reveal answers when ready.</span>
+                        </div>
+                        <Button onClick={revealAnswers} variant="secondary" size="sm">
+                          <Eye className="w-4 h-4 mr-2" />
+                          Reveal Answers
+                        </Button>
+                      </div>
+                    ) : (
+                      <p className="text-muted-foreground">
+                        Showing correct answer...
+                      </p>
+                    )}
                     {currentQuestion?.hostNotes && (
                       <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
                         <div className="flex items-center gap-2 mb-2">
@@ -570,11 +585,12 @@ export default function HostControlPage({
                         onClick={showScoreboard}
                         variant="outline"
                         className="flex-1"
+                        disabled={awaitingReveal}
                       >
                         <BarChart3 className="w-4 h-4 mr-2" />
                         Show Scoreboard
                       </Button>
-                      <Button onClick={nextQuestion} className="flex-1">
+                      <Button onClick={nextQuestion} className="flex-1" disabled={awaitingReveal}>
                         <SkipForward className="w-4 h-4 mr-2" />
                         Next Question
                       </Button>
@@ -638,7 +654,7 @@ export default function HostControlPage({
                     )}
                     {gameState.currentQuestionIndex <
                     gameState.totalQuestions - 1 ? (
-                      <Button onClick={nextQuestion} size="lg" className="w-full">
+                      <Button onClick={nextQuestion} size="lg" className="w-full" disabled={awaitingReveal}>
                         <SkipForward className="w-4 h-4 mr-2" />
                         Next Question
                       </Button>

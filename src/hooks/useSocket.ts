@@ -40,6 +40,7 @@ interface UseSocketReturn {
   scores: PlayerScore[];
   answerResult: { correct: boolean; points: number; position: number } | null;
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
+  awaitingReveal: boolean;
   playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
   easterEggClicks: Map<string, EasterEggClickDetail[]>; // questionId -> clicks
   powerUpUsages: Map<string, Array<{ playerId: string; powerUpType: PowerUpType }>>; // questionId -> power-ups
@@ -88,6 +89,7 @@ export function useSocket({
     correctAnswerIds: string[];
     stats: AnswerStats;
   } | null>(null);
+  const [awaitingReveal, setAwaitingReveal] = useState(false);
   const [playerAnswers, setPlayerAnswers] = useState<Map<string, PlayerAnswerDetail[]>>(
     new Map()
   );
@@ -191,6 +193,7 @@ export function useSocket({
       setTimeRemaining(question.timeLimit);
       setAnswerResult(null);
       setQuestionEnded(null);
+      setAwaitingReveal(false);
       setNextQuestionPreview(null); // Clear preview when question starts
       // Clear answers for new question (but keep old questions' answers)
       setPlayerAnswers((prev) => {
@@ -284,8 +287,14 @@ export function useSocket({
     socket.on("game:questionEnd", (data) => {
       setQuestionEnded(data);
       setGameState((prev) => (prev ? { ...prev, status: "REVEALING" } : prev));
+      setAwaitingReveal(false);
     });
 
+    socket.on("game:timeUp", () => {
+      setAwaitingReveal(true);
+      setGameState((prev) => (prev ? { ...prev, status: "REVEALING" } : prev));
+      setTimeRemaining(0);
+    });
     socket.on("game:scoreUpdate", ({ scores: newScores }) => {
       setScores(newScores);
     });
@@ -405,6 +414,10 @@ export function useSocket({
     socketRef.current?.emit("host:skipTimer", { gameCode: gameCode.toUpperCase() });
   }, [gameCode]);
 
+  const revealAnswers = useCallback(() => {
+    socketRef.current?.emit("host:revealAnswers", { gameCode: gameCode.toUpperCase() });
+  }, [gameCode]);
+
   const cancelGame = useCallback(() => {
     console.log("cancelGame called, emitting host:cancelGame for", gameCode.toUpperCase());
     socketRef.current?.emit("host:cancelGame", { gameCode: gameCode.toUpperCase() });
@@ -460,6 +473,7 @@ export function useSocket({
     scores,
     answerResult,
     questionEnded,
+    awaitingReveal,
     playerAnswers,
     easterEggClicks,
     powerUpUsages,
@@ -481,5 +495,6 @@ export function useSocket({
     admitPlayer,
     refusePlayer,
     toggleAutoAdmit,
+    revealAnswers,
   };
 }
