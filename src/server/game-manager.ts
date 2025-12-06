@@ -675,22 +675,33 @@ export class GameManager {
       (q) => q.questionType !== "SECTION"
     ).length;
 
-    if (nextIndex < game.questions.length) {
-      const nextQuestion = game.questions[nextIndex];
-      // Calculate actual question number (excluding sections)
-      const questionNumber = game.questions
-        .slice(0, nextIndex + 1)
-        .filter((q) => q.questionType !== "SECTION").length;
-
-      this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", {
-        question: nextQuestion,
-        questionNumber,
-        totalQuestions,
-      });
-    } else {
-      // No more questions
+    if (nextIndex >= game.questions.length) {
       this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", null);
+      return;
     }
+
+    const nextItem = game.questions[nextIndex];
+    let section: QuestionData | null = null;
+    let previewQuestion: QuestionData | null = nextItem;
+    let previewIndex = nextIndex;
+
+    if (nextItem.questionType === "SECTION") {
+      section = nextItem;
+      previewQuestion = null;
+    }
+
+    const questionNumber = previewQuestion
+      ? game.questions
+          .slice(0, previewIndex + 1)
+          .filter((q) => q.questionType !== "SECTION").length
+      : null;
+
+    this.io.to(`game:${gameCode}:host`).emit("game:nextQuestionPreview", {
+      section,
+      question: previewQuestion,
+      questionNumber,
+      totalQuestions,
+    });
   }
 
   private async handleShowScoreboard(

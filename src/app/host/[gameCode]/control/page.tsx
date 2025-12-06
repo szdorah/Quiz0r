@@ -518,28 +518,50 @@ export default function HostControlPage({
                     )}
                     {/* Next Question Preview */}
                     {nextQuestionPreview && (
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                        <div className="flex items-center gap-2">
                           <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                           <p className="font-medium text-blue-800 dark:text-blue-300 text-sm">
-                            Up Next (Q{nextQuestionPreview.questionNumber} of {nextQuestionPreview.totalQuestions})
+                            {nextQuestionPreview.questionNumber
+                              ? `Up Next (Q${nextQuestionPreview.questionNumber} of ${nextQuestionPreview.totalQuestions})`
+                              : "Up Next"}
                           </p>
                         </div>
-                        <p className="text-blue-900 dark:text-blue-200">{nextQuestionPreview.question.questionText}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {nextQuestionPreview.question.answers.map((answer, i) => (
-                            <span
-                              key={answer.id}
-                              className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
-                            >
-                              {String.fromCharCode(65 + i)}. {answer.answerText}
-                            </span>
-                          ))}
-                        </div>
-                        {nextQuestionPreview.question.hostNotes && (
-                          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
-                            Notes: {nextQuestionPreview.question.hostNotes}
-                          </p>
+                        {nextQuestionPreview.section ? (
+                          <div className="p-3 bg-indigo-100/70 dark:bg-indigo-800/30 rounded border border-indigo-200 dark:border-indigo-700">
+                            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-1">Section</p>
+                            <p className="text-indigo-900 dark:text-indigo-100">
+                              {nextQuestionPreview.section.questionText}
+                            </p>
+                            {nextQuestionPreview.section.hostNotes && (
+                              <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                                {nextQuestionPreview.section.hostNotes}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          nextQuestionPreview.question && (
+                            <div className="space-y-2">
+                              <p className="text-blue-900 dark:text-blue-200 font-medium">
+                                {nextQuestionPreview.question.questionText}
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {nextQuestionPreview.question.answers.map((answer, i) => (
+                                  <span
+                                    key={answer.id}
+                                    className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
+                                  >
+                                    {String.fromCharCode(65 + i)}. {answer.answerText}
+                                  </span>
+                                ))}
+                              </div>
+                              {nextQuestionPreview.question.hostNotes && (
+                                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
+                                  Notes: {nextQuestionPreview.question.hostNotes}
+                                </p>
+                              )}
+                            </div>
+                          )
                         )}
                       </div>
                     )}
@@ -567,28 +589,50 @@ export default function HostControlPage({
                     </p>
                     {/* Next Question Preview */}
                     {nextQuestionPreview && (
-                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
-                        <div className="flex items-center gap-2 mb-2">
+                      <div className="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg space-y-3">
+                        <div className="flex items-center gap-2">
                           <Eye className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                           <p className="font-medium text-blue-800 dark:text-blue-300 text-sm">
-                            Up Next (Q{nextQuestionPreview.questionNumber} of {nextQuestionPreview.totalQuestions})
+                            {nextQuestionPreview.questionNumber
+                              ? `Up Next (Q${nextQuestionPreview.questionNumber} of ${nextQuestionPreview.totalQuestions})`
+                              : "Up Next"}
                           </p>
                         </div>
-                        <p className="text-blue-900 dark:text-blue-200">{nextQuestionPreview.question.questionText}</p>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {nextQuestionPreview.question.answers.map((answer, i) => (
-                            <span
-                              key={answer.id}
-                              className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
-                            >
-                              {String.fromCharCode(65 + i)}. {answer.answerText}
-                            </span>
-                          ))}
-                        </div>
-                        {nextQuestionPreview.question.hostNotes && (
-                          <p className="mt-2 text-xs text-blue-600 dark:text-blue-400 italic">
-                            Notes: {nextQuestionPreview.question.hostNotes}
-                          </p>
+                        {nextQuestionPreview.section ? (
+                          <div className="p-3 bg-indigo-100/70 dark:bg-indigo-800/30 rounded border border-indigo-200 dark:border-indigo-700">
+                            <p className="text-sm font-semibold text-indigo-900 dark:text-indigo-200 mb-1">Section</p>
+                            <p className="text-indigo-900 dark:text-indigo-100">
+                              {nextQuestionPreview.section.questionText}
+                            </p>
+                            {nextQuestionPreview.section.hostNotes && (
+                              <p className="text-xs text-indigo-700 dark:text-indigo-300 mt-1">
+                                {nextQuestionPreview.section.hostNotes}
+                              </p>
+                            )}
+                          </div>
+                        ) : (
+                          nextQuestionPreview.question && (
+                            <div className="space-y-2">
+                              <p className="text-blue-900 dark:text-blue-200 font-medium">
+                                {nextQuestionPreview.question.questionText}
+                              </p>
+                              <div className="mt-1 flex flex-wrap gap-2">
+                                {nextQuestionPreview.question.answers.map((answer, i) => (
+                                  <span
+                                    key={answer.id}
+                                    className="text-xs px-2 py-1 bg-blue-100 dark:bg-blue-800/30 text-blue-700 dark:text-blue-300 rounded"
+                                  >
+                                    {String.fromCharCode(65 + i)}. {answer.answerText}
+                                  </span>
+                                ))}
+                              </div>
+                              {nextQuestionPreview.question.hostNotes && (
+                                <p className="mt-1 text-xs text-blue-600 dark:text-blue-400 italic">
+                                  Notes: {nextQuestionPreview.question.hostNotes}
+                                </p>
+                              )}
+                            </div>
+                          )
                         )}
                       </div>
                     )}

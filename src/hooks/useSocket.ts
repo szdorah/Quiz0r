@@ -16,8 +16,9 @@ import {
 } from "@/types";
 
 interface NextQuestionPreview {
-  question: QuestionData;
-  questionNumber: number;
+  section?: QuestionData | null;
+  question: QuestionData | null;
+  questionNumber: number | null;
   totalQuestions: number;
 }
 

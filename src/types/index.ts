@@ -229,8 +229,9 @@ export interface ServerToClientEvents {
   }) => void;
   "game:cancelled": () => void;
   "game:nextQuestionPreview": (data: {
-    question: QuestionData;
-    questionNumber: number;
+    section?: QuestionData | null;
+    question: QuestionData | null;
+    questionNumber: number | null;
     totalQuestions: number;
   } | null) => void;
   "player:answerResult": (data: {
