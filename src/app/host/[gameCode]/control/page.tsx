@@ -53,6 +53,7 @@ export default function HostControlPage({
 
   const [tunnelUrl, setTunnelUrl] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
 
   // Fetch tunnel URL on mount
   useEffect(() => {
@@ -70,22 +71,62 @@ export default function HostControlPage({
     fetchTunnelUrl();
   }, []);
 
+  // Poll for short URL created by display page
+  useEffect(() => {
+    if (!gameCode) return;
+
+    let interval: NodeJS.Timeout | null = null;
+
+    async function checkShortUrl() {
+      try {
+        const res = await fetch(`/api/shorten?gameCode=${gameCode}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.shortUrl) {
+            setShortUrl(data.shortUrl);
+            // Stop polling once we have the URL
+            if (interval) {
+              clearInterval(interval);
+              interval = null;
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Failed to retrieve short URL:", error);
+      }
+    }
+
+    // Check immediately
+    checkShortUrl();
+
+    // Poll every 2 seconds until we get the URL
+    interval = setInterval(checkShortUrl, 2000);
+
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [gameCode]);
+
   function copyExternalUrl() {
     if (tunnelUrl) {
       const fullUrl = `${tunnelUrl}/play/${gameCode}`;
+      // Use short URL if available, otherwise fallback to full URL
+      const urlToCopy = shortUrl || fullUrl;
 
       // Try modern clipboard API first, fallback to textarea method for non-secure contexts
       if (navigator.clipboard && window.isSecureContext) {
-        navigator.clipboard.writeText(fullUrl).then(() => {
+        navigator.clipboard.writeText(urlToCopy).then(() => {
           setCopied(true);
           setTimeout(() => setCopied(false), 2000);
         }).catch(() => {
           // Fallback if clipboard API fails
-          fallbackCopy(fullUrl);
+          fallbackCopy(urlToCopy);
         });
       } else {
         // Use fallback for non-secure contexts (like Docker without HTTPS)
-        fallbackCopy(fullUrl);
+        fallbackCopy(urlToCopy);
       }
     }
   }

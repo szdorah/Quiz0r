@@ -18,17 +18,35 @@ export async function GET() {
       where: { key: "tunnel_url" },
     });
 
+    // Get Short.io settings
+    const shortioApiKeySetting = await prisma.setting.findUnique({
+      where: { key: "shortio_api_key" },
+    });
+
+    const shortioDomainSetting = await prisma.setting.findUnique({
+      where: { key: "shortio_domain" },
+    });
+
     const hasToken = !!tokenSetting?.value;
     const maskedToken = tokenSetting?.value
       ? `${tokenSetting.value.slice(0, 8)}...${tokenSetting.value.slice(-4)}`
       : null;
     const tunnelUrl = tunnelSetting?.value || null;
 
+    const hasShortioApiKey = !!shortioApiKeySetting?.value;
+    const maskedShortioApiKey = shortioApiKeySetting?.value
+      ? `${shortioApiKeySetting.value.slice(0, 8)}...${shortioApiKeySetting.value.slice(-4)}`
+      : null;
+    const shortioDomain = shortioDomainSetting?.value || null;
+
     return NextResponse.json({
       ngrokToken: maskedToken,
       hasToken,
       tunnelRunning: !!tunnelUrl,
       tunnelUrl,
+      shortioApiKey: maskedShortioApiKey,
+      hasShortioApiKey,
+      shortioDomain,
     });
   } catch (error) {
     console.error("Failed to get settings:", error);
@@ -43,7 +61,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { ngrokToken } = body;
+    const { ngrokToken, shortioApiKey, shortioDomain } = body;
 
     if (ngrokToken !== undefined) {
       if (ngrokToken) {
@@ -66,6 +84,38 @@ export async function POST(request: Request) {
           where: { key: "ngrok_token" },
         });
         await stopTunnel();
+      }
+    }
+
+    if (shortioApiKey !== undefined) {
+      if (shortioApiKey) {
+        // Save Short.io API key
+        await prisma.setting.upsert({
+          where: { key: "shortio_api_key" },
+          update: { value: shortioApiKey },
+          create: { key: "shortio_api_key", value: shortioApiKey },
+        });
+      } else {
+        // Remove Short.io API key
+        await prisma.setting.deleteMany({
+          where: { key: "shortio_api_key" },
+        });
+      }
+    }
+
+    if (shortioDomain !== undefined) {
+      if (shortioDomain) {
+        // Save Short.io domain
+        await prisma.setting.upsert({
+          where: { key: "shortio_domain" },
+          update: { value: shortioDomain },
+          create: { key: "shortio_domain", value: shortioDomain },
+        });
+      } else {
+        // Remove Short.io domain
+        await prisma.setting.deleteMany({
+          where: { key: "shortio_domain" },
+        });
       }
     }
 

@@ -14,6 +14,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   ArrowLeft,
   Settings,
   Globe,
@@ -24,6 +32,7 @@ import {
   Check,
   ExternalLink,
   Copy,
+  Link2,
 } from "lucide-react";
 
 interface SettingsData {
@@ -31,6 +40,9 @@ interface SettingsData {
   hasToken: boolean;
   tunnelRunning: boolean;
   tunnelUrl: string | null;
+  shortioApiKey: string | null;
+  hasShortioApiKey: boolean;
+  shortioDomain: string | null;
 }
 
 export default function SettingsPage() {
@@ -42,6 +54,11 @@ export default function SettingsPage() {
   const [tunnelLoading, setTunnelLoading] = useState(false);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [copied, setCopied] = useState(false);
+  const [shortioApiKeyInput, setShortioApiKeyInput] = useState("");
+  const [shortioDomainInput, setShortioDomainInput] = useState("");
+  const [showShortio, setShowShortio] = useState(false);
+  const [savingShortio, setSavingShortio] = useState(false);
+  const [showRemoveDialog, setShowRemoveDialog] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -163,6 +180,60 @@ export default function SettingsPage() {
       navigator.clipboard.writeText(settings.tunnelUrl);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }
+  }
+
+  async function saveShortioSettings() {
+    setSavingShortio(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          shortioApiKey: shortioApiKeyInput,
+          shortioDomain: shortioDomainInput,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Short.io settings saved successfully!" });
+        setShortioApiKeyInput("");
+        setShortioDomainInput("");
+        setShowShortio(false);
+        fetchSettings();
+      } else {
+        const data = await res.json();
+        setMessage({ type: "error", text: data.error || "Failed to save Short.io settings" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to save Short.io settings" });
+    } finally {
+      setSavingShortio(false);
+    }
+  }
+
+  async function confirmRemoveShortioSettings() {
+    setSavingShortio(true);
+    setMessage(null);
+    setShowRemoveDialog(false);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ shortioApiKey: "", shortioDomain: "" }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Short.io settings removed" });
+        fetchSettings();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to remove Short.io settings" });
+    } finally {
+      setSavingShortio(false);
     }
   }
 
@@ -340,6 +411,148 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Short.io Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Link2 className="w-5 h-5" />
+            Short.io URL Shortener
+          </CardTitle>
+          <CardDescription>
+            Generate short URLs for join links to make them easier to share.
+            Get a free API key and find your domain at{" "}
+            <a
+              href="https://app.short.io/settings/integrations/api-key"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              short.io
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* API Key Section */}
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-muted-foreground" />
+              <Label>Short.io API Key</Label>
+            </div>
+
+            {settings?.hasShortioApiKey ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
+                    {settings.shortioApiKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRemoveDialog(true)}
+                    disabled={savingShortio}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                {settings.shortioDomain && (
+                  <div className="space-y-2">
+                    <Label className="text-sm text-muted-foreground">Domain</Label>
+                    <code className="block px-3 py-2 bg-muted rounded-md text-sm">
+                      {settings.shortioDomain}
+                    </code>
+                  </div>
+                )}
+              </div>
+            ) : showShortio ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Paste your Short.io API key..."
+                    value={shortioApiKeyInput}
+                    onChange={(e) => setShortioApiKeyInput(e.target.value)}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Domain (required)</Label>
+                  <Input
+                    type="text"
+                    placeholder="e.g., link.yourdomain.com"
+                    value={shortioDomainInput}
+                    onChange={(e) => setShortioDomainInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Your Short.io domain (find it in your Short.io dashboard)
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={saveShortioSettings}
+                    disabled={!shortioApiKeyInput || !shortioDomainInput || savingShortio}
+                  >
+                    {savingShortio ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowShortio(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => setShowShortio(true)}>
+                <Key className="w-4 h-4 mr-2" />
+                Add Short.io Settings
+              </Button>
+            )}
+          </div>
+
+          {settings?.hasShortioApiKey && (
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                Short URLs will automatically be generated for join links when available.
+                If URL shortening fails, the full URL will be used as a fallback.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Remove Confirmation Dialog */}
+      <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Short.io Settings?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove your Short.io API key and domain?
+              Your join links will no longer be shortened.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveDialog(false)}
+              disabled={savingShortio}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveShortioSettings}
+              disabled={savingShortio}
+            >
+              {savingShortio ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Remove Settings"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

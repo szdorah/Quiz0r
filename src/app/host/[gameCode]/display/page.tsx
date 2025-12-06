@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, Trophy, Medal, Award, Layers } from "lucide-react";
+import { Check, Trophy, Medal, Award, Layers, Loader2 } from "lucide-react";
 import { ThemeProvider, getAnswerColor } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { AspectRatioHelper } from "@/components/display/AspectRatioHelper";
@@ -21,6 +21,8 @@ export default function HostDisplayPage({
 }) {
   const { gameCode } = params;
   const [baseUrl, setBaseUrl] = useState("");
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [urlReady, setUrlReady] = useState(false);
 
   // Poll for tunnel URL - keeps checking until we get an external URL
   useEffect(() => {
@@ -70,6 +72,48 @@ export default function HostDisplayPage({
       }
     };
   }, []);
+
+  // Attempt to shorten URL when baseUrl changes
+  useEffect(() => {
+    if (!baseUrl) return;
+
+    let timeoutId: NodeJS.Timeout;
+
+    async function attemptShorten() {
+      const fullUrl = `${baseUrl}/play/${gameCode}`;
+
+      try {
+        const res = await fetch("/api/shorten", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ url: fullUrl, gameCode }),
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          if (data.shortUrl) {
+            setShortUrl(data.shortUrl);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to shorten URL:", error);
+        // Fallback to full URL (shortUrl remains null)
+      } finally {
+        setUrlReady(true);
+      }
+    }
+
+    // Set a timeout to show URL even if shortening takes too long
+    timeoutId = setTimeout(() => {
+      setUrlReady(true);
+    }, 3000);
+
+    attemptShorten();
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [baseUrl, gameCode]);
 
   const {
     connected,
@@ -156,8 +200,13 @@ export default function HostDisplayPage({
 
   // Waiting Room
   if (gameState.status === "WAITING") {
-    const joinUrl = `${baseUrl}/play/${gameCode}`;
+    const fullUrl = `${baseUrl}/play/${gameCode}`;
+    // Use short URL if available, otherwise fallback to full URL
+    const joinUrl = shortUrl || fullUrl;
     const theme = gameState.quizTheme;
+
+    // Don't show URL/QR code until we've attempted to get short URL
+    const showJoinInfo = urlReady && baseUrl;
 
     return (
       <ThemeProvider theme={theme}>
@@ -180,25 +229,31 @@ export default function HostDisplayPage({
             </div>
 
             {/* QR Code & Code */}
-            <div className="flex flex-col items-center gap-6 mb-12">
-              <Card className="p-4 md:p-6 bg-white">
-                <QRCodeSVG
-                  value={joinUrl}
-                  size={typeof window !== 'undefined' && window.innerWidth < 640 ? 180 : 256}
-                  level="M"
-                  className="w-full h-auto max-w-[256px]"
-                />
-              </Card>
-              <div className="text-center px-4">
-                <p className="text-sm text-muted-foreground mb-2">Game Code</p>
-                <p className="text-4xl md:text-5xl lg:text-6xl font-mono font-bold tracking-wider text-primary break-all">
-                  {gameCode}
-                </p>
-                <p className="text-xs md:text-sm text-muted-foreground mt-2 break-all">
-                  Join at <span className="font-medium">{joinUrl}</span>
-                </p>
+            {showJoinInfo ? (
+              <div className="flex flex-col items-center gap-6 mb-12">
+                <Card className="p-4 md:p-6 bg-white">
+                  <QRCodeSVG
+                    value={joinUrl}
+                    size={typeof window !== 'undefined' && window.innerWidth < 640 ? 180 : 256}
+                    level="M"
+                    className="w-full h-auto max-w-[256px]"
+                  />
+                </Card>
+                <div className="text-center px-4">
+                  <p className="text-sm text-muted-foreground mb-2">Game Code</p>
+                  <p className="text-4xl md:text-5xl lg:text-6xl font-mono font-bold tracking-wider text-primary break-all">
+                    {gameCode}
+                  </p>
+                  <p className="text-xs md:text-sm text-muted-foreground mt-2 break-all">
+                    Join at <span className="font-medium">{joinUrl}</span>
+                  </p>
+                </div>
               </div>
-            </div>
+            ) : (
+              <div className="flex justify-center mb-12">
+                <Loader2 className="w-12 h-12 animate-spin text-primary" />
+              </div>
+            )}
 
             {/* Players */}
             <div className="text-center">
