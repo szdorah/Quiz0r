@@ -599,6 +599,24 @@ export default function HostDisplayPage({
                     </Avatar>
                   )}
                   <span className="font-medium flex-1">{player.name}</span>
+
+                  {/* Power-up indicators */}
+                  {"powerUpsUsed" in player && player.powerUpsUsed && player.powerUpsUsed.length > 0 && (
+                    <div className="flex gap-1">
+                      {player.powerUpsUsed.map((usage, idx) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-1.5 py-0.5 bg-muted rounded"
+                          title={`Q${usage.questionNumber}: ${usage.powerUpType}`}
+                        >
+                          {usage.powerUpType === "hint" && "💡"}
+                          {usage.powerUpType === "copy" && "👥"}
+                          {usage.powerUpType === "double" && "⚡"}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   {player.change !== 0 && (
                     <span
                       className={`text-sm ${

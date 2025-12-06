@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
+import { PowerUpType } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -41,6 +42,8 @@ import {
   UserX,
   Bell,
   Shield,
+  Lightbulb,
+  Sparkles,
 } from "lucide-react";
 
 export default function HostControlPage({
@@ -57,6 +60,7 @@ export default function HostControlPage({
     scores,
     playerAnswers,
     easterEggClicks,
+    powerUpUsages,
     nextQuestionPreview,
     gameCancelled,
     admissionRequests,
@@ -94,13 +98,20 @@ export default function HostControlPage({
     fetchTunnelUrl();
   }, []);
 
-  // Poll for short URL created by display page
+  // Poll for short URL created by display page (only if URL shortener API is configured)
   useEffect(() => {
     if (!gameCode) return;
 
     let interval: NodeJS.Timeout | null = null;
+    let checkCount = 0;
+    const MAX_CHECKS = 5; // Stop after 5 attempts (10 seconds)
+    let stopped = false; // Track if we should stop polling
 
     async function checkShortUrl() {
+      if (stopped) return;
+
+      checkCount++;
+
       try {
         const res = await fetch(`/api/shorten?gameCode=${gameCode}`);
         if (res.ok) {
@@ -108,6 +119,15 @@ export default function HostControlPage({
           if (data.shortUrl) {
             setShortUrl(data.shortUrl);
             // Stop polling once we have the URL
+            stopped = true;
+            if (interval) {
+              clearInterval(interval);
+              interval = null;
+            }
+          } else if (checkCount >= MAX_CHECKS) {
+            // No short URL after max checks - stop polling
+            // This means either no API key or URL not created yet
+            stopped = true;
             if (interval) {
               clearInterval(interval);
               interval = null;
@@ -116,16 +136,23 @@ export default function HostControlPage({
         }
       } catch (error) {
         console.error("Failed to retrieve short URL:", error);
+        // Stop polling on error
+        stopped = true;
+        if (interval) {
+          clearInterval(interval);
+          interval = null;
+        }
       }
     }
 
-    // Check immediately
-    checkShortUrl();
-
-    // Poll every 2 seconds until we get the URL
+    // Set up interval first
     interval = setInterval(checkShortUrl, 2000);
 
+    // Then check immediately
+    checkShortUrl();
+
     return () => {
+      stopped = true;
       if (interval) {
         clearInterval(interval);
       }
@@ -843,6 +870,21 @@ export default function HostControlPage({
                               🥚
                             </span>
                           )}
+
+                        {/* Power-up Indicators */}
+                        {currentQuestion && powerUpUsages.get(currentQuestion.id)
+                          ?.filter((usage) => usage.playerId === player.playerId)
+                          .map((usage, idx) => (
+                            <span
+                              key={idx}
+                              className="text-sm mr-1"
+                              title={`Used ${usage.powerUpType} power-up`}
+                            >
+                              {usage.powerUpType === "hint" && "💡"}
+                              {usage.powerUpType === "copy" && "👥"}
+                              {usage.powerUpType === "double" && "⚡"}
+                            </span>
+                          ))}
 
                         <span className="font-bold text-primary mr-2">
                           {player.score}

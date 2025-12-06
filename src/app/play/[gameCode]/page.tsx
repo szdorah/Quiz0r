@@ -9,7 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX } from "lucide-react";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { PowerUpType, PlayerPowerUpState } from "@/types";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
@@ -34,6 +43,18 @@ export default function PlayerGamePage({
   const [easterEggClicked, setEasterEggClicked] = useState<Set<string>>(new Set());
   const [gameStatus, setGameStatus] = useState<"loading" | "valid" | "not_found" | "ended">("loading");
   const [joinTheme, setJoinTheme] = useState<any>(null);
+
+  // Power-up state
+  const [powerUpState, setPowerUpState] = useState<PlayerPowerUpState>({
+    hintsRemaining: 0,
+    copyRemaining: 0,
+    doubleRemaining: 0,
+    usedThisQuestion: new Set(),
+  });
+  const [selectedPowerUps, setSelectedPowerUps] = useState<Set<PowerUpType>>(new Set());
+  const [copiedPlayerId, setCopiedPlayerId] = useState<string | null>(null);
+  const [showCopyPlayerSelector, setShowCopyPlayerSelector] = useState(false);
+  const [showHintModal, setShowHintModal] = useState(false);
 
   // Check if game exists and is joinable on mount
   useEffect(() => {
@@ -166,6 +187,27 @@ export default function PlayerGamePage({
     setHasSubmitted(false);
   }, [effectiveCurrentQuestion?.id]);
 
+  // Initialize power-up counts from gameState
+  useEffect(() => {
+    if (gameState?.powerUps) {
+      setPowerUpState((prev) => ({
+        ...prev,
+        hintsRemaining: gameState.powerUps.hintCount,
+        copyRemaining: gameState.powerUps.copyAnswerCount,
+        doubleRemaining: gameState.powerUps.doublePointsCount,
+      }));
+    }
+  }, [gameState?.powerUps]);
+
+  // Reset power-up selections when question changes
+  useEffect(() => {
+    if (gameState?.status === "QUESTION") {
+      setPowerUpState((prev) => ({ ...prev, usedThisQuestion: new Set() }));
+      setSelectedPowerUps(new Set());
+      setCopiedPlayerId(null);
+    }
+  }, [gameState?.currentQuestionIndex, gameState?.status]);
+
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     setJoinError("");
@@ -211,6 +253,36 @@ export default function PlayerGamePage({
     }
   }
 
+  function emitPowerUps(questionId: string) {
+    if (!socket) return;
+
+    // Emit power-ups first
+    Array.from(selectedPowerUps).forEach((powerUpType) => {
+      socket.emit("player:usePowerUp", {
+        gameCode: gameCode.toUpperCase(),
+        questionId,
+        powerUpType,
+        ...(powerUpType === PowerUpType.COPY && copiedPlayerId ? { copiedPlayerId } : {}),
+      });
+
+      // Update local state
+      setPowerUpState((prev) => {
+        const next = { ...prev };
+        if (powerUpType === PowerUpType.HINT) next.hintsRemaining--;
+        if (powerUpType === PowerUpType.COPY) next.copyRemaining--;
+        if (powerUpType === PowerUpType.DOUBLE) next.doubleRemaining--;
+        const usedSet = new Set(next.usedThisQuestion);
+        usedSet.add(powerUpType);
+        next.usedThisQuestion = usedSet;
+        return next;
+      });
+    });
+
+    // Clear selection
+    setSelectedPowerUps(new Set());
+    setCopiedPlayerId(null);
+  }
+
   function toggleAnswer(answerId: string) {
     if (hasSubmitted) return;
 
@@ -220,6 +292,8 @@ export default function PlayerGamePage({
       // Single select - replace selection
       newSelected.clear();
       newSelected.add(answerId);
+      // Emit power-ups before submitting answer
+      emitPowerUps(effectiveCurrentQuestion.id);
       // Auto-submit for single select
       submitAnswer(effectiveCurrentQuestion.id, [answerId]);
       setHasSubmitted(true);
@@ -237,6 +311,8 @@ export default function PlayerGamePage({
 
   function handleSubmitMultiSelect() {
     if (!effectiveCurrentQuestion || hasSubmitted || selectedAnswers.size === 0) return;
+    // Emit power-ups before submitting answer
+    emitPowerUps(effectiveCurrentQuestion.id);
     submitAnswer(effectiveCurrentQuestion.id, Array.from(selectedAnswers));
     setHasSubmitted(true);
   }
@@ -264,6 +340,46 @@ export default function PlayerGamePage({
 
     // Mark as clicked
     setEasterEggClicked((prev) => new Set(prev).add(questionId));
+  }
+
+  function handlePowerUpToggle(powerUpType: PowerUpType) {
+    if (powerUpType === PowerUpType.HINT) {
+      // Show hint modal - once selected, can't unselect
+      if (!selectedPowerUps.has(PowerUpType.HINT)) {
+        setShowHintModal(true);
+        setSelectedPowerUps((prev) => {
+          const next = new Set(prev);
+          next.add(PowerUpType.HINT);
+          return next;
+        });
+      }
+    } else if (powerUpType === PowerUpType.COPY) {
+      // Open player selector only if not already selected
+      if (!selectedPowerUps.has(PowerUpType.COPY)) {
+        setShowCopyPlayerSelector(true);
+      }
+    } else if (powerUpType === PowerUpType.DOUBLE) {
+      // Toggle double points with visual feedback
+      setSelectedPowerUps((prev) => {
+        const next = new Set(prev);
+        if (next.has(powerUpType)) {
+          next.delete(powerUpType);
+        } else {
+          next.add(powerUpType);
+        }
+        return next;
+      });
+    }
+  }
+
+  function handleCopyPlayerSelected(selectedPlayerId: string) {
+    setSelectedPowerUps((prev) => {
+      const next = new Set(prev);
+      next.add(PowerUpType.COPY);
+      return next;
+    });
+    setCopiedPlayerId(selectedPlayerId);
+    setShowCopyPlayerSelector(false);
   }
 
   // Player waiting for admission (pending status)
@@ -821,6 +937,110 @@ export default function PlayerGamePage({
             </div>
           )}
 
+          {/* Power-ups Section */}
+          {gameState.status === "QUESTION" && !hasSubmitted && (powerUpState.hintsRemaining > 0 || powerUpState.copyRemaining > 0 || powerUpState.doubleRemaining > 0) && (
+            <div className="px-8 py-4 border-t border-border">
+              <div className="flex items-center gap-2 mb-3">
+                <Zap className="w-4 h-4" />
+                <span className="text-sm font-medium">Power-ups</span>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {/* Hint Power-up */}
+                {powerUpState.hintsRemaining > 0 && (
+                  <Button
+                    variant={selectedPowerUps.has(PowerUpType.HINT) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePowerUpToggle(PowerUpType.HINT)}
+                    disabled={powerUpState.usedThisQuestion.has(PowerUpType.HINT)}
+                    className="flex flex-col h-auto py-2"
+                  >
+                    <Lightbulb className="w-5 h-5 mb-1" />
+                    <span className="text-xs">Hint</span>
+                    <span className="text-xs text-muted-foreground">
+                      {powerUpState.hintsRemaining} left
+                    </span>
+                  </Button>
+                )}
+
+                {/* Copy Answer Power-up */}
+                {powerUpState.copyRemaining > 0 && (
+                  <Button
+                    variant={selectedPowerUps.has(PowerUpType.COPY) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePowerUpToggle(PowerUpType.COPY)}
+                    disabled={powerUpState.usedThisQuestion.has(PowerUpType.COPY)}
+                    className="flex flex-col h-auto py-2"
+                  >
+                    <Users className="w-5 h-5 mb-1" />
+                    <span className="text-xs">Copy</span>
+                    <span className="text-xs text-muted-foreground">
+                      {powerUpState.copyRemaining} left
+                    </span>
+                  </Button>
+                )}
+
+                {/* Double Points Power-up */}
+                {powerUpState.doubleRemaining > 0 && (
+                  <Button
+                    variant={selectedPowerUps.has(PowerUpType.DOUBLE) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => handlePowerUpToggle(PowerUpType.DOUBLE)}
+                    disabled={powerUpState.usedThisQuestion.has(PowerUpType.DOUBLE)}
+                    className="flex flex-col h-auto py-2"
+                  >
+                    <Sparkles className="w-5 h-5 mb-1" />
+                    <span className="text-xs">Double</span>
+                    <span className="text-xs text-muted-foreground">
+                      {powerUpState.doubleRemaining} left
+                    </span>
+                  </Button>
+                )}
+              </div>
+
+              {/* Active Power-ups Feedback */}
+              {(selectedPowerUps.has(PowerUpType.HINT) || selectedPowerUps.has(PowerUpType.COPY) || selectedPowerUps.has(PowerUpType.DOUBLE)) && (
+                <div className="mt-3 space-y-2">
+                  {/* Hint Active Badge */}
+                  {selectedPowerUps.has(PowerUpType.HINT) && (
+                    <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Lightbulb className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                        <p className="text-xs font-medium text-blue-900 dark:text-blue-100">
+                          Hint Active
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Copy Confirmation */}
+                  {selectedPowerUps.has(PowerUpType.COPY) && copiedPlayerId && (
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Users className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                        <p className="text-xs font-medium text-purple-900 dark:text-purple-100">
+                          Copy Active - Will copy from {gameState.players.find(p => p.id === copiedPlayerId)?.name || 'selected player'}
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Double Points Confirmation */}
+                  {selectedPowerUps.has(PowerUpType.DOUBLE) && (
+                    <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                        <p className="text-xs font-medium text-amber-900 dark:text-amber-100">
+                          Double Points Active - Your score will be doubled!
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Answers */}
           <div className="flex-1 px-8 py-4 space-y-4">
             {effectiveCurrentQuestion?.answers.map((answer, index) => {
@@ -966,6 +1186,69 @@ export default function PlayerGamePage({
             </div>
           )}
         </div>
+
+        {/* Hint Modal */}
+        <Dialog open={showHintModal} onOpenChange={setShowHintModal}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Lightbulb className="w-5 h-5" />
+                Hint
+              </DialogTitle>
+            </DialogHeader>
+            <div className="py-6">
+              <p className="text-lg">{effectiveCurrentQuestion?.hint}</p>
+            </div>
+            <DialogFooter>
+              <Button onClick={() => setShowHintModal(false)}>Close</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Copy Player Selector Dialog */}
+        <Dialog open={showCopyPlayerSelector} onOpenChange={setShowCopyPlayerSelector}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Users className="w-5 h-5" />
+                Copy Answer
+              </DialogTitle>
+              <DialogDescription>
+                Select a player to copy their answer. This is a blind copy - you won't see their choice.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-2 max-h-96 overflow-y-auto">
+              {gameState?.players
+                .filter(p => p.name !== playerName && p.isActive)
+                .map(player => (
+                  <Button
+                    key={player.id}
+                    variant="outline"
+                    className="w-full justify-start"
+                    onClick={() => handleCopyPlayerSelected(player.id)}
+                  >
+                    <div className="flex items-center gap-2">
+                      {player.avatarEmoji?.startsWith("/") ? (
+                        <img
+                          src={player.avatarEmoji}
+                          alt={player.name}
+                          className="w-8 h-8 rounded-full object-cover"
+                        />
+                      ) : (
+                        <div
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-white text-sm"
+                          style={{ backgroundColor: player.avatarColor }}
+                        >
+                          {player.avatarEmoji || player.name[0]}
+                        </div>
+                      )}
+                      <span>{player.name}</span>
+                    </div>
+                  </Button>
+                ))}
+            </div>
+          </DialogContent>
+        </Dialog>
       </ThemeProvider>
     );
   }
@@ -1057,6 +1340,24 @@ export default function PlayerGamePage({
                     {player.name}
                     {isMe && " (You)"}
                   </span>
+
+                  {/* Power-up indicators */}
+                  {"powerUpsUsed" in player && player.powerUpsUsed && player.powerUpsUsed.length > 0 && (
+                    <div className="flex gap-1">
+                      {player.powerUpsUsed.map((usage: { powerUpType: PowerUpType; questionNumber: number }, idx: number) => (
+                        <span
+                          key={idx}
+                          className="text-xs px-1.5 py-0.5 bg-muted rounded"
+                          title={`Q${usage.questionNumber}: ${usage.powerUpType}`}
+                        >
+                          {usage.powerUpType === "hint" && "💡"}
+                          {usage.powerUpType === "copy" && "👥"}
+                          {usage.powerUpType === "double" && "⚡"}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
                   <span className="font-bold text-primary">{player.score}</span>
                 </div>
               );

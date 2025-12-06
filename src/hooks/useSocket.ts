@@ -11,6 +11,7 @@ import {
   EasterEggClickDetail,
   ServerToClientEvents,
   ClientToServerEvents,
+  PowerUpType,
 } from "@/types";
 
 interface NextQuestionPreview {
@@ -38,6 +39,7 @@ interface UseSocketReturn {
   questionEnded: { correctAnswerIds: string[]; stats: AnswerStats } | null;
   playerAnswers: Map<string, PlayerAnswerDetail[]>; // questionId -> answers
   easterEggClicks: Map<string, EasterEggClickDetail[]>; // questionId -> clicks
+  powerUpUsages: Map<string, Array<{ playerId: string; powerUpType: PowerUpType }>>; // questionId -> power-ups
   nextQuestionPreview: NextQuestionPreview | null;
   error: string | null;
   gameCancelled: boolean;
@@ -83,6 +85,9 @@ export function useSocket({
     new Map()
   );
   const [easterEggClicks, setEasterEggClicks] = useState<Map<string, EasterEggClickDetail[]>>(
+    new Map()
+  );
+  const [powerUpUsages, setPowerUpUsages] = useState<Map<string, Array<{ playerId: string; powerUpType: PowerUpType }>>>(
     new Map()
   );
   const [nextQuestionPreview, setNextQuestionPreview] = useState<NextQuestionPreview | null>(null);
@@ -241,6 +246,15 @@ export function useSocket({
       });
     });
 
+    socket.on("game:powerUpUsed", ({ playerId, questionId, powerUpType }) => {
+      setPowerUpUsages((prev) => {
+        const newMap = new Map(prev);
+        const existing = newMap.get(questionId) || [];
+        newMap.set(questionId, [...existing, { playerId, powerUpType }]);
+        return newMap;
+      });
+    });
+
     socket.on("game:questionEnd", (data) => {
       setQuestionEnded(data);
       setGameState((prev) => (prev ? { ...prev, status: "REVEALING" } : prev));
@@ -387,6 +401,7 @@ export function useSocket({
     questionEnded,
     playerAnswers,
     easterEggClicks,
+    powerUpUsages,
     nextQuestionPreview,
     error,
     gameCancelled,

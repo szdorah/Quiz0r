@@ -65,17 +65,20 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
   }
 }
 
-// PATCH /api/quizzes/[quizId] - Partially update quiz (e.g., autoAdmit)
+// PATCH /api/quizzes/[quizId] - Partially update quiz (e.g., autoAdmit, power-ups)
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   try {
     const { quizId } = await params;
     const body = await request.json();
-    const { autoAdmit } = body;
+    const { autoAdmit, hintCount, copyAnswerCount, doublePointsCount } = body;
 
     const quiz = await prisma.quiz.update({
       where: { id: quizId },
       data: {
         ...(autoAdmit !== undefined && { autoAdmit }),
+        ...(hintCount !== undefined && { hintCount }),
+        ...(copyAnswerCount !== undefined && { copyAnswerCount }),
+        ...(doublePointsCount !== undefined && { doublePointsCount }),
       },
     });
 

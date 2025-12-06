@@ -44,6 +44,8 @@ import {
   Palette,
   Download,
   Shield,
+  Zap,
+  AlertCircle,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -79,6 +81,7 @@ interface Question {
   questionText: string;
   imageUrl?: string | null;
   hostNotes?: string | null;
+  hint?: string | null;
   questionType: string;
   timeLimit: number;
   points: number;
@@ -91,6 +94,9 @@ interface Quiz {
   title: string;
   description?: string | null;
   autoAdmit: boolean;
+  hintCount: number;
+  copyAnswerCount: number;
+  doublePointsCount: number;
   questions: Question[];
 }
 
@@ -332,6 +338,7 @@ export default function QuestionsPage({
   const [questionText, setQuestionText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [hostNotes, setHostNotes] = useState("");
+  const [hint, setHint] = useState("");
   const [questionType, setQuestionType] = useState("SINGLE_SELECT");
   const [timeLimit, setTimeLimit] = useState(30);
   const [points, setPoints] = useState(100);
@@ -437,6 +444,7 @@ export default function QuestionsPage({
     setQuestionText("");
     setImageUrl("");
     setHostNotes("");
+    setHint("");
     setQuestionType("SINGLE_SELECT");
     setTimeLimit(30);
     setPoints(100);
@@ -458,6 +466,7 @@ export default function QuestionsPage({
     setQuestionText(question.questionText);
     setImageUrl(question.imageUrl || "");
     setHostNotes(question.hostNotes || "");
+    setHint(question.hint || "");
     setQuestionType(question.questionType);
     setTimeLimit(question.timeLimit);
     setPoints(question.points);
@@ -622,10 +631,17 @@ export default function QuestionsPage({
       }
     }
 
+    // Hint validation
+    if (quiz && quiz.hintCount > 0 && !hint.trim()) {
+      alert("Hint is required when Hint power-up is enabled");
+      return;
+    }
+
     const questionData = {
       questionText,
       imageUrl: imageUrl || null,
       hostNotes: hostNotes || null,
+      hint: hint || null,
       questionType,
       timeLimit,
       points,
@@ -681,6 +697,25 @@ export default function QuestionsPage({
       }
     } catch (error) {
       console.error("Failed to update auto-admit:", error);
+    }
+  }
+
+  async function updatePowerUpCount(field: string, value: number) {
+    try {
+      const res = await fetch(`/api/quizzes/${quizId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ [field]: value }),
+      });
+
+      if (res.ok) {
+        // Update local state
+        setQuiz((prev) => prev ? { ...prev, [field]: value } : null);
+        // Refresh quiz data to update question warnings
+        await fetchQuiz();
+      }
+    } catch (error) {
+      console.error("Failed to update power-up count:", error);
     }
   }
 
@@ -990,6 +1025,32 @@ export default function QuestionsPage({
                   />
                   <p className="text-xs text-muted-foreground">
                     These notes are shown to the host in the control panel during the question and when revealing answers.
+                  </p>
+                </div>
+
+                {/* Hint */}
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="hint">
+                      Hint {quiz.hintCount > 0 && <span className="text-red-500">*</span>}
+                    </Label>
+                    {quiz.hintCount > 0 && (
+                      <span className="text-xs text-muted-foreground">
+                        Required (Hint power-up enabled)
+                      </span>
+                    )}
+                  </div>
+                  <Textarea
+                    id="hint"
+                    placeholder="Provide a helpful hint for this question..."
+                    value={hint}
+                    onChange={(e) => setHint(e.target.value)}
+                    rows={2}
+                    maxLength={200}
+                    className="text-sm"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    {hint.length}/200 characters
                   </p>
                 </div>
 
@@ -1347,6 +1408,89 @@ export default function QuestionsPage({
               onCheckedChange={updateAutoAdmit}
             />
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Power-ups Configuration */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Zap className="w-4 h-4" />
+            Power-ups
+          </CardTitle>
+          <CardDescription>
+            Configure power-ups available to players during gameplay. Set to 0 to disable a power-up type.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Hint Power-up */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="hint-count">💡 Hint</Label>
+              <p className="text-sm text-muted-foreground">
+                Shows a hint for the question. All questions must have hints if enabled.
+              </p>
+            </div>
+            <Input
+              id="hint-count"
+              type="number"
+              min="0"
+              max="10"
+              className="w-20"
+              value={quiz.hintCount}
+              onChange={(e) => updatePowerUpCount('hintCount', parseInt(e.target.value))}
+            />
+          </div>
+
+          {/* Copy Answer Power-up */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="copy-count">👥 Copy Answer</Label>
+              <p className="text-sm text-muted-foreground">
+                Copy another player's answer (blind copy - no preview).
+              </p>
+            </div>
+            <Input
+              id="copy-count"
+              type="number"
+              min="0"
+              max="10"
+              className="w-20"
+              value={quiz.copyAnswerCount}
+              onChange={(e) => updatePowerUpCount('copyAnswerCount', parseInt(e.target.value))}
+            />
+          </div>
+
+          {/* Double Points Power-up */}
+          <div className="flex items-center justify-between">
+            <div className="space-y-0.5 flex-1">
+              <Label htmlFor="double-count">⚡ Double Points</Label>
+              <p className="text-sm text-muted-foreground">
+                Doubles the final score for the question (after speed bonus).
+              </p>
+            </div>
+            <Input
+              id="double-count"
+              type="number"
+              min="0"
+              max="10"
+              className="w-20"
+              value={quiz.doublePointsCount}
+              onChange={(e) => updatePowerUpCount('doublePointsCount', parseInt(e.target.value))}
+            />
+          </div>
+
+          {quiz.hintCount > 0 && (
+            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
+              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Hint Requirement</p>
+                <p className="text-sm text-amber-700 dark:text-amber-300">
+                  All questions must have a hint when Hint power-up is enabled. Questions without hints will show a warning.
+                </p>
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -14,6 +14,12 @@ model Quiz {
   description String?
   theme       String?       // JSON string containing QuizTheme
   autoAdmit   Boolean       @default(true) // Auto-admit players by default
+
+  // Power-up Configuration (default: all disabled)
+  hintCount          Int @default(0)
+  copyAnswerCount    Int @default(0)
+  doublePointsCount  Int @default(0)
+
   createdAt   DateTime      @default(now())
   updatedAt   DateTime      @updatedAt
   isActive    Boolean       @default(true)
@@ -43,9 +49,13 @@ model Question {
   easterEggUrl              String?
   easterEggDisablesScoring  Boolean  @default(false)
 
-  answers       Answer[]
-  playerAnswers PlayerAnswer[]
+  // Power-up Configuration
+  hint String?  // Required if quiz has hintCount > 0
+
+  answers         Answer[]
+  playerAnswers   PlayerAnswer[]
   easterEggClicks EasterEggClick[]
+  powerUpUsages   PowerUpUsage[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -109,8 +119,9 @@ model Player {
   admissionStatus String    @default("admitted")
   removedAt       DateTime?
 
-  answers PlayerAnswer[]
+  answers         PlayerAnswer[]
   easterEggClicks EasterEggClick[]
+  powerUpUsages   PowerUpUsage[]
 
   @@unique([gameSessionId, name])
   @@index([gameSessionId])
@@ -148,6 +159,23 @@ model EasterEggClick {
   clickedAt  DateTime @default(now())
 
   @@unique([playerId, questionId])
+  @@index([playerId])
+  @@index([questionId])
+}
+
+// Power-up usage tracking
+model PowerUpUsage {
+  id         String   @id @default(cuid())
+  playerId   String
+  player     Player   @relation(fields: [playerId], references: [id], onDelete: Cascade)
+  questionId String
+  question   Question @relation(fields: [questionId], references: [id], onDelete: Cascade)
+
+  powerUpType      String   // "hint", "copy", "double"
+  copiedPlayerId   String?  // Only for "copy" type
+  usedAt           DateTime @default(now())
+
+  @@unique([playerId, questionId, powerUpType]) // Prevent using same type twice per question
   @@index([playerId])
   @@index([questionId])
 }

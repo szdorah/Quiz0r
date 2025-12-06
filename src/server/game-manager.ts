@@ -11,6 +11,7 @@ import {
   ClientToServerEvents,
   ServerToClientEvents,
   QuizPreloadData,
+  PowerUpType,
 } from "@/types";
 import { QuizTheme } from "@/types/theme";
 import {
@@ -68,6 +69,7 @@ export class GameManager {
     socket.on("player:answer", (data) => this.handlePlayerAnswer(socket, data));
     socket.on("player:preloadProgress", (data) => this.handlePreloadProgress(socket, data));
     socket.on("player:easterEggClick", (data) => this.handleEasterEggClick(socket, data));
+    socket.on("player:usePowerUp", (data) => this.handlePowerUpUsage(socket, data));
 
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
@@ -410,7 +412,7 @@ export class GameManager {
     socket: TypedSocket,
     data: { gameCode: string; questionId: string; answerIds: string[] }
   ) {
-    const { gameCode, questionId, answerIds } = data;
+    let { gameCode, questionId, answerIds } = data;
     const upperCode = gameCode.toUpperCase();
     const game = this.activeGames.get(upperCode);
 
@@ -422,6 +424,57 @@ export class GameManager {
     // Check if already answered
     const answeredPlayers = game.playerAnswers.get(questionId);
     if (!answeredPlayers || answeredPlayers.has(playerId)) return;
+
+    // Check for Copy power-up
+    const powerUps = await prisma.powerUpUsage.findMany({
+      where: { playerId, questionId },
+    });
+
+    const copyPowerUp = powerUps.find(p => p.powerUpType === "copy");
+    if (copyPowerUp && copyPowerUp.copiedPlayerId) {
+      // Check if copied player is still active
+      const copiedPlayer = await prisma.player.findUnique({
+        where: { id: copyPowerUp.copiedPlayerId },
+      });
+
+      if (!copiedPlayer || !copiedPlayer.isActive) {
+        // Copied player disconnected - refund the power-up
+        await prisma.powerUpUsage.delete({
+          where: { id: copyPowerUp.id },
+        });
+
+        // Notify player that Copy was refunded
+        socket.emit("game:powerUpRefunded", {
+          powerUpType: "copy",
+          reason: "Copied player disconnected",
+        });
+
+        console.log(`[PowerUp] Copy refunded for player ${playerId} - copied player disconnected`);
+
+        // Don't process as answer - return early (counts as non-answer)
+        return;
+      }
+
+      // Check for copied player's answer
+      const copiedAnswer = await prisma.playerAnswer.findUnique({
+        where: {
+          playerId_questionId: {
+            playerId: copyPowerUp.copiedPlayerId,
+            questionId,
+          },
+        },
+      });
+
+      if (copiedAnswer) {
+        // Use copied player's answer
+        answerIds = JSON.parse(copiedAnswer.selectedAnswerIds);
+        console.log(`[PowerUp] Player ${playerId} copied answer from ${copyPowerUp.copiedPlayerId}`);
+      } else {
+        // Copied player hasn't answered - count as non-answer
+        console.log(`[PowerUp] Player ${playerId} copy failed - copied player hasn't answered`);
+        return;
+      }
+    }
 
     answeredPlayers.add(playerId);
 
@@ -467,6 +520,13 @@ export class GameManager {
         // Player clicked easter egg and scoring is disabled - give 0 points
         points = 0;
       }
+    }
+
+    // Check for Double Points power-up
+    const doublePowerUp = powerUps.find((p: { powerUpType: string }) => p.powerUpType === "double");
+    if (doublePowerUp) {
+      points = points * 2;  // Double after all other calculations
+      console.log(`[PowerUp] Player ${playerId} used double points - score: ${points / 2} -> ${points}`);
     }
 
     // Save answer to database
@@ -987,6 +1047,11 @@ export class GameManager {
               Math.floor((Date.now() - activeGame.questionStartedAt) / 1000)
           )
         : undefined,
+      powerUps: {
+        hintCount: gameSession.quiz.hintCount,
+        copyAnswerCount: gameSession.quiz.copyAnswerCount,
+        doublePointsCount: gameSession.quiz.doublePointsCount,
+      },
     };
   }
 
@@ -1001,6 +1066,29 @@ export class GameManager {
       orderBy: { totalScore: "desc" },
     });
 
+    // Fetch power-up usage for all players
+    const playerIds = players.map(p => p.id);
+    const powerUpUsages = await prisma.powerUpUsage.findMany({
+      where: {
+        playerId: { in: playerIds },
+      },
+      include: {
+        question: {
+          select: { orderIndex: true },
+        },
+      },
+    });
+
+    // Group power-ups by player
+    const powerUpsByPlayer = new Map<string, Array<{ powerUpType: PowerUpType; questionNumber: number }>>();
+    for (const usage of powerUpUsages) {
+      const existing = powerUpsByPlayer.get(usage.playerId) || [];
+      powerUpsByPlayer.set(usage.playerId, [...existing, {
+        powerUpType: usage.powerUpType as PowerUpType,
+        questionNumber: usage.question.orderIndex + 1,
+      }]);
+    }
+
     return players.map((p, index) => {
       const previousPosition = game?.previousPositions.get(p.id) || index + 1;
       return {
@@ -1011,6 +1099,7 @@ export class GameManager {
         score: p.totalScore,
         position: index + 1,
         change: previousPosition - (index + 1),
+        powerUpsUsed: powerUpsByPlayer.get(p.id) || [],
       };
     });
   }
@@ -1181,6 +1270,48 @@ export class GameManager {
       }
     } catch (error) {
       console.error("Error handling easter egg click:", error);
+    }
+  }
+
+  private async handlePowerUpUsage(
+    socket: TypedSocket,
+    data: {
+      gameCode: string;
+      questionId: string;
+      powerUpType: PowerUpType;
+      copiedPlayerId?: string;
+    }
+  ) {
+    const { gameCode, questionId, powerUpType, copiedPlayerId } = data;
+    const upperCode = gameCode.toUpperCase();
+    const game = this.activeGames.get(upperCode);
+
+    if (!game || game.status !== "QUESTION") return;
+
+    const playerId = (socket as any).playerId;
+    if (!playerId) return;
+
+    try {
+      // Record power-up usage
+      await prisma.powerUpUsage.create({
+        data: {
+          playerId,
+          questionId,
+          powerUpType,
+          copiedPlayerId: powerUpType === "copy" ? copiedPlayerId : null,
+        },
+      });
+
+      // Notify host
+      this.io.to(`game:${upperCode}:host`).emit("game:powerUpUsed", {
+        playerId,
+        questionId,
+        powerUpType,
+      });
+
+      console.log(`[PowerUp] Player ${playerId} used ${powerUpType} power-up for question ${questionId}`);
+    } catch (error) {
+      console.error("Error handling power-up usage:", error);
     }
   }
 }

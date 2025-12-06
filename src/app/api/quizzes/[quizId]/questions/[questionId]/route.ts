@@ -19,6 +19,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       points,
       orderIndex,
       answers,
+      hint,
       easterEggEnabled,
       easterEggButtonText,
       easterEggUrl,
@@ -35,6 +36,7 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (timeLimit !== undefined) updateData.timeLimit = timeLimit;
     if (points !== undefined) updateData.points = points;
     if (orderIndex !== undefined) updateData.orderIndex = orderIndex;
+    if (hint !== undefined) updateData.hint = hint?.trim() || null;
 
     // Easter egg fields
     if (easterEggEnabled !== undefined) {

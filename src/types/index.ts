@@ -9,6 +9,15 @@ export const QuestionType = {
 
 export type QuestionType = (typeof QuestionType)[keyof typeof QuestionType];
 
+// Power-up types
+export const PowerUpType = {
+  HINT: "hint",
+  COPY: "copy",
+  DOUBLE: "double",
+} as const;
+
+export type PowerUpType = (typeof PowerUpType)[keyof typeof PowerUpType];
+
 // Game status types
 export const GameStatus = {
   WAITING: "WAITING",
@@ -35,6 +44,11 @@ export interface GameState {
   currentQuestion?: QuestionData | null;
   timeRemaining?: number;
   autoAdmit?: boolean;
+  powerUps: {
+    hintCount: number;
+    copyAnswerCount: number;
+    doublePointsCount: number;
+  };
 }
 
 export interface PlayerInfo {
@@ -61,6 +75,7 @@ export interface QuestionData {
   timeLimit: number;
   points: number;
   answers: AnswerOption[];
+  hint?: string | null;
   easterEggEnabled?: boolean;
   easterEggButtonText?: string | null;
   easterEggUrl?: string | null;
@@ -81,6 +96,10 @@ export interface PlayerScore {
   score: number;
   position: number;
   change: number;
+  powerUpsUsed: Array<{
+    powerUpType: PowerUpType;
+    questionNumber: number;
+  }>;
 }
 
 export interface AnswerStats {
@@ -107,6 +126,19 @@ export interface EasterEggClickDetail {
   avatarColor: string;
   avatarEmoji?: string | null;
   clickedAt: number;
+}
+
+export interface PowerUpUsageData {
+  powerUpType: PowerUpType;
+  questionId: string;
+  copiedPlayerId?: string | null;
+}
+
+export interface PlayerPowerUpState {
+  hintsRemaining: number;
+  copyRemaining: number;
+  doubleRemaining: number;
+  usedThisQuestion: Set<PowerUpType>;
 }
 
 export interface QuizPreloadData {
@@ -176,6 +208,15 @@ export interface ServerToClientEvents {
     questionId: string;
     click: EasterEggClickDetail;
   }) => void;
+  "game:powerUpUsed": (data: {
+    playerId: string;
+    questionId: string;
+    powerUpType: PowerUpType;
+  }) => void;
+  "game:powerUpRefunded": (data: {
+    powerUpType: PowerUpType;
+    reason: string;
+  }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
@@ -212,5 +253,11 @@ export interface ClientToServerEvents {
   "player:easterEggClick": (data: {
     gameCode: string;
     questionId: string;
+  }) => void;
+  "player:usePowerUp": (data: {
+    gameCode: string;
+    questionId: string;
+    powerUpType: PowerUpType;
+    copiedPlayerId?: string;
   }) => void;
 }
