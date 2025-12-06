@@ -10,6 +10,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Check, Trophy, Medal, Award, Layers } from "lucide-react";
 import { ThemeProvider, getAnswerColor } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
+import { AspectRatioHelper } from "@/components/display/AspectRatioHelper";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
 import { getContrastingTextColor } from "@/lib/color-utils";
 
@@ -127,6 +128,7 @@ export default function HostDisplayPage({
             </div>
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -147,6 +149,7 @@ export default function HostDisplayPage({
             </div>
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -236,6 +239,7 @@ export default function HostDisplayPage({
             </div>
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -274,6 +278,7 @@ export default function HostDisplayPage({
             )}
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -396,6 +401,7 @@ export default function HostDisplayPage({
             )}
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -562,6 +568,7 @@ export default function HostDisplayPage({
             )}
           </div>
         </div>
+        <AspectRatioHelper />
       </ThemeProvider>
     );
   }
@@ -582,6 +589,7 @@ export default function HostDisplayPage({
           <p className="text-muted-foreground mt-2">Game in progress...</p>
         </div>
       </div>
+      <AspectRatioHelper />
     </ThemeProvider>
   );
 }
