@@ -57,6 +57,7 @@ interface UseSocketReturn {
   showScoreboard: () => void;
   endGame: () => void;
   skipTimer: () => void;
+  revealAnswers: () => void;
   cancelGame: () => void;
   submitAnswer: (questionId: string, answerIds: string[]) => void;
   removePlayer: (playerId: string) => void;

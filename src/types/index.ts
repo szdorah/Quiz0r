@@ -284,6 +284,7 @@ export interface ClientToServerEvents {
     questionId: string;
     answerIds: string[];
   }) => void;
+  "player:updateLanguage": (data: { gameCode: string; languageCode: LanguageCode }) => void;
   "player:reconnect": (data: { gameCode: string; playerId: string }) => void;
   "player:preloadProgress": (data: {
     gameCode: string;

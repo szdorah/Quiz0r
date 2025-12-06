@@ -620,9 +620,10 @@ export default function QuestionsPage({
           Object.keys(data.translations.questionTranslations || {}).forEach((lang) => {
             langs.add(lang as LanguageCode);
           });
-          Object.values(data.translations.answerTranslations || {}).forEach((answerMap: Record<string, string>) => {
-            Object.keys(answerMap || {}).forEach((lang) => langs.add(lang as LanguageCode));
-          });
+          Object.values(data.translations.answerTranslations || {} as Record<string, Record<string, string>>)
+            .forEach((answerMap) => {
+              Object.keys(answerMap || {}).forEach((lang) => langs.add(lang as LanguageCode));
+            });
           setAvailableTranslationLanguages(Array.from(langs));
         }
       }
