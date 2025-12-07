@@ -16,8 +16,12 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
         questions: {
           include: {
             answers: {
+              include: {
+                translations: true,
+              },
               orderBy: { orderIndex: "asc" },
             },
+            translations: true,
           },
           orderBy: { orderIndex: "asc" },
         },

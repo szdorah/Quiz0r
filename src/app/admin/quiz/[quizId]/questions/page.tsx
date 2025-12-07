@@ -2,92 +2,34 @@
 
 import { useEffect, useState, useRef, useMemo } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Switch } from "@/components/ui/switch";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Loader2 } from "lucide-react";
+import { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import { arrayMove } from "@dnd-kit/sortable";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  ArrowLeft,
-  Plus,
-  Trash2,
-  GripVertical,
+  AlertCircle,
   Check,
   X,
-  Play,
-  Image,
-  Upload,
-  Loader2,
-  Layers,
-  Palette,
-  Download,
-  Shield,
-  Zap,
-  AlertCircle,
-  Languages,
-  MoreHorizontal,
-  Lightbulb,
-  Users,
   Sparkles,
-  Pencil,
-  Copy,
+  Trash2,
+  Languages,
 } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { SupportedLanguages, type LanguageCode, type TranslationStatus } from "@/types";
 
-// DnD Kit imports
-import {
-  DndContext,
-  closestCenter,
-  KeyboardSensor,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  DragEndEvent,
-  DragStartEvent,
-  DragOverlay,
-} from "@dnd-kit/core";
-import {
-  arrayMove,
-  SortableContext,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
-import { CSS } from "@dnd-kit/utilities";
-import { SupportedLanguages, type LanguageCode } from "@/types";
+// New components
+import { QuestionListHeader } from "@/components/quiz/questions/QuestionListHeader";
+import { QuestionList } from "@/components/quiz/questions/QuestionList";
+import { QuizSettingsSidebar } from "@/components/quiz/settings/QuizSettingsSidebar";
+import { QuestionEditorDialog } from "@/components/quiz/editor/QuestionEditorDialog";
+import { SectionEditorDialog } from "@/components/quiz/editor/SectionEditorDialog";
 
 interface Answer {
   id?: string;
@@ -125,7 +67,7 @@ interface SectionGroup {
   questions: Question[];
 }
 
-// Group questions by sections for visual display
+// Group questions by sections for reordering
 function groupQuestionsBySections(questions: Question[]): SectionGroup[] {
   const groups: SectionGroup[] = [];
   let currentGroup: SectionGroup = {
@@ -135,24 +77,20 @@ function groupQuestionsBySections(questions: Question[]): SectionGroup[] {
 
   for (const q of questions) {
     if (q.questionType === "SECTION") {
-      // Save previous group if it has content
       if (currentGroup.section || currentGroup.questions.length > 0) {
         groups.push(currentGroup);
       }
-      // Start new group with this section
       currentGroup = { section: q, questions: [] };
     } else {
       currentGroup.questions.push(q);
     }
   }
-  // Don't forget the last group
   if (currentGroup.section || currentGroup.questions.length > 0) {
     groups.push(currentGroup);
   }
   return groups;
 }
 
-// Flatten groups back to a single array preserving order
 function flattenGroups(groups: SectionGroup[]): Question[] {
   const result: Question[] = [];
   for (const group of groups) {
@@ -162,185 +100,6 @@ function flattenGroups(groups: SectionGroup[]): Question[] {
     result.push(...group.questions);
   }
   return result;
-}
-
-// Sortable Question Card Component
-function SortableQuestionCard({
-  question,
-  questionNumber,
-  onEdit,
-  onDelete,
-  isInSection,
-}: {
-  question: Question;
-  questionNumber: number;
-  onEdit: (question: Question) => void;
-  onDelete: (questionId: string) => void;
-  isInSection: boolean;
-}) {
-  const isSection = question.questionType === "SECTION";
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({ id: question.id });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.5 : 1,
-  };
-
-  return (
-    <div
-      ref={setNodeRef}
-      style={style}
-      className={isInSection && !isSection ? "ml-8" : ""}
-    >
-      <Card
-        className={`group ${isSection ? "border-primary/50 bg-primary/5" : ""} ${
-          isDragging ? "ring-2 ring-primary" : ""
-        }`}
-      >
-        <CardHeader className="pb-2">
-          <div className="flex items-start gap-4">
-            {/* Drag Handle - 44x44px touch target for accessibility */}
-            <div
-              {...attributes}
-              {...listeners}
-              className="cursor-grab active:cursor-grabbing p-3 -m-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors touch-manipulation"
-            >
-              <GripVertical className="w-5 h-5" />
-            </div>
-            <div
-              className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
-                isSection
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-primary/10 text-primary"
-              }`}
-            >
-              {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
-            </div>
-            <div className="flex-1 min-w-0">
-              <CardTitle className="text-base font-medium">
-                {question.questionText}
-              </CardTitle>
-              <CardDescription className="flex items-center gap-3 mt-1">
-                {isSection ? (
-                  <>
-                    <span className="text-primary font-medium">Section</span>
-                    {question.hostNotes && (
-                      <>
-                        <span>•</span>
-                        <span className="truncate max-w-[200px]">{question.hostNotes}</span>
-                      </>
-                    )}
-                  </>
-                ) : (
-                  <>
-                    <span>
-                      {question.questionType === "MULTI_SELECT"
-                        ? "Multi Select"
-                        : "Single Select"}
-                    </span>
-                    <span>•</span>
-                    <span>{question.timeLimit}s</span>
-                    <span>•</span>
-                    <span>{question.points} pts</span>
-                  </>
-                )}
-                {question.imageUrl && (
-                  <>
-                    <span>•</span>
-                    <span className="flex items-center">
-                      <Image className="w-3 h-3 mr-1" />
-                      Image
-                    </span>
-                  </>
-                )}
-              </CardDescription>
-            </div>
-            {/* Edit buttons - always visible for mobile accessibility */}
-            <div className="flex items-center gap-1 shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onEdit(question)}
-                className="h-9 w-9"
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => onDelete(question.id)}
-                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        {!isSection && question.answers.length > 0 && (
-          <CardContent className="pt-0 pl-20">
-            <div className="flex flex-wrap gap-2">
-              {question.answers.map((answer, aIndex) => (
-                <div
-                  key={aIndex}
-                  className={`text-sm px-3 py-1 rounded-full ${
-                    answer.isCorrect
-                      ? "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400"
-                      : "bg-muted text-muted-foreground"
-                  }`}
-                >
-                  {answer.isCorrect && (
-                    <Check className="w-3 h-3 inline mr-1" />
-                  )}
-                  {answer.answerText}
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        )}
-      </Card>
-    </div>
-  );
-}
-
-// Drag Overlay Card (shown while dragging)
-function DragOverlayCard({ question, questionNumber }: { question: Question; questionNumber: number }) {
-  const isSection = question.questionType === "SECTION";
-
-  return (
-    <Card
-      className={`${isSection ? "border-primary/50 bg-primary/5" : ""} ring-2 ring-primary shadow-lg`}
-    >
-      <CardHeader className="pb-2">
-        <div className="flex items-start gap-4">
-          <div className="p-1 -m-1 text-muted-foreground">
-            <GripVertical className="w-5 h-5" />
-          </div>
-          <div
-            className={`flex items-center justify-center w-8 h-8 rounded-full font-semibold text-sm ${
-              isSection
-                ? "bg-primary text-primary-foreground"
-                : "bg-primary/10 text-primary"
-            }`}
-          >
-            {isSection ? <Layers className="w-4 h-4" /> : questionNumber}
-          </div>
-          <div className="flex-1 min-w-0">
-            <CardTitle className="text-base font-medium">
-              {question.questionText}
-            </CardTitle>
-          </div>
-        </div>
-      </CardHeader>
-    </Card>
-  );
 }
 
 export default function QuestionsPage({
@@ -355,6 +114,7 @@ export default function QuestionsPage({
   const [sectionDialogOpen, setSectionDialogOpen] = useState(false);
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(false);
 
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -390,7 +150,7 @@ export default function QuestionsPage({
 
   // Translations dialog state
   const [translationsDialogOpen, setTranslationsDialogOpen] = useState(false);
-  const [translationStatuses, setTranslationStatuses] = useState<any[]>([]);
+  const [translationStatuses, setTranslationStatuses] = useState<TranslationStatus[]>([]);
   const [loadingTranslations, setLoadingTranslations] = useState(false);
   const [translatingLanguage, setTranslatingLanguage] = useState<LanguageCode | null>(null);
   const [confirmTranslateLanguage, setConfirmTranslateLanguage] = useState<LanguageCode | null>(null);
@@ -404,37 +164,8 @@ export default function QuestionsPage({
   const [deletingLanguage, setDeletingLanguage] = useState<LanguageCode | null>(null);
   const [deleteResult, setDeleteResult] = useState<{ success: boolean; error?: string } | null>(null);
 
-  // DnD sensors
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-    })
-  );
-
-  // Group questions for visual display
-  const sectionGroups = useMemo(
-    () => (quiz ? groupQuestionsBySections(quiz.questions) : []),
-    [quiz]
-  );
-
-  // Get the active dragging question
-  const activeQuestion = useMemo(
-    () => quiz?.questions.find((q) => q.id === activeId) || null,
-    [quiz, activeId]
-  );
-
-  // Calculate question number for the active question
-  const activeQuestionNumber = useMemo(() => {
-    if (!activeQuestion || !quiz || activeQuestion.questionType === "SECTION") return 0;
-    return quiz.questions
-      .slice(0, quiz.questions.findIndex((q) => q.id === activeQuestion.id) + 1)
-      .filter((q) => q.questionType !== "SECTION").length;
-  }, [activeQuestion, quiz]);
+  // Question translation status for individual cards
+  const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>>(new Map());
 
   useEffect(() => {
     fetchQuiz();
@@ -447,6 +178,96 @@ export default function QuestionsPage({
       if (res.ok) {
         const data = await res.json();
         setQuiz(data);
+
+        // Compute per-question/section translation status
+        const statusMap = new Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>();
+
+        if (data.questions) {
+          for (const question of data.questions) {
+            const questionTranslations = question.translations || [];
+
+            // For sections, we only need to check questionText (title) and hostNotes (description)
+            if (question.questionType === "SECTION") {
+              const langCodes = new Set<LanguageCode>();
+              questionTranslations.forEach((t: { languageCode: string }) => {
+                if (t.languageCode !== "en") langCodes.add(t.languageCode as LanguageCode);
+              });
+
+              if (langCodes.size === 0) {
+                statusMap.set(question.id, { status: "none", languages: [] });
+              } else {
+                const completeLangs: LanguageCode[] = [];
+                let hasPartial = false;
+
+                for (const lang of Array.from(langCodes)) {
+                  const hasTitle = questionTranslations.some(
+                    (t: { languageCode: string; questionText?: string }) => t.languageCode === lang && t.questionText?.trim()
+                  );
+                  // Description is optional, so only check if original has description
+                  const needsDescription = question.hostNotes?.trim();
+                  const hasDescription = !needsDescription || questionTranslations.some(
+                    (t: { languageCode: string; hostNotes?: string }) => t.languageCode === lang && t.hostNotes?.trim()
+                  );
+
+                  if (hasTitle && hasDescription) {
+                    completeLangs.push(lang);
+                  } else {
+                    hasPartial = true;
+                  }
+                }
+
+                statusMap.set(question.id, {
+                  status: hasPartial ? "partial" : "complete",
+                  languages: completeLangs,
+                });
+              }
+              continue;
+            }
+
+            // For regular questions
+            const answerTranslations = question.answers?.flatMap((a: { translations?: { languageCode: string }[] }) => a.translations || []) || [];
+
+            // Get all unique language codes from translations
+            const langCodes = new Set<LanguageCode>();
+            questionTranslations.forEach((t: { languageCode: string }) => {
+              if (t.languageCode !== "en") langCodes.add(t.languageCode as LanguageCode);
+            });
+            answerTranslations.forEach((t: { languageCode: string }) => {
+              if (t.languageCode !== "en") langCodes.add(t.languageCode as LanguageCode);
+            });
+
+            if (langCodes.size === 0) {
+              statusMap.set(question.id, { status: "none", languages: [] });
+            } else {
+              // Check if all languages are complete
+              const completeLangs: LanguageCode[] = [];
+              let hasPartial = false;
+
+              for (const lang of Array.from(langCodes)) {
+                const hasQuestionText = questionTranslations.some(
+                  (t: { languageCode: string; questionText?: string }) => t.languageCode === lang && t.questionText?.trim()
+                );
+                const answerCount = question.answers?.filter((a: { answerText?: string }) => a.answerText?.trim()).length || 0;
+                const translatedAnswerCount = question.answers?.filter((a: { translations?: { languageCode: string; answerText?: string }[] }) =>
+                  a.translations?.some((t) => t.languageCode === lang && t.answerText?.trim())
+                ).length || 0;
+
+                if (hasQuestionText && translatedAnswerCount >= answerCount) {
+                  completeLangs.push(lang);
+                } else {
+                  hasPartial = true;
+                }
+              }
+
+              statusMap.set(question.id, {
+                status: hasPartial ? "partial" : "complete",
+                languages: completeLangs,
+              });
+            }
+          }
+        }
+
+        setQuestionTranslationStatuses(statusMap);
       }
     } catch (error) {
       console.error("Failed to fetch quiz:", error);
@@ -468,7 +289,6 @@ export default function QuestionsPage({
         return;
       }
 
-      // Download the ZIP file
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
@@ -505,6 +325,10 @@ export default function QuestionsPage({
     setEasterEggUrl("");
     setEasterEggDisablesScoring(false);
     setEditingQuestion(null);
+    setQuestionTranslations({} as Record<LanguageCode, any>);
+    setAnswerTranslations({});
+    setActiveTranslationTab("en");
+    setAvailableTranslationLanguages(["en"]);
   }
 
   async function fetchTranslationStatus() {
@@ -626,9 +450,7 @@ export default function QuestionsPage({
           const key = a.id || `answer-${index}`;
           return {
             id: a.id!,
-            answerText:
-              answerTranslations[key]?.[lang] ??
-              a.answerText,
+            answerText: answerTranslations[key]?.[lang] ?? a.answerText,
           };
         });
 
@@ -671,7 +493,6 @@ export default function QuestionsPage({
           setQuestionTranslations(data.translations.questionTranslations || {});
           setAnswerTranslations(data.translations.answerTranslations || {});
 
-          // Get available languages
           const langs = new Set<LanguageCode>(["en"]);
           Object.keys(data.translations.questionTranslations || {}).forEach((lang) => {
             langs.add(lang as LanguageCode);
@@ -690,11 +511,11 @@ export default function QuestionsPage({
 
   function addTranslationLanguage(lang: LanguageCode) {
     if (!availableTranslationLanguages.includes(lang)) {
-      setAvailableTranslationLanguages(prev => [...prev, lang]);
+      setAvailableTranslationLanguages((prev) => [...prev, lang]);
       setActiveTranslationTab(lang);
-      setQuestionTranslations(prev => ({
+      setQuestionTranslations((prev) => ({
         ...prev,
-        [lang]: { questionText: "", hostNotes: "", hint: "", easterEggButtonText: "" }
+        [lang]: { questionText: "", hostNotes: "", hint: "", easterEggButtonText: "" },
       }));
     }
   }
@@ -703,40 +524,52 @@ export default function QuestionsPage({
     const qt = questionTranslations[lang];
     if (!qt?.questionText) return "empty";
 
-    const hasAllAnswers = answers.every(a =>
-      answerTranslations[a.id || `answer-${answers.indexOf(a)}`]?.[lang]
+    const hasAllAnswers = answers.every(
+      (a) => answerTranslations[a.id || `answer-${answers.indexOf(a)}`]?.[lang]
     );
 
     return qt.questionText && hasAllAnswers ? "complete" : "partial";
   }
 
+  function getSectionTranslationStatus(lang: LanguageCode): "complete" | "partial" | "empty" {
+    const qt = questionTranslations[lang];
+    if (!qt?.questionText) return "empty";
+
+    // For sections, check title and optionally description
+    const hasTitle = qt.questionText?.trim();
+    const needsDescription = hostNotes?.trim();
+    const hasDescription = !needsDescription || qt.hostNotes?.trim();
+
+    return hasTitle && hasDescription ? "complete" : "partial";
+  }
+
   function copyToTranslation(field: string, value: string, lang: LanguageCode) {
-    setQuestionTranslations(prev => ({
+    setQuestionTranslations((prev) => ({
       ...prev,
-      [lang]: { ...prev[lang], [field]: value }
+      [lang]: { ...prev[lang], [field]: value },
     }));
   }
 
   function copyAnswerToTranslation(answer: Answer, lang: LanguageCode) {
     const key = answer.id || `answer-${answers.indexOf(answer)}`;
-    setAnswerTranslations(prev => ({
+    setAnswerTranslations((prev) => ({
       ...prev,
-      [key]: { ...(prev[key] || {}), [lang]: answer.answerText }
+      [key]: { ...(prev[key] || {}), [lang]: answer.answerText },
     }));
   }
 
   function updateQuestionTranslation(lang: LanguageCode, field: string, value: string) {
-    setQuestionTranslations(prev => ({
+    setQuestionTranslations((prev) => ({
       ...prev,
-      [lang]: { ...prev[lang], [field]: value }
+      [lang]: { ...prev[lang], [field]: value },
     }));
   }
 
   function updateAnswerTranslation(answer: Answer, lang: LanguageCode, value: string) {
     const key = answer.id || `answer-${answers.indexOf(answer)}`;
-    setAnswerTranslations(prev => ({
+    setAnswerTranslations((prev) => ({
       ...prev,
-      [key]: { ...(prev[key] || {}), [lang]: value }
+      [key]: { ...(prev[key] || {}), [lang]: value },
     }));
   }
 
@@ -755,7 +588,6 @@ export default function QuestionsPage({
       );
 
       if (res.ok) {
-        // Reload translations to get the new AI-translated content
         await loadQuestionTranslations(editingQuestion.id);
         setActiveTranslationTab(lang);
       } else {
@@ -792,18 +624,15 @@ export default function QuestionsPage({
     setEasterEggUrl((question as any).easterEggUrl || "");
     setEasterEggDisablesScoring((question as any).easterEggDisablesScoring || false);
 
-    // Reset translation state
     setQuestionTranslations({} as Record<LanguageCode, any>);
     setAnswerTranslations({});
     setActiveTranslationTab("en");
     setAvailableTranslationLanguages(["en"]);
 
-    // Load translations if editing existing question
     if (question.id) {
       loadQuestionTranslations(question.id);
     }
 
-    // Open the appropriate dialog based on type
     if (question.questionType === "SECTION") {
       setSectionDialogOpen(true);
     } else {
@@ -836,14 +665,11 @@ export default function QuestionsPage({
     try {
       let res;
       if (editingQuestion) {
-        res = await fetch(
-          `/api/quizzes/${quizId}/questions/${editingQuestion.id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(sectionData),
-          }
-        );
+        res = await fetch(`/api/quizzes/${quizId}/questions/${editingQuestion.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(sectionData),
+        });
       } else {
         res = await fetch(`/api/quizzes/${quizId}/questions`, {
           method: "POST",
@@ -899,31 +725,7 @@ export default function QuestionsPage({
     setImageUrl("");
   }
 
-  function addAnswer() {
-    setAnswers([...answers, { answerText: "", isCorrect: false }]);
-  }
-
-  function removeAnswer(index: number) {
-    if (answers.length <= 2) return;
-    setAnswers(answers.filter((_, i) => i !== index));
-  }
-
-  function updateAnswer(index: number, field: keyof Answer, value: unknown) {
-    const newAnswers = [...answers];
-    newAnswers[index] = { ...newAnswers[index], [field]: value };
-
-    // For single select, ensure only one answer is correct
-    if (field === "isCorrect" && value === true && questionType === "SINGLE_SELECT") {
-      newAnswers.forEach((a, i) => {
-        if (i !== index) a.isCorrect = false;
-      });
-    }
-
-    setAnswers(newAnswers);
-  }
-
   async function saveQuestion() {
-    // Validate
     if (!questionText.trim()) {
       alert("Question text is required");
       return;
@@ -941,7 +743,6 @@ export default function QuestionsPage({
       return;
     }
 
-    // Easter egg validation
     if (easterEggEnabled) {
       if (!easterEggButtonText.trim()) {
         alert("Easter egg button text is required");
@@ -953,7 +754,6 @@ export default function QuestionsPage({
       }
     }
 
-    // Hint validation
     if (quiz && quiz.hintCount > 0 && !hint.trim()) {
       alert("Hint is required when Hint power-up is enabled");
       return;
@@ -977,14 +777,11 @@ export default function QuestionsPage({
     try {
       let res;
       if (editingQuestion) {
-        res = await fetch(
-          `/api/quizzes/${quizId}/questions/${editingQuestion.id}`,
-          {
-            method: "PUT",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(questionData),
-          }
-        );
+        res = await fetch(`/api/quizzes/${quizId}/questions/${editingQuestion.id}`, {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(questionData),
+        });
       } else {
         res = await fetch(`/api/quizzes/${quizId}/questions`, {
           method: "POST",
@@ -1015,7 +812,7 @@ export default function QuestionsPage({
         body: JSON.stringify({ autoAdmit }),
       });
       if (res.ok) {
-        setQuiz((prev) => prev ? { ...prev, autoAdmit } : null);
+        setQuiz((prev) => (prev ? { ...prev, autoAdmit } : null));
       }
     } catch (error) {
       console.error("Failed to update auto-admit:", error);
@@ -1031,9 +828,7 @@ export default function QuestionsPage({
       });
 
       if (res.ok) {
-        // Update local state
-        setQuiz((prev) => prev ? { ...prev, [field]: value } : null);
-        // Refresh quiz data to update question warnings
+        setQuiz((prev) => (prev ? { ...prev, [field]: value } : null));
         await fetchQuiz();
       }
     } catch (error) {
@@ -1053,6 +848,45 @@ export default function QuestionsPage({
       }
     } catch (error) {
       console.error("Failed to delete question:", error);
+    }
+  }
+
+  async function duplicateQuestion(questionId: string) {
+    if (!quiz) return;
+
+    const question = quiz.questions.find((q) => q.id === questionId);
+    if (!question || question.questionType === "SECTION") return;
+
+    try {
+      const questionData = {
+        questionText: `${question.questionText} (Copy)`,
+        imageUrl: question.imageUrl || null,
+        hostNotes: question.hostNotes || null,
+        hint: question.hint || null,
+        questionType: question.questionType,
+        timeLimit: question.timeLimit,
+        points: question.points,
+        answers: question.answers.map((a) => ({
+          answerText: a.answerText,
+          isCorrect: a.isCorrect,
+        })),
+      };
+
+      const res = await fetch(`/api/quizzes/${quizId}/questions`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(questionData),
+      });
+
+      if (res.ok) {
+        fetchQuiz();
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to duplicate question");
+      }
+    } catch (error) {
+      console.error("Failed to duplicate question:", error);
+      alert("Failed to duplicate question");
     }
   }
 
@@ -1078,7 +912,6 @@ export default function QuestionsPage({
     let newQuestions: Question[];
 
     if (isSection) {
-      // When dragging a section, also move all questions that belong to it
       const groups = groupQuestionsBySections(quiz.questions);
       const sectionGroupIndex = groups.findIndex((g) => g.section?.id === active.id);
 
@@ -1087,14 +920,10 @@ export default function QuestionsPage({
       const sectionGroup = groups[sectionGroupIndex];
       const itemsToMove = [sectionGroup.section!, ...sectionGroup.questions];
 
-      // Remove the section group from groups
       const remainingGroups = groups.filter((_, i) => i !== sectionGroupIndex);
-
-      // Find where to insert based on the over target
       const overItem = quiz.questions.find((q) => q.id === over.id);
       if (!overItem) return;
 
-      // Find which group the over item belongs to
       let targetGroupIndex = -1;
       let insertAfterGroup = false;
 
@@ -1102,7 +931,7 @@ export default function QuestionsPage({
         const group = remainingGroups[i];
         if (group.section?.id === over.id) {
           targetGroupIndex = i;
-          insertAfterGroup = oldIndex < newIndex;
+          insertAfterGroup = false;
           break;
         }
         if (group.questions.some((q) => q.id === over.id)) {
@@ -1112,48 +941,35 @@ export default function QuestionsPage({
         }
       }
 
-      // Create new groups array with the section group in the new position
-      const newGroups: SectionGroup[] = [];
-
       if (targetGroupIndex === -1) {
-        // Insert at beginning
-        newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
-        newGroups.push(...remainingGroups);
-      } else {
-        for (let i = 0; i < remainingGroups.length; i++) {
-          if (!insertAfterGroup && i === targetGroupIndex) {
-            newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
-          }
-          newGroups.push(remainingGroups[i]);
-          if (insertAfterGroup && i === targetGroupIndex) {
-            newGroups.push({ section: sectionGroup.section, questions: sectionGroup.questions });
-          }
-        }
+        targetGroupIndex = remainingGroups.length - 1;
+        insertAfterGroup = true;
       }
+
+      const newGroups = [...remainingGroups];
+      const insertIndex = insertAfterGroup ? targetGroupIndex + 1 : targetGroupIndex;
+      newGroups.splice(insertIndex, 0, sectionGroup);
 
       newQuestions = flattenGroups(newGroups);
     } else {
-      // Simple question reorder
       newQuestions = arrayMove(quiz.questions, oldIndex, newIndex);
     }
 
-    // Optimistically update UI
-    setQuiz({ ...quiz, questions: newQuestions });
+    const updatedQuestions = newQuestions.map((q, index) => ({
+      ...q,
+      orderIndex: index,
+    }));
 
-    // Save to server
+    setQuiz((prev) => (prev ? { ...prev, questions: updatedQuestions } : null));
+
     try {
-      const res = await fetch(`/api/quizzes/${quizId}/questions/reorder`, {
+      await fetch(`/api/quizzes/${quizId}/questions/reorder`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          questionIds: newQuestions.map((q) => q.id),
+          questionIds: updatedQuestions.map((q) => q.id),
         }),
       });
-
-      if (!res.ok) {
-        // Revert on error
-        fetchQuiz();
-      }
     } catch (error) {
       console.error("Failed to reorder questions:", error);
       fetchQuiz();
@@ -1163,1003 +979,172 @@ export default function QuestionsPage({
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-muted-foreground">Loading...</div>
+        <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   if (!quiz) {
     return (
-      <div className="text-center py-16">
-        <p className="text-muted-foreground">Quiz not found</p>
-        <Link href="/admin" className="text-primary hover:underline mt-2 inline-block">
-          Back to Quizzes
+      <div className="flex flex-col items-center justify-center min-h-[400px] text-center">
+        <h2 className="text-2xl font-bold mb-2">Quiz not found</h2>
+        <p className="text-muted-foreground mb-4">
+          The quiz you&apos;re looking for doesn&apos;t exist or has been deleted.
+        </p>
+        <Link href="/admin">
+          <Button>Back to Quizzes</Button>
         </Link>
       </div>
     );
   }
 
-  // Calculate question numbers
-  let questionCounter = 0;
-  const questionNumbers = new Map<string, number>();
-  for (const q of quiz.questions) {
-    if (q.questionType !== "SECTION") {
-      questionCounter++;
-      questionNumbers.set(q.id, questionCounter);
-    }
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <Link
-            href="/admin"
-            className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Quizzes
-          </Link>
-          <h1 className="text-3xl font-bold">{quiz.title}</h1>
-          <p className="text-muted-foreground">
-            {quiz.questions.length} item{quiz.questions.length !== 1 ? "s" : ""} •{" "}
-            {quiz.questions.filter((q) => q.questionType !== "SECTION").length} question
-            {quiz.questions.filter((q) => q.questionType !== "SECTION").length !== 1 ? "s" : ""}
-          </p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {/* Primary Actions */}
-          <Link href={`/host?quizId=${quizId}`}>
-            <Button disabled={quiz.questions.filter((q) => q.questionType !== "SECTION").length === 0}>
-              <Play className="w-4 h-4 mr-2" />
-              <span className="hidden sm:inline">Play</span>
-            </Button>
-          </Link>
-          <Button variant="outline" onClick={openSectionDialog}>
-            <Layers className="w-4 h-4 sm:mr-2" />
-            <span className="hidden sm:inline">Add Section</span>
-          </Button>
-          <Dialog
-            open={dialogOpen}
-            onOpenChange={(open) => {
-              setDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogTrigger asChild>
-              <Button>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Question
-              </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingQuestion ? "Edit" : "Add"} Question
-                </DialogTitle>
-                <DialogDescription>
-                  Create a multiple choice question with 2-6 answer options.
-                </DialogDescription>
-              </DialogHeader>
+      {/* Header with Stats and Actions */}
+      <QuestionListHeader
+        quiz={quiz}
+        translationStatuses={translationStatuses}
+        onAddQuestion={() => {
+          resetForm();
+          setDialogOpen(true);
+        }}
+        onAddSection={openSectionDialog}
+        onToggleSettings={() => setSettingsSidebarOpen(!settingsSidebarOpen)}
+        onOpenTranslations={openTranslationsDialog}
+        onExportQuiz={handleExport}
+        isExporting={exporting}
+        settingsOpen={settingsSidebarOpen}
+      />
 
-              <Tabs value={activeTranslationTab} onValueChange={setActiveTranslationTab} className="py-4">
-                {/* Translation tabs with Add Language button */}
-                {editingQuestion && (
-                  <div className="flex items-center gap-2 mb-2">
-                    {availableTranslationLanguages.length > 1 && (
-                      <TabsList className="grid" style={{ gridTemplateColumns: `repeat(${availableTranslationLanguages.length}, minmax(0, 1fr))` }}>
-                        {availableTranslationLanguages.map((lang) => (
-                          <TabsTrigger key={lang} value={lang} className="flex items-center gap-1.5">
-                            {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
-                            {lang !== "en" && (
-                              getTranslationStatus(lang) === "complete" ? (
-                                <Check className="w-3 h-3 text-green-500" />
-                              ) : getTranslationStatus(lang) === "partial" ? (
-                                <div className="w-2 h-2 rounded-full bg-yellow-500" />
-                              ) : (
-                                <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
-                              )
-                            )}
-                          </TabsTrigger>
-                        ))}
-                      </TabsList>
-                    )}
-                    {/* Add Language dropdown */}
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Language
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent>
-                        {(Object.keys(SupportedLanguages) as LanguageCode[])
-                          .filter(lang => lang !== "en" && !availableTranslationLanguages.includes(lang))
-                          .map(lang => (
-                            <DropdownMenuItem key={lang} onClick={() => addTranslationLanguage(lang)}>
-                              {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
-                            </DropdownMenuItem>
-                          ))}
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                )}
+      {/* Questions List */}
+      <QuestionList
+        questions={quiz.questions}
+        hintRequired={quiz.hintCount > 0}
+        translationStatuses={translationStatuses}
+        questionTranslationStatuses={questionTranslationStatuses}
+        activeId={activeId}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onEdit={openEditDialog}
+        onDelete={deleteQuestion}
+        onDuplicate={duplicateQuestion}
+        onAddQuestion={() => {
+          resetForm();
+          setDialogOpen(true);
+        }}
+      />
 
-                {/* English (original) tab */}
-                <TabsContent value="en" className="space-y-6 mt-4">
-                  {/* Question Text */}
-                <div className="space-y-2">
-                  <Label htmlFor="questionText">Question</Label>
-                  <Textarea
-                    id="questionText"
-                    placeholder="Enter your question..."
-                    value={questionText}
-                    onChange={(e) => setQuestionText(e.target.value)}
-                    rows={2}
-                  />
-                </div>
+      {/* Settings Sidebar */}
+      <QuizSettingsSidebar
+        quiz={quiz}
+        isOpen={settingsSidebarOpen}
+        onClose={() => setSettingsSidebarOpen(false)}
+        onUpdateAutoAdmit={updateAutoAdmit}
+        onUpdatePowerUp={updatePowerUpCount}
+      />
 
-                {/* Image Upload */}
-                <div className="space-y-2">
-                  <Label>
-                    <Image className="w-4 h-4 inline mr-2" />
-                    Image (optional)
-                  </Label>
+      {/* Question Editor Dialog */}
+      <QuestionEditorDialog
+        open={dialogOpen}
+        onOpenChange={(open) => {
+          setDialogOpen(open);
+          if (!open) resetForm();
+        }}
+        editingQuestion={editingQuestion}
+        hintRequired={quiz.hintCount > 0}
+        questionText={questionText}
+        setQuestionText={setQuestionText}
+        imageUrl={imageUrl}
+        setImageUrl={setImageUrl}
+        hostNotes={hostNotes}
+        setHostNotes={setHostNotes}
+        hint={hint}
+        setHint={setHint}
+        questionType={questionType}
+        setQuestionType={setQuestionType}
+        timeLimit={timeLimit}
+        setTimeLimit={setTimeLimit}
+        points={points}
+        setPoints={setPoints}
+        answers={answers}
+        setAnswers={setAnswers}
+        easterEggEnabled={easterEggEnabled}
+        setEasterEggEnabled={setEasterEggEnabled}
+        easterEggButtonText={easterEggButtonText}
+        setEasterEggButtonText={setEasterEggButtonText}
+        easterEggUrl={easterEggUrl}
+        setEasterEggUrl={setEasterEggUrl}
+        easterEggDisablesScoring={easterEggDisablesScoring}
+        setEasterEggDisablesScoring={setEasterEggDisablesScoring}
+        availableTranslationLanguages={availableTranslationLanguages}
+        activeTranslationTab={activeTranslationTab}
+        setActiveTranslationTab={setActiveTranslationTab}
+        questionTranslations={questionTranslations}
+        answerTranslations={answerTranslations}
+        onAddTranslationLanguage={addTranslationLanguage}
+        onUpdateQuestionTranslation={updateQuestionTranslation}
+        onUpdateAnswerTranslation={updateAnswerTranslation}
+        onCopyToTranslation={copyToTranslation}
+        onCopyAnswerToTranslation={copyAnswerToTranslation}
+        onAutoTranslate={autoTranslateQuestion}
+        onSaveTranslation={saveTranslationForLanguage}
+        autoTranslatingQuestion={autoTranslatingQuestion}
+        savingTranslation={savingTranslation}
+        getTranslationStatus={getTranslationStatus}
+        uploading={uploading}
+        onImageUpload={handleImageUpload}
+        onRemoveImage={removeImage}
+        onSave={saveQuestion}
+        onCancel={() => {
+          setDialogOpen(false);
+          resetForm();
+        }}
+      />
 
-                  {imageUrl ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={imageUrl}
-                        alt="Question"
-                        className="max-h-40 rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={removeImage}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        ref={fileInputRef}
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        className="hidden"
-                        onChange={handleImageUpload}
-                        disabled={uploading}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex-1 h-24"
-                        onClick={() => fileInputRef.current?.click()}
-                        disabled={uploading}
-                      >
-                        {uploading ? (
-                          <div className="flex flex-col items-center text-muted-foreground">
-                            <Loader2 className="w-6 h-6 animate-spin mb-1" />
-                            <span className="text-sm">Uploading...</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center text-muted-foreground">
-                            <Upload className="w-6 h-6 mb-1" />
-                            <span className="text-sm">Click to upload image</span>
-                            <span className="text-xs">JPEG, PNG, GIF, WebP (max 5MB)</span>
-                          </div>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-
-                  {/* Or use URL */}
-                  <div className="flex items-center gap-2 pt-2">
-                    <span className="text-xs text-muted-foreground">Or paste URL:</span>
-                    <Input
-                      placeholder="https://example.com/image.jpg"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      className="flex-1 h-8 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Host Notes */}
-                <div className="space-y-2">
-                  <Label htmlFor="hostNotes">Host Notes (optional)</Label>
-                  <Textarea
-                    id="hostNotes"
-                    placeholder="Notes visible only to the host during the quiz (e.g., talking points, fun facts, additional context)..."
-                    value={hostNotes}
-                    onChange={(e) => setHostNotes(e.target.value)}
-                    rows={2}
-                    className="text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    These notes are shown to the host in the control panel during the question and when revealing answers.
-                  </p>
-                </div>
-
-                {/* Hint */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="hint">
-                      Hint {quiz.hintCount > 0 && <span className="text-red-500">*</span>}
-                    </Label>
-                    {quiz.hintCount > 0 && (
-                      <span className="text-xs text-muted-foreground">
-                        Required (Hint power-up enabled)
-                      </span>
-                    )}
-                  </div>
-                  <Textarea
-                    id="hint"
-                    placeholder="Provide a helpful hint for this question..."
-                    value={hint}
-                    onChange={(e) => setHint(e.target.value)}
-                    rows={2}
-                    maxLength={200}
-                    className="text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {hint.length}/200 characters
-                  </p>
-                </div>
-
-                {/* Type Selection */}
-                <div className="space-y-2">
-                  <Label>Type</Label>
-                  <Select value={questionType} onValueChange={setQuestionType}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="SINGLE_SELECT">Single Select</SelectItem>
-                      <SelectItem value="MULTI_SELECT">Multi Select</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Time & Points Settings */}
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="timeLimit">Time (seconds)</Label>
-                    <Input
-                      id="timeLimit"
-                      type="number"
-                      min={5}
-                      max={120}
-                      value={timeLimit}
-                      onChange={(e) => setTimeLimit(Number(e.target.value))}
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="points">Points</Label>
-                    <Input
-                      id="points"
-                      type="number"
-                      min={10}
-                      max={1000}
-                      step={10}
-                      value={points}
-                      onChange={(e) => setPoints(Number(e.target.value))}
-                    />
-                  </div>
-                </div>
-
-                {/* Answers */}
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <Label>Answers</Label>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={addAnswer}
-                      disabled={answers.length >= 6}
-                    >
-                      <Plus className="w-3 h-3 mr-1" />
-                      Add
-                    </Button>
-                  </div>
-
-                  {answers.map((answer, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      <GripVertical className="w-4 h-4 text-muted-foreground" />
-                      <Input
-                        placeholder={`Answer ${index + 1}`}
-                        value={answer.answerText}
-                        onChange={(e) =>
-                          updateAnswer(index, "answerText", e.target.value)
-                        }
-                        className="flex-1"
-                      />
-                      <div className="flex items-center gap-2">
-                        <Switch
-                          checked={answer.isCorrect}
-                          onCheckedChange={(checked) =>
-                            updateAnswer(index, "isCorrect", checked)
-                          }
-                        />
-                        <span className="text-xs text-muted-foreground w-16">
-                          {answer.isCorrect ? (
-                            <span className="text-green-600 flex items-center">
-                              <Check className="w-3 h-3 mr-1" />
-                              Correct
-                            </span>
-                          ) : (
-                            <span className="text-muted-foreground flex items-center">
-                              <X className="w-3 h-3 mr-1" />
-                              Wrong
-                            </span>
-                          )}
-                        </span>
-                      </div>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeAnswer(index)}
-                        disabled={answers.length <= 2}
-                        className="text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ))}
-
-                  {questionType === "MULTI_SELECT" && (
-                    <p className="text-xs text-muted-foreground">
-                      Multiple answers can be marked as correct. Players get partial
-                      credit for each correct answer selected.
-                    </p>
-                  )}
-                </div>
-
-                {/* Easter Egg Configuration */}
-                <div className="space-y-3 pt-4 border-t">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-0.5">
-                      <Label htmlFor="easterEgg">Easter Egg Button</Label>
-                      <p className="text-xs text-muted-foreground">
-                        Add a special button that opens a web page
-                      </p>
-                    </div>
-                    <Switch
-                      id="easterEgg"
-                      checked={easterEggEnabled}
-                      onCheckedChange={setEasterEggEnabled}
-                    />
-                  </div>
-
-                  {easterEggEnabled && (
-                    <div className="space-y-3 pl-4 border-l-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="easterEggButtonText">Button Text</Label>
-                        <Input
-                          id="easterEggButtonText"
-                          placeholder="Click for a surprise!"
-                          value={easterEggButtonText}
-                          onChange={(e) => setEasterEggButtonText(e.target.value)}
-                          maxLength={50}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          {easterEggButtonText.length}/50 characters
-                        </p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="easterEggUrl">URL</Label>
-                        <Input
-                          id="easterEggUrl"
-                          type="url"
-                          placeholder="https://example.com"
-                          value={easterEggUrl}
-                          onChange={(e) => setEasterEggUrl(e.target.value)}
-                        />
-                        <p className="text-xs text-muted-foreground">
-                          Opens in a new tab when clicked. Must start with http:// or https://
-                        </p>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div className="space-y-0.5">
-                          <Label htmlFor="disableScoring">Disable Scoring</Label>
-                          <p className="text-xs text-muted-foreground">
-                            Players who click won&apos;t earn points for this question
-                          </p>
-                        </div>
-                        <Switch
-                          id="disableScoring"
-                          checked={easterEggDisablesScoring}
-                          onCheckedChange={setEasterEggDisablesScoring}
-                        />
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={saveQuestion}>
-                    {editingQuestion ? "Save Changes" : "Add Question"}
-                  </Button>
-                </div>
-                </TabsContent>
-
-                {/* Translation tabs for other languages - Side by Side Layout */}
-                {availableTranslationLanguages
-                  .filter((lang) => lang !== "en")
-                  .map((lang) => (
-                    <TabsContent key={lang} value={lang} className="space-y-4 mt-4">
-                      <div className="p-4 bg-muted/30 rounded-lg space-y-6">
-                        <p className="text-sm font-medium">
-                          {SupportedLanguages[lang].flag} {SupportedLanguages[lang].nativeName} Translation
-                        </p>
-
-                        {/* Question Text - Side by Side */}
-                        <div className="space-y-2">
-                          <Label>Question</Label>
-                          <div className="grid grid-cols-2 gap-3">
-                            {/* English (left) */}
-                            <div className="relative">
-                              <div className="text-sm p-3 bg-muted rounded-lg border min-h-[80px]">
-                                <span className="text-xs text-muted-foreground block mb-1">English</span>
-                                <p className="text-foreground">{questionText}</p>
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                className="absolute top-2 right-2 h-6 w-6 p-0"
-                                onClick={() => copyToTranslation("questionText", questionText, lang)}
-                                title="Copy to translation"
-                              >
-                                <Copy className="w-3 h-3" />
-                              </Button>
-                            </div>
-                            {/* Translation (right) */}
-                            <Textarea
-                              placeholder={`Enter question in ${SupportedLanguages[lang].nativeName}...`}
-                              value={questionTranslations[lang]?.questionText || ""}
-                              onChange={(e) => updateQuestionTranslation(lang, "questionText", e.target.value)}
-                              rows={3}
-                              className="min-h-[80px]"
-                            />
-                          </div>
-                        </div>
-
-                        {/* Host Notes - Side by Side (only if English has content) */}
-                        {hostNotes && (
-                          <div className="space-y-2">
-                            <Label>Host Notes</Label>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="relative">
-                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[60px]">
-                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
-                                  <p className="text-foreground text-sm">{hostNotes}</p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-2 right-2 h-6 w-6 p-0"
-                                  onClick={() => copyToTranslation("hostNotes", hostNotes, lang)}
-                                  title="Copy to translation"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <Textarea
-                                placeholder={`Enter host notes in ${SupportedLanguages[lang].nativeName}...`}
-                                value={questionTranslations[lang]?.hostNotes || ""}
-                                onChange={(e) => updateQuestionTranslation(lang, "hostNotes", e.target.value)}
-                                rows={2}
-                                className="min-h-[60px]"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Hint - Side by Side (only if English has content) */}
-                        {hint && (
-                          <div className="space-y-2">
-                            <Label>Hint</Label>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="relative">
-                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[60px]">
-                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
-                                  <p className="text-foreground text-sm">{hint}</p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-2 right-2 h-6 w-6 p-0"
-                                  onClick={() => copyToTranslation("hint", hint, lang)}
-                                  title="Copy to translation"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <Textarea
-                                placeholder={`Enter hint in ${SupportedLanguages[lang].nativeName}...`}
-                                value={questionTranslations[lang]?.hint || ""}
-                                onChange={(e) => updateQuestionTranslation(lang, "hint", e.target.value)}
-                                rows={2}
-                                className="min-h-[60px]"
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Easter Egg Button Text - Side by Side (only if enabled) */}
-                        {easterEggEnabled && easterEggButtonText && (
-                          <div className="space-y-2">
-                            <Label>Easter Egg Button Text</Label>
-                            <div className="grid grid-cols-2 gap-3">
-                              <div className="relative">
-                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[40px]">
-                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
-                                  <p className="text-foreground text-sm">{easterEggButtonText}</p>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-2 right-2 h-6 w-6 p-0"
-                                  onClick={() => copyToTranslation("easterEggButtonText", easterEggButtonText, lang)}
-                                  title="Copy to translation"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <Input
-                                placeholder={`Button text in ${SupportedLanguages[lang].nativeName}...`}
-                                value={questionTranslations[lang]?.easterEggButtonText || ""}
-                                onChange={(e) => updateQuestionTranslation(lang, "easterEggButtonText", e.target.value)}
-                              />
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Answers - Side by Side */}
-                        <div className="space-y-3">
-                          <Label>Answers</Label>
-                          {answers.map((answer, index) => (
-                            <div key={index} className="grid grid-cols-2 gap-3 items-center">
-                              <div className="relative">
-                                <div className="text-sm p-2 bg-muted rounded-lg border flex items-center gap-2">
-                                  {answer.isCorrect && <Check className="w-3 h-3 text-green-500 flex-shrink-0" />}
-                                  <span className="text-foreground">{answer.answerText}</span>
-                                </div>
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  className="absolute top-1 right-1 h-6 w-6 p-0"
-                                  onClick={() => copyAnswerToTranslation(answer, lang)}
-                                  title="Copy to translation"
-                                >
-                                  <Copy className="w-3 h-3" />
-                                </Button>
-                              </div>
-                              <Input
-                                placeholder={`Answer in ${SupportedLanguages[lang].nativeName}...`}
-                                value={answerTranslations[answer.id || `answer-${index}`]?.[lang] || ""}
-                                onChange={(e) => updateAnswerTranslation(answer, lang, e.target.value)}
-                              />
-                            </div>
-                          ))}
-                        </div>
-
-                        {/* Action Buttons */}
-                        <div className="flex justify-between items-center pt-2">
-                          {/* Auto Translate Button */}
-                          <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => autoTranslateQuestion(lang)}
-                            disabled={autoTranslatingQuestion === lang || savingTranslation === lang}
-                          >
-                            {autoTranslatingQuestion === lang ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Translating...
-                              </>
-                            ) : (
-                              <>
-                                <Sparkles className="w-4 h-4 mr-2" />
-                                Auto Translate
-                              </>
-                            )}
-                          </Button>
-
-                          {/* Save Button */}
-                          <Button
-                            type="button"
-                            onClick={() => saveTranslationForLanguage(lang)}
-                            disabled={savingTranslation === lang || autoTranslatingQuestion === lang}
-                          >
-                            {savingTranslation === lang ? (
-                              <>
-                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                Saving...
-                              </>
-                            ) : (
-                              "Save translation"
-                            )}
-                          </Button>
-                        </div>
-                      </div>
-                    </TabsContent>
-                  ))}
-              </Tabs>
-            </DialogContent>
-          </Dialog>
-
-          {/* Secondary Actions Dropdown */}
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon">
-                <MoreHorizontal className="w-4 h-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <Link href={`/admin/quiz/${quizId}/theme`}>
-                <DropdownMenuItem className="cursor-pointer">
-                  <Palette className="w-4 h-4 mr-2" />
-                  Theme
-                </DropdownMenuItem>
-              </Link>
-              <DropdownMenuItem onClick={openTranslationsDialog} className="cursor-pointer">
-                <Languages className="w-4 h-4 mr-2" />
-                Translations
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleExport} disabled={exporting || !quiz} className="cursor-pointer">
-                <Download className="w-4 h-4 mr-2" />
-                {exporting ? "Exporting..." : "Export Quiz"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          {/* Section Dialog */}
-          <Dialog
-            open={sectionDialogOpen}
-            onOpenChange={(open) => {
-              setSectionDialogOpen(open);
-              if (!open) resetForm();
-            }}
-          >
-            <DialogContent className="max-w-lg">
-              <DialogHeader>
-                <DialogTitle>
-                  {editingQuestion ? "Edit" : "Add"} Section
-                </DialogTitle>
-                <DialogDescription>
-                  Add a section divider to introduce a new topic or group of questions.
-                </DialogDescription>
-              </DialogHeader>
-
-              <div className="space-y-4 py-4">
-                {/* Section Title */}
-                <div className="space-y-2">
-                  <Label htmlFor="sectionTitle">Section Title</Label>
-                  <Input
-                    id="sectionTitle"
-                    placeholder="Enter section title..."
-                    value={questionText}
-                    onChange={(e) => setQuestionText(e.target.value)}
-                  />
-                </div>
-
-                {/* Description */}
-                <div className="space-y-2">
-                  <Label htmlFor="sectionDescription">Description (optional)</Label>
-                  <Textarea
-                    id="sectionDescription"
-                    placeholder="Optional description or subtitle for this section..."
-                    value={hostNotes}
-                    onChange={(e) => setHostNotes(e.target.value)}
-                    rows={2}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    This description will be shown on the section slide.
-                  </p>
-                </div>
-
-                {/* Image Upload */}
-                <div className="space-y-2">
-                  <Label>
-                    <Image className="w-4 h-4 inline mr-2" />
-                    Image (optional)
-                  </Label>
-
-                  {imageUrl ? (
-                    <div className="relative inline-block">
-                      <img
-                        src={imageUrl}
-                        alt="Section"
-                        className="max-h-40 rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={removeImage}
-                      >
-                        <Trash2 className="w-3 h-3" />
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex gap-2">
-                      <input
-                        type="file"
-                        accept="image/jpeg,image/png,image/gif,image/webp"
-                        className="hidden"
-                        id="sectionImageUpload"
-                        onChange={handleImageUpload}
-                        disabled={uploading}
-                      />
-                      <Button
-                        type="button"
-                        variant="outline"
-                        className="flex-1 h-20"
-                        onClick={() => document.getElementById('sectionImageUpload')?.click()}
-                        disabled={uploading}
-                      >
-                        {uploading ? (
-                          <div className="flex flex-col items-center text-muted-foreground">
-                            <Loader2 className="w-5 h-5 animate-spin mb-1" />
-                            <span className="text-sm">Uploading...</span>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center text-muted-foreground">
-                            <Upload className="w-5 h-5 mb-1" />
-                            <span className="text-sm">Click to upload</span>
-                          </div>
-                        )}
-                      </Button>
-                    </div>
-                  )}
-
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-muted-foreground">Or paste URL:</span>
-                    <Input
-                      placeholder="https://example.com/image.jpg"
-                      value={imageUrl}
-                      onChange={(e) => setImageUrl(e.target.value)}
-                      className="flex-1 h-8 text-sm"
-                    />
-                  </div>
-                </div>
-
-                {/* Actions */}
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setSectionDialogOpen(false);
-                      resetForm();
-                    }}
-                  >
-                    Cancel
-                  </Button>
-                  <Button onClick={saveSection}>
-                    {editingQuestion ? "Save Changes" : "Add Section"}
-                  </Button>
-                </div>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Player Admission Control */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Shield className="w-4 h-4" />
-            Player Admission
-          </CardTitle>
-          <CardDescription>
-            Control how players join games using this quiz
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label htmlFor="auto-admit">Auto-Admit Players</Label>
-              <p className="text-sm text-muted-foreground">
-                {quiz.autoAdmit
-                  ? "New players join automatically"
-                  : "New players require host approval"}
-              </p>
-            </div>
-            <Switch
-              id="auto-admit"
-              checked={quiz.autoAdmit ?? true}
-              onCheckedChange={updateAutoAdmit}
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Power-ups Configuration */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Zap className="w-4 h-4" />
-            Power-ups
-          </CardTitle>
-          <CardDescription>
-            Configure power-ups available to players during gameplay. Set to 0 to disable a power-up type.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Hint Power-up */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-0.5 flex-1">
-              <Label htmlFor="hint-count" className="flex items-center gap-2">
-                <Lightbulb className="w-4 h-4 text-blue-500" />
-                Hint
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Shows a hint for the question. All questions must have hints if enabled.
-              </p>
-            </div>
-            <Input
-              id="hint-count"
-              type="number"
-              min="0"
-              max="10"
-              className="w-20"
-              value={quiz.hintCount}
-              onChange={(e) => updatePowerUpCount('hintCount', parseInt(e.target.value))}
-            />
-          </div>
-
-          {/* Copy Answer Power-up */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-0.5 flex-1">
-              <Label htmlFor="copy-count" className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-purple-500" />
-                Copy Answer
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Copy another player&apos;s answer (blind copy - no preview).
-              </p>
-            </div>
-            <Input
-              id="copy-count"
-              type="number"
-              min="0"
-              max="10"
-              className="w-20"
-              value={quiz.copyAnswerCount}
-              onChange={(e) => updatePowerUpCount('copyAnswerCount', parseInt(e.target.value))}
-            />
-          </div>
-
-          {/* Double Points Power-up */}
-          <div className="flex items-center justify-between gap-4">
-            <div className="space-y-0.5 flex-1">
-              <Label htmlFor="double-count" className="flex items-center gap-2">
-                <Sparkles className="w-4 h-4 text-amber-500" />
-                Double Points
-              </Label>
-              <p className="text-sm text-muted-foreground">
-                Doubles the final score for the question (after speed bonus).
-              </p>
-            </div>
-            <Input
-              id="double-count"
-              type="number"
-              min="0"
-              max="10"
-              className="w-20"
-              value={quiz.doublePointsCount}
-              onChange={(e) => updatePowerUpCount('doublePointsCount', parseInt(e.target.value))}
-            />
-          </div>
-
-          {quiz.hintCount > 0 && (
-            <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md">
-              <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 flex-shrink-0" />
-              <div>
-                <p className="text-sm font-medium text-amber-800 dark:text-amber-200">Hint Requirement</p>
-                <p className="text-sm text-amber-700 dark:text-amber-300">
-                  All questions must have a hint when Hint power-up is enabled. Questions without hints will show a warning.
-                </p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Questions List with Drag and Drop */}
-      {quiz.questions.length === 0 ? (
-        <Card className="border-dashed">
-          <CardContent className="flex flex-col items-center justify-center py-16">
-            <p className="text-muted-foreground mb-4">No questions yet</p>
-            <Button onClick={() => setDialogOpen(true)}>
-              <Plus className="w-4 h-4 mr-2" />
-              Add Your First Question
-            </Button>
-          </CardContent>
-        </Card>
-      ) : (
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <SortableContext
-            items={quiz.questions.map((q) => q.id)}
-            strategy={verticalListSortingStrategy}
-          >
-            <div className="space-y-3">
-              {sectionGroups.map((group, groupIndex) => (
-                <div key={groupIndex} className="space-y-2">
-                  {/* Section Header */}
-                  {group.section && (
-                    <SortableQuestionCard
-                      question={group.section}
-                      questionNumber={0}
-                      onEdit={openEditDialog}
-                      onDelete={deleteQuestion}
-                      isInSection={false}
-                    />
-                  )}
-                  {/* Questions in this section */}
-                  {group.questions.map((question) => (
-                    <SortableQuestionCard
-                      key={question.id}
-                      question={question}
-                      questionNumber={questionNumbers.get(question.id) || 0}
-                      onEdit={openEditDialog}
-                      onDelete={deleteQuestion}
-                      isInSection={group.section !== null}
-                    />
-                  ))}
-                </div>
-              ))}
-            </div>
-          </SortableContext>
-          <DragOverlay>
-            {activeQuestion && (
-              <DragOverlayCard
-                question={activeQuestion}
-                questionNumber={activeQuestionNumber}
-              />
-            )}
-          </DragOverlay>
-        </DndContext>
-      )}
+      {/* Section Editor Dialog */}
+      <SectionEditorDialog
+        open={sectionDialogOpen}
+        onOpenChange={(open) => {
+          setSectionDialogOpen(open);
+          if (!open) resetForm();
+        }}
+        editingSection={editingQuestion?.questionType === "SECTION" ? editingQuestion : null}
+        sectionTitle={questionText}
+        setSectionTitle={setQuestionText}
+        sectionDescription={hostNotes}
+        setSectionDescription={setHostNotes}
+        imageUrl={imageUrl}
+        setImageUrl={setImageUrl}
+        availableTranslationLanguages={availableTranslationLanguages}
+        activeTranslationTab={activeTranslationTab}
+        setActiveTranslationTab={setActiveTranslationTab}
+        sectionTranslations={questionTranslations}
+        onAddTranslationLanguage={addTranslationLanguage}
+        onUpdateSectionTranslation={updateQuestionTranslation}
+        onCopyToTranslation={copyToTranslation}
+        onAutoTranslate={autoTranslateQuestion}
+        onSaveTranslation={saveTranslationForLanguage}
+        autoTranslatingSection={autoTranslatingQuestion}
+        savingTranslation={savingTranslation}
+        getTranslationStatus={getSectionTranslationStatus}
+        uploading={uploading}
+        onImageUpload={handleImageUpload}
+        onRemoveImage={removeImage}
+        onSave={saveSection}
+        onCancel={() => {
+          setSectionDialogOpen(false);
+          resetForm();
+        }}
+      />
 
       {/* Translations Dialog */}
       <Dialog open={translationsDialogOpen} onOpenChange={setTranslationsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
           <DialogHeader className="flex-shrink-0">
-            <DialogTitle>Quiz Translations</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Languages className="w-5 h-5" />
+              Quiz Translations
+            </DialogTitle>
             <DialogDescription>
               Translate your quiz into multiple languages using AI. Players can select their preferred language when joining.
             </DialogDescription>
@@ -2212,7 +1197,7 @@ export default function QuestionsPage({
                             </div>
                             <div className="flex gap-2">
                               <Button
-                                variant={status?.translatedFields > 0 ? "outline" : "default"}
+                                variant={(status?.translatedFields ?? 0) > 0 ? "outline" : "default"}
                                 size="sm"
                                 onClick={() => handleTranslateQuiz(languageCode)}
                                 disabled={isTranslating}
@@ -2222,13 +1207,13 @@ export default function QuestionsPage({
                                     <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                                     Translating...
                                   </>
-                                ) : status?.translatedFields > 0 ? (
+                                ) : (status?.translatedFields ?? 0) > 0 ? (
                                   "Re-translate"
                                 ) : (
                                   "Translate"
                                 )}
                               </Button>
-                              {status?.translatedFields > 0 && (
+                              {(status?.translatedFields ?? 0) > 0 && (
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -2339,7 +1324,6 @@ export default function QuestionsPage({
 
           <div className="py-4">
             {!translationResult ? (
-              // Progress state
               <div className="space-y-4">
                 <div className="flex items-center justify-center py-6">
                   <div className="relative">
@@ -2351,12 +1335,8 @@ export default function QuestionsPage({
                 <p className="text-sm text-muted-foreground text-center">
                   Translating questions using AI...
                 </p>
-                <p className="text-xs text-muted-foreground text-center">
-                  This may take a few minutes depending on the number of questions.
-                </p>
               </div>
             ) : translationResult.success ? (
-              // Success state
               <div className="space-y-4">
                 <div className="flex items-center justify-center py-4">
                   <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
@@ -2366,22 +1346,19 @@ export default function QuestionsPage({
                 <div className="text-center space-y-1">
                   {(translationResult.translated ?? 0) > 0 ? (
                     <p className="text-lg font-medium">
-                      {translationResult.translated} question{translationResult.translated !== 1 ? 's' : ''} translated successfully
+                      {translationResult.translated} question{translationResult.translated !== 1 ? "s" : ""} translated
                     </p>
                   ) : (
-                    <p className="text-lg font-medium">
-                      Translation complete
-                    </p>
+                    <p className="text-lg font-medium">Translation complete</p>
                   )}
                   {(translationResult.failed ?? 0) > 0 && (
                     <p className="text-sm text-amber-600 dark:text-amber-400">
-                      {translationResult.failed} question{translationResult.failed !== 1 ? 's' : ''} failed
+                      {translationResult.failed} question{translationResult.failed !== 1 ? "s" : ""} failed
                     </p>
                   )}
                 </div>
               </div>
             ) : (
-              // Error state
               <div className="space-y-4">
                 <div className="flex items-center justify-center py-4">
                   <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
@@ -2397,9 +1374,7 @@ export default function QuestionsPage({
 
           {translationResult && (
             <div className="flex justify-end">
-              <Button onClick={closeTranslationProgress}>
-                Done
-              </Button>
+              <Button onClick={closeTranslationProgress}>Done</Button>
             </div>
           )}
         </DialogContent>
@@ -2512,9 +1487,7 @@ export default function QuestionsPage({
 
           {deleteResult && (
             <div className="flex justify-end">
-              <Button onClick={closeDeleteProgress}>
-                Done
-              </Button>
+              <Button onClick={closeDeleteProgress}>Done</Button>
             </div>
           )}
         </DialogContent>

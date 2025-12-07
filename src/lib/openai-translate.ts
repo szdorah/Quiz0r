@@ -24,6 +24,16 @@ interface TranslationResponse {
   }>;
 }
 
+interface SectionTranslationRequest {
+  title: string;
+  description?: string | null;
+}
+
+interface SectionTranslationResponse {
+  title: string;
+  description?: string | null;
+}
+
 /**
  * Get OpenAI client instance with API key from database
  */
@@ -183,6 +193,110 @@ CRITICAL RULES:
 }
 
 /**
+ * Translate a section (SECTION type question) to a target language using OpenAI GPT-4o
+ * Sections only have title (questionText) and description (hostNotes)
+ * @param sectionId - The section ID to translate
+ * @param targetLanguage - The target language code (e.g., 'es', 'fr')
+ * @returns Success status
+ */
+export async function translateSection(
+  sectionId: string,
+  targetLanguage: LanguageCode
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    // Get OpenAI client
+    const openai = await getOpenAIClient();
+    if (!openai) {
+      return { success: false, error: "OpenAI API key not configured" };
+    }
+
+    // Get section
+    const section = await prisma.question.findUnique({
+      where: { id: sectionId },
+    });
+
+    if (!section) {
+      return { success: false, error: "Section not found" };
+    }
+
+    if (section.questionType !== "SECTION") {
+      return { success: false, error: "Not a section" };
+    }
+
+    // Prepare translation request
+    const request: SectionTranslationRequest = {
+      title: section.questionText,
+      description: section.hostNotes,
+    };
+
+    const languageInfo = SupportedLanguages[targetLanguage];
+    const systemPrompt = `You are a professional translator for educational quiz content.
+Translate from English to ${languageInfo.name} (${languageInfo.nativeName}).
+
+CRITICAL RULES:
+1. Maintain EXACT JSON structure
+2. Only translate text values, never field names
+3. Preserve formatting and line breaks
+4. Keep the tone appropriate for quiz section headers
+5. Return ONLY valid JSON with no markdown formatting or code blocks
+6. If a field is null or empty, keep it null/empty in the response`;
+
+    // Call OpenAI API
+    const completion = await openai.chat.completions.create({
+      model: "gpt-4o",
+      messages: [
+        { role: "system", content: systemPrompt },
+        {
+          role: "user",
+          content: `Translate this quiz section header to ${languageInfo.name}:\n\n${JSON.stringify(request, null, 2)}`,
+        },
+      ],
+      response_format: { type: "json_object" },
+      temperature: 0.3,
+    });
+
+    const responseText = completion.choices[0]?.message?.content;
+    if (!responseText) {
+      return { success: false, error: "No response from OpenAI" };
+    }
+
+    // Parse response
+    const translated = JSON.parse(responseText) as SectionTranslationResponse;
+
+    // Save section translation (stored in questionText and hostNotes fields)
+    await prisma.questionTranslation.upsert({
+      where: {
+        questionId_languageCode: {
+          questionId: sectionId,
+          languageCode: targetLanguage,
+        },
+      },
+      update: {
+        questionText: translated.title,
+        hostNotes: translated.description,
+        isAutoTranslated: true,
+        updatedAt: new Date(),
+      },
+      create: {
+        questionId: sectionId,
+        languageCode: targetLanguage,
+        questionText: translated.title,
+        hostNotes: translated.description,
+        isAutoTranslated: true,
+      },
+    });
+
+    return { success: true };
+  } catch (error) {
+    console.error("Failed to translate section:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Translation failed",
+    };
+  }
+}
+
+/**
  * Translate an entire quiz to a target language
  * @param quizId - The quiz ID to translate
  * @param targetLanguage - The target language code
@@ -195,29 +309,60 @@ export async function translateEntireQuiz(
   onProgress?: (current: number, total: number) => void
 ): Promise<{ success: boolean; translated: number; failed: number; errors: string[] }> {
   try {
-    // Get all questions for the quiz (excluding SECTION type)
-    const questions = await prisma.question.findMany({
+    // Get all questions for the quiz (including sections)
+    const allItems = await prisma.question.findMany({
       where: {
         quizId: quizId,
-        questionType: { not: "SECTION" },
       },
       orderBy: { orderIndex: "asc" },
     });
 
-    if (questions.length === 0) {
+    if (allItems.length === 0) {
       return { success: true, translated: 0, failed: 0, errors: [] };
     }
 
+    // Separate sections and questions
+    const sections = allItems.filter((item) => item.questionType === "SECTION");
+    const questions = allItems.filter((item) => item.questionType !== "SECTION");
+
+    const totalItems = sections.length + questions.length;
     let translated = 0;
     let failed = 0;
     const errors: string[] = [];
+    let currentIndex = 0;
 
-    for (let i = 0; i < questions.length; i++) {
-      const question = questions[i];
+    // Translate sections first
+    for (const section of sections) {
+      currentIndex++;
 
       // Report progress
       if (onProgress) {
-        onProgress(i + 1, questions.length);
+        onProgress(currentIndex, totalItems);
+      }
+
+      // Translate the section
+      const result = await translateSection(section.id, targetLanguage);
+
+      if (result.success) {
+        translated++;
+      } else {
+        failed++;
+        errors.push(`Section "${section.questionText}": ${result.error || "Unknown error"}`);
+      }
+
+      // Add delay between requests to avoid rate limits (500ms)
+      if (currentIndex < totalItems) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+
+    // Translate questions
+    for (const question of questions) {
+      currentIndex++;
+
+      // Report progress
+      if (onProgress) {
+        onProgress(currentIndex, totalItems);
       }
 
       // Translate the question
@@ -227,11 +372,11 @@ export async function translateEntireQuiz(
         translated++;
       } else {
         failed++;
-        errors.push(`Question ${i + 1}: ${result.error || "Unknown error"}`);
+        errors.push(`Question "${question.questionText.substring(0, 30)}...": ${result.error || "Unknown error"}`);
       }
 
       // Add delay between requests to avoid rate limits (500ms)
-      if (i < questions.length - 1) {
+      if (currentIndex < totalItems) {
         await new Promise((resolve) => setTimeout(resolve, 500));
       }
     }
@@ -269,11 +414,10 @@ export async function getQuizTranslationStatus(quizId: string): Promise<
   }>
 > {
   try {
-    // Get all questions with their answers (excluding SECTION type)
-    const questions = await prisma.question.findMany({
+    // Get all items (questions and sections) with their answers
+    const allItems = await prisma.question.findMany({
       where: {
         quizId: quizId,
-        questionType: { not: "SECTION" },
       },
       include: {
         answers: true,
@@ -281,12 +425,26 @@ export async function getQuizTranslationStatus(quizId: string): Promise<
       },
     });
 
-    if (questions.length === 0) {
+    if (allItems.length === 0) {
       return [];
     }
 
+    // Separate sections and questions
+    const sections = allItems.filter((item) => item.questionType === "SECTION");
+    const questions = allItems.filter((item) => item.questionType !== "SECTION");
+
     // Calculate total translatable fields per language
     let totalFieldsPerLanguage = 0;
+
+    // Count section fields
+    for (const section of sections) {
+      // Section title (questionText) - always counted
+      totalFieldsPerLanguage += 1;
+      // Section description (hostNotes) - only count if exists
+      if (section.hostNotes) totalFieldsPerLanguage += 1;
+    }
+
+    // Count question fields
     for (const question of questions) {
       // Question text (always counted)
       totalFieldsPerLanguage += 1;
@@ -307,10 +465,10 @@ export async function getQuizTranslationStatus(quizId: string): Promise<
         .map(async (languageCode) => {
           const languageInfo = SupportedLanguages[languageCode];
 
-          // Get all translations for this language
+          // Get all translations for this language (including sections)
           const questionTranslations = await prisma.questionTranslation.findMany({
             where: {
-              questionId: { in: questions.map((q) => q.id) },
+              questionId: { in: allItems.map((q) => q.id) },
               languageCode: languageCode,
             },
           });
@@ -327,6 +485,18 @@ export async function getQuizTranslationStatus(quizId: string): Promise<
           // Count translated fields
           let translatedFields = 0;
 
+          // Count section translations
+          for (const section of sections) {
+            const sTranslation = questionTranslations.find((t) => t.questionId === section.id);
+            if (sTranslation) {
+              // Section title
+              if (sTranslation.questionText) translatedFields += 1;
+              // Section description (only count if original has it)
+              if (section.hostNotes && sTranslation.hostNotes) translatedFields += 1;
+            }
+          }
+
+          // Count question translations
           for (const question of questions) {
             const qTranslation = questionTranslations.find((t) => t.questionId === question.id);
 

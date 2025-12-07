@@ -17,7 +17,7 @@ export async function GET(
         },
         players: {
           where: {
-            isActive: true,
+            // Include all admitted players - for finished games, players will be inactive
             admissionStatus: "admitted"
           },
           orderBy: { totalScore: "desc" },
@@ -26,14 +26,14 @@ export async function GET(
             name: true,
             avatarColor: true,
             avatarEmoji: true,
-            totalScore: true
+            totalScore: true,
+            isActive: true
           }
         },
         _count: {
           select: {
             players: {
               where: {
-                isActive: true,
                 admissionStatus: "admitted"
               }
             }

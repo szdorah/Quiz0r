@@ -49,7 +49,6 @@ export async function GET(request: NextRequest) {
           },
           players: {
             where: {
-              isActive: true,
               admissionStatus: "admitted"
             },
             orderBy: { totalScore: "desc" },
@@ -59,14 +58,16 @@ export async function GET(request: NextRequest) {
               name: true,
               avatarColor: true,
               avatarEmoji: true,
-              totalScore: true
+              totalScore: true,
+              isActive: true
             }
           },
           _count: {
             select: {
               players: {
                 where: {
-                  isActive: true,
+                  // For finished games, count all admitted players
+                  // For running games, this still gives total admitted count
                   admissionStatus: "admitted"
                 }
               }
@@ -89,7 +90,10 @@ export async function GET(request: NextRequest) {
         endedAt: game.endedAt?.toISOString() || null,
         quiz: game.quiz,
         playerCount: game._count.players,
-        topPlayers: game.players
+        // For running games, show active players; for finished games, show top scorers
+        topPlayers: game.status === "FINISHED"
+          ? game.players
+          : game.players.filter(p => p.isActive)
       })),
       pagination: {
         page,

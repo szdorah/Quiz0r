@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
-import { translateQuestion } from "@/lib/openai-translate";
+import { translateQuestion, translateSection } from "@/lib/openai-translate";
 import { SupportedLanguages, type LanguageCode } from "@/types";
+import { prisma } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-// POST /api/quizzes/[quizId]/questions/[questionId]/translate - Translate single question
+// POST /api/quizzes/[quizId]/questions/[questionId]/translate - Translate single question or section
 export async function POST(
   request: Request,
   { params }: { params: { quizId: string; questionId: string } }
@@ -30,8 +31,23 @@ export async function POST(
       );
     }
 
-    // Perform translation
-    const result = await translateQuestion(questionId, targetLanguage as LanguageCode);
+    // Check if this is a section or a question
+    const item = await prisma.question.findUnique({
+      where: { id: questionId },
+      select: { questionType: true },
+    });
+
+    if (!item) {
+      return NextResponse.json(
+        { error: "Question not found" },
+        { status: 404 }
+      );
+    }
+
+    // Call appropriate translation function
+    const result = item.questionType === "SECTION"
+      ? await translateSection(questionId, targetLanguage as LanguageCode)
+      : await translateQuestion(questionId, targetLanguage as LanguageCode);
 
     if (!result.success) {
       return NextResponse.json(
@@ -42,12 +58,14 @@ export async function POST(
 
     return NextResponse.json({
       success: true,
-      message: "Question translated successfully",
+      message: item.questionType === "SECTION"
+        ? "Section translated successfully"
+        : "Question translated successfully",
     });
   } catch (error) {
-    console.error("Failed to translate question:", error);
+    console.error("Failed to translate:", error);
     return NextResponse.json(
-      { error: "Failed to translate question" },
+      { error: "Failed to translate" },
       { status: 500 }
     );
   }
