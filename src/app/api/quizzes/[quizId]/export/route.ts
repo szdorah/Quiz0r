@@ -22,7 +22,11 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       include: {
         questions: {
           include: {
+            translations: true,
             answers: {
+              include: {
+                translations: true,
+              },
               orderBy: { orderIndex: "asc" },
             },
           },
@@ -76,6 +80,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
               imageRef: answerImageRef,
               isCorrect: answer.isCorrect,
               orderIndex: answer.orderIndex,
+              translations: answer.translations?.map((t) => ({
+                languageCode: t.languageCode,
+                answerText: t.answerText,
+              })) ?? [],
             };
           })
         );
@@ -88,6 +96,18 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           timeLimit: question.timeLimit,
           points: question.points,
           orderIndex: question.orderIndex,
+          hint: question.hint,
+          easterEggEnabled: question.easterEggEnabled,
+          easterEggButtonText: question.easterEggButtonText,
+          easterEggUrl: question.easterEggUrl,
+          easterEggDisablesScoring: question.easterEggDisablesScoring,
+          translations: question.translations?.map((t) => ({
+            languageCode: t.languageCode,
+            questionText: t.questionText,
+            hostNotes: t.hostNotes,
+            hint: t.hint,
+            easterEggButtonText: t.easterEggButtonText,
+          })) ?? [],
           answers: exportedAnswers,
         };
       })
@@ -95,11 +115,17 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // 4. Create quiz.json
     const exportData: ExportedQuiz = {
-      exportVersion: "1.0",
+      exportVersion: "1.1",
       exportedAt: new Date().toISOString(),
       title: quiz.title,
       description: quiz.description,
       theme: quiz.theme,
+      autoAdmit: quiz.autoAdmit,
+      powerUps: {
+        hintCount: quiz.hintCount,
+        copyAnswerCount: quiz.copyAnswerCount,
+        doublePointsCount: quiz.doublePointsCount,
+      },
       questions: exportedQuestions,
     };
 

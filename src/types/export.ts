@@ -3,12 +3,35 @@
  * Defines the structure of exported quiz data
  */
 
+export type ExportVersion = "1.0" | "1.1";
+
+export interface ExportedPowerUps {
+  hintCount: number;
+  copyAnswerCount: number;
+  doublePointsCount: number;
+}
+
+export interface ExportedQuestionTranslation {
+  languageCode: string;
+  questionText: string;
+  hostNotes: string | null;
+  hint: string | null;
+  easterEggButtonText: string | null;
+}
+
+export interface ExportedAnswerTranslation {
+  languageCode: string;
+  answerText: string;
+}
+
 export interface ExportedQuiz {
-  exportVersion: "1.0";
+  exportVersion: ExportVersion;
   exportedAt: string; // ISO timestamp
   title: string;
   description: string | null;
   theme: string | null; // JSON string of QuizTheme
+  autoAdmit?: boolean; // Optional for legacy exports
+  powerUps?: ExportedPowerUps; // Optional for legacy exports
   questions: ExportedQuestion[];
 }
 
@@ -20,6 +43,12 @@ export interface ExportedQuestion {
   timeLimit: number;
   points: number;
   orderIndex: number;
+  hint?: string | null;
+  easterEggEnabled?: boolean;
+  easterEggButtonText?: string | null;
+  easterEggUrl?: string | null;
+  easterEggDisablesScoring?: boolean;
+  translations?: ExportedQuestionTranslation[];
   answers: ExportedAnswer[];
 }
 
@@ -28,4 +57,5 @@ export interface ExportedAnswer {
   imageRef: string | null; // Path in ZIP: e.g., "images/a_0_2.jpg"
   isCorrect: boolean;
   orderIndex: number;
+  translations?: ExportedAnswerTranslation[];
 }

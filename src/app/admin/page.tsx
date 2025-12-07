@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +10,26 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Plus, Pencil, Trash2, Play, Upload } from "lucide-react";
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Play,
+  Upload,
+  Loader2,
+  FileArchive,
+} from "lucide-react";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 interface Quiz {
   id: string;
@@ -26,7 +44,9 @@ export default function AdminDashboard() {
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [loading, setLoading] = useState(true);
   const [importing, setImporting] = useState(false);
-  const importFileRef = useRef<HTMLInputElement>(null);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuizzes();
@@ -61,9 +81,16 @@ export default function AdminDashboard() {
     }
   }
 
-  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  function resetImportDialog() {
+    setSelectedFile(null);
+    setImportError(null);
+  }
+
+  async function handleImport(file: File) {
+    if (!file) {
+      setImportError("Please choose a .zip file to import");
+      return;
+    }
 
     setImporting(true);
     try {
@@ -78,20 +105,23 @@ export default function AdminDashboard() {
       const data = await res.json();
 
       if (res.ok) {
-        toast.success(data.message);
+        toast.success(data.message || "Quiz imported");
         // Refresh the quiz list
-        fetchQuizzes();
+        await fetchQuizzes();
+        setImportDialogOpen(false);
+        resetImportDialog();
       } else {
-        toast.error(data.error || "Failed to import quiz");
+        setImportError(data.error || "Failed to import quiz");
+        toast.error("Failed to import quiz", {
+          description: data.error,
+        });
       }
     } catch (error) {
       console.error("Import error:", error);
+      setImportError("Something went wrong while importing the quiz.");
       toast.error("Failed to import quiz");
     } finally {
       setImporting(false);
-      if (importFileRef.current) {
-        importFileRef.current.value = "";
-      }
     }
   }
 
@@ -114,21 +144,9 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <input
-            ref={importFileRef}
-            type="file"
-            accept=".zip"
-            className="hidden"
-            onChange={handleImport}
-            disabled={importing}
-          />
-          <Button
-            variant="outline"
-            onClick={() => importFileRef.current?.click()}
-            disabled={importing}
-          >
+          <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
-            {importing ? "Importing..." : "Import Quiz"}
+            Import Quiz
           </Button>
           <Link href="/admin/quiz/new">
             <Button>
@@ -138,6 +156,88 @@ export default function AdminDashboard() {
           </Link>
         </div>
       </div>
+
+      <Dialog
+        open={importDialogOpen}
+        onOpenChange={(open) => {
+          setImportDialogOpen(open);
+          if (!open) resetImportDialog();
+        }}
+      >
+        <DialogContent className="sm:max-w-[520px]">
+          <DialogHeader>
+            <DialogTitle>Import Quiz</DialogTitle>
+            <DialogDescription>
+              Upload a quiz export (.zip) to add it to your collection. Images
+              and translations are imported automatically.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            <div className="flex gap-3 rounded-lg border bg-muted/30 p-3 text-sm text-muted-foreground">
+              <FileArchive className="h-5 w-5 text-primary flex-shrink-0" />
+              <div>
+                <p className="font-medium text-foreground">Need the export?</p>
+                <p>
+                  Use the Export button inside a quiz to download a .zip that
+                  includes questions, sections, images, and translations.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quizImportFile">Quiz export (.zip)</Label>
+              <Input
+                id="quizImportFile"
+                type="file"
+                accept=".zip"
+                onChange={(e) => {
+                  const file = e.target.files?.[0] || null;
+                  setSelectedFile(file);
+                  setImportError(null);
+                }}
+                disabled={importing}
+                className="cursor-pointer"
+              />
+              {selectedFile && (
+                <p className="text-sm text-muted-foreground">
+                  {selectedFile.name} • {(selectedFile.size / 1024).toFixed(1)}{" "}
+                  KB
+                </p>
+              )}
+              {importError && (
+                <p className="text-sm text-destructive">{importError}</p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setImportDialogOpen(false)}
+              disabled={importing}
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={() => selectedFile && handleImport(selectedFile)}
+              disabled={!selectedFile || importing}
+            >
+              {importing ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Importing...
+                </>
+              ) : (
+                <>
+                  <Upload className="mr-2 h-4 w-4" />
+                  Import Quiz
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Quiz Grid */}
       {quizzes.length === 0 ? (

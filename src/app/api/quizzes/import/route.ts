@@ -80,6 +80,11 @@ export async function POST(request: NextRequest) {
 
     // 5. Sanitize all text fields
     const sanitizedData = sanitizeQuizData(quizData);
+    const powerUps = sanitizedData.powerUps ?? {
+      hintCount: 0,
+      copyAnswerCount: 0,
+      doublePointsCount: 0,
+    };
 
     // 6. Upload images and create mapping
     const imageMapping = new Map<string, string>(); // ref -> new URL
@@ -105,6 +110,10 @@ export async function POST(request: NextRequest) {
         title: sanitizedData.title,
         description: sanitizedData.description,
         theme: sanitizedData.theme,
+        autoAdmit: sanitizedData.autoAdmit ?? true,
+        hintCount: powerUps.hintCount ?? 0,
+        copyAnswerCount: powerUps.copyAnswerCount ?? 0,
+        doublePointsCount: powerUps.doublePointsCount ?? 0,
         questions: {
           create: sanitizedData.questions.map((q) => ({
             questionText: q.questionText,
@@ -114,12 +123,34 @@ export async function POST(request: NextRequest) {
             timeLimit: q.timeLimit,
             points: q.points,
             orderIndex: q.orderIndex,
+            hint: q.hint || null,
+            easterEggEnabled: q.easterEggEnabled ?? false,
+            easterEggButtonText: q.easterEggEnabled ? q.easterEggButtonText : null,
+            easterEggUrl: q.easterEggEnabled ? q.easterEggUrl : null,
+            easterEggDisablesScoring: q.easterEggEnabled ? q.easterEggDisablesScoring ?? false : false,
+            translations: q.translations && q.translations.length > 0 ? {
+              create: q.translations.map((t) => ({
+                languageCode: t.languageCode,
+                questionText: t.questionText,
+                hostNotes: t.hostNotes || null,
+                hint: t.hint || null,
+                easterEggButtonText: t.easterEggButtonText || null,
+                isAutoTranslated: false,
+              })),
+            } : undefined,
             answers: {
               create: q.answers.map((a) => ({
                 answerText: a.answerText,
                 imageUrl: a.imageRef ? imageMapping.get(a.imageRef) || null : null,
                 isCorrect: a.isCorrect,
                 orderIndex: a.orderIndex,
+                translations: a.translations && a.translations.length > 0 ? {
+                  create: a.translations.map((t) => ({
+                    languageCode: t.languageCode,
+                    answerText: t.answerText,
+                    isAutoTranslated: false,
+                  })),
+                } : undefined,
               })),
             },
           })),

@@ -3,6 +3,7 @@
  * Validates imported quiz structure and constraints
  */
 
+import { SupportedLanguages } from "@/types";
 import { ExportedQuiz } from "@/types/export";
 
 export interface ValidationResult {
@@ -17,6 +18,20 @@ export function validateQuizStructure(data: unknown): ValidationResult {
   }
 
   const quiz = data as Partial<ExportedQuiz>;
+
+  // Version metadata
+  const version = quiz.exportVersion ?? "1.0";
+  if (version !== "1.0" && version !== "1.1") {
+    return { valid: false, error: `Unsupported export version: ${version}` };
+  }
+
+  if (!quiz.exportedAt || typeof quiz.exportedAt !== "string") {
+    return { valid: false, error: "Quiz exportedAt timestamp is required" };
+  }
+
+  if (Number.isNaN(Date.parse(quiz.exportedAt))) {
+    return { valid: false, error: "Quiz exportedAt must be a valid timestamp" };
+  }
 
   // Required fields
   if (!quiz.title || typeof quiz.title !== "string" || quiz.title.trim() === "") {
@@ -48,6 +63,40 @@ export function validateQuizStructure(data: unknown): ValidationResult {
         JSON.parse(quiz.theme);
       } catch {
         return { valid: false, error: "Quiz theme is not valid JSON" };
+      }
+    }
+  }
+
+  // Auto-admit flag
+  if (quiz.autoAdmit !== undefined && typeof quiz.autoAdmit !== "boolean") {
+    return { valid: false, error: "autoAdmit must be a boolean" };
+  }
+
+  // Power-ups (allow legacy top-level counts)
+  const powerUps = quiz.powerUps ?? {
+    hintCount: (quiz as any).hintCount,
+    copyAnswerCount: (quiz as any).copyAnswerCount,
+    doublePointsCount: (quiz as any).doublePointsCount,
+  };
+
+  if (powerUps && typeof powerUps !== "object") {
+    return { valid: false, error: "powerUps must be an object" };
+  }
+
+  if (powerUps) {
+    const powerUpFields: Array<[string, unknown]> = [
+      ["hintCount", powerUps.hintCount],
+      ["copyAnswerCount", powerUps.copyAnswerCount],
+      ["doublePointsCount", powerUps.doublePointsCount],
+    ];
+
+    for (const [field, value] of powerUpFields) {
+      if (value === undefined) continue;
+      if (typeof value !== "number" || value < 0 || value > 10) {
+        return {
+          valid: false,
+          error: `Power-up ${field} must be a number between 0 and 10`,
+        };
       }
     }
   }
@@ -93,6 +142,19 @@ function validateQuestion(q: unknown, index: number): ValidationResult {
     return { valid: false, error: `Question ${index + 1}: text is too long (max 500 characters)` };
   }
 
+  if (question.imageRef !== null && question.imageRef !== undefined && typeof question.imageRef !== "string") {
+    return { valid: false, error: `Question ${index + 1}: imageRef must be a string or null` };
+  }
+
+  if (question.hostNotes !== null && question.hostNotes !== undefined) {
+    if (typeof question.hostNotes !== "string") {
+      return { valid: false, error: `Question ${index + 1}: hostNotes must be a string` };
+    }
+    if (question.hostNotes.length > 1000) {
+      return { valid: false, error: `Question ${index + 1}: hostNotes is too long (max 1000 characters)` };
+    }
+  }
+
   // Question type
   const validTypes = ["SINGLE_SELECT", "MULTI_SELECT", "SECTION"];
   if (!validTypes.includes(question.questionType)) {
@@ -107,6 +169,55 @@ function validateQuestion(q: unknown, index: number): ValidationResult {
   // Points
   if (typeof question.points !== "number" || question.points < 0 || question.points > 10000) {
     return { valid: false, error: `Question ${index + 1}: invalid points value (must be 0-10000)` };
+  }
+
+  // Hint
+  if (question.hint !== null && question.hint !== undefined) {
+    if (typeof question.hint !== "string") {
+      return { valid: false, error: `Question ${index + 1}: hint must be a string` };
+    }
+    if (question.hint.length > 500) {
+      return { valid: false, error: `Question ${index + 1}: hint is too long (max 500 characters)` };
+    }
+  }
+
+  // Easter egg configuration
+  if (question.easterEggEnabled !== undefined && typeof question.easterEggEnabled !== "boolean") {
+    return { valid: false, error: `Question ${index + 1}: easterEggEnabled must be a boolean` };
+  }
+
+  if (question.easterEggButtonText !== null && question.easterEggButtonText !== undefined) {
+    if (typeof question.easterEggButtonText !== "string") {
+      return { valid: false, error: `Question ${index + 1}: easterEggButtonText must be a string` };
+    }
+    if (question.easterEggButtonText.length > 200) {
+      return { valid: false, error: `Question ${index + 1}: easterEggButtonText is too long (max 200 characters)` };
+    }
+  }
+
+  if (question.easterEggUrl !== null && question.easterEggUrl !== undefined) {
+    if (typeof question.easterEggUrl !== "string") {
+      return { valid: false, error: `Question ${index + 1}: easterEggUrl must be a string` };
+    }
+    if (!/^https?:\/\/.+/i.test(question.easterEggUrl)) {
+      return { valid: false, error: `Question ${index + 1}: easterEggUrl must start with http or https` };
+    }
+    if (question.easterEggUrl.length > 500) {
+      return { valid: false, error: `Question ${index + 1}: easterEggUrl is too long (max 500 characters)` };
+    }
+  }
+
+  if (question.easterEggDisablesScoring !== undefined && typeof question.easterEggDisablesScoring !== "boolean") {
+    return { valid: false, error: `Question ${index + 1}: easterEggDisablesScoring must be a boolean` };
+  }
+
+  if (question.easterEggEnabled) {
+    if (!question.easterEggButtonText) {
+      return { valid: false, error: `Question ${index + 1}: easterEggButtonText is required when easterEggEnabled is true` };
+    }
+    if (!question.easterEggUrl) {
+      return { valid: false, error: `Question ${index + 1}: easterEggUrl is required when easterEggEnabled is true` };
+    }
   }
 
   // Order index
@@ -151,6 +262,10 @@ function validateQuestion(q: unknown, index: number): ValidationResult {
         return { valid: false, error: `Question ${index + 1}, Answer ${j + 1}: text is too long (max 200 characters)` };
       }
 
+      if (a.imageRef !== null && a.imageRef !== undefined && typeof a.imageRef !== "string") {
+        return { valid: false, error: `Question ${index + 1}, Answer ${j + 1}: imageRef must be a string or null` };
+      }
+
       if (typeof a.isCorrect !== "boolean") {
         return { valid: false, error: `Question ${index + 1}, Answer ${j + 1}: isCorrect must be boolean` };
       }
@@ -158,12 +273,111 @@ function validateQuestion(q: unknown, index: number): ValidationResult {
       if (typeof a.orderIndex !== "number" || a.orderIndex < 0) {
         return { valid: false, error: `Question ${index + 1}, Answer ${j + 1}: invalid order index` };
       }
+
+      if (a.translations !== undefined) {
+        if (!Array.isArray(a.translations)) {
+          return { valid: false, error: `Question ${index + 1}, Answer ${j + 1}: translations must be an array` };
+        }
+
+        for (let k = 0; k < a.translations.length; k++) {
+          const result = validateAnswerTranslation(a.translations[k], index, j, k);
+          if (!result.valid) {
+            return result;
+          }
+        }
+      }
     }
   } else {
     // Sections should have zero answers
     if (question.answers.length > 0) {
       return { valid: false, error: `Question ${index + 1}: SECTION questions should not have answers` };
     }
+  }
+
+  if (question.translations !== undefined) {
+    if (!Array.isArray(question.translations)) {
+      return { valid: false, error: `Question ${index + 1}: translations must be an array` };
+    }
+
+    if (question.translations.length > 50) {
+      return { valid: false, error: `Question ${index + 1}: too many translations (max 50)` };
+    }
+
+    for (let j = 0; j < question.translations.length; j++) {
+      const result = validateQuestionTranslation(question.translations[j], index, j);
+      if (!result.valid) {
+        return result;
+      }
+    }
+  }
+
+  return { valid: true };
+}
+
+function validateQuestionTranslation(
+  t: any,
+  questionIndex: number,
+  translationIndex: number
+): ValidationResult {
+  if (!t || typeof t !== "object") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: invalid` };
+  }
+
+  if (!t.languageCode || typeof t.languageCode !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: languageCode is required` };
+  }
+
+  if (!(t.languageCode in SupportedLanguages)) {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: unsupported language` };
+  }
+
+  if (!t.questionText || typeof t.questionText !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: questionText is required` };
+  }
+
+  if (t.questionText.length > 500) {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: questionText is too long (max 500 characters)` };
+  }
+
+  if (t.hostNotes !== null && t.hostNotes !== undefined && typeof t.hostNotes !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: hostNotes must be a string` };
+  }
+
+  if (t.hint !== null && t.hint !== undefined && typeof t.hint !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: hint must be a string` };
+  }
+
+  if (t.easterEggButtonText !== null && t.easterEggButtonText !== undefined && typeof t.easterEggButtonText !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Translation ${translationIndex + 1}: easterEggButtonText must be a string` };
+  }
+
+  return { valid: true };
+}
+
+function validateAnswerTranslation(
+  t: any,
+  questionIndex: number,
+  answerIndex: number,
+  translationIndex: number
+): ValidationResult {
+  if (!t || typeof t !== "object") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Answer ${answerIndex + 1}, Translation ${translationIndex + 1}: invalid` };
+  }
+
+  if (!t.languageCode || typeof t.languageCode !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Answer ${answerIndex + 1}, Translation ${translationIndex + 1}: languageCode is required` };
+  }
+
+  if (!(t.languageCode in SupportedLanguages)) {
+    return { valid: false, error: `Question ${questionIndex + 1}, Answer ${answerIndex + 1}, Translation ${translationIndex + 1}: unsupported language` };
+  }
+
+  if (!t.answerText || typeof t.answerText !== "string") {
+    return { valid: false, error: `Question ${questionIndex + 1}, Answer ${answerIndex + 1}, Translation ${translationIndex + 1}: answerText is required` };
+  }
+
+  if (t.answerText.length > 200) {
+    return { valid: false, error: `Question ${questionIndex + 1}, Answer ${answerIndex + 1}, Translation ${translationIndex + 1}: answerText is too long (max 200 characters)` };
   }
 
   return { valid: true };

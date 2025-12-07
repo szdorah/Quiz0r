@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { SupportedLanguages, type LanguageCode, type TranslationStatus } from "@/types";
+import { toast } from "sonner";
 
 // New components
 import { QuestionListHeader } from "@/components/quiz/questions/QuestionListHeader";
@@ -285,7 +286,9 @@ export default function QuestionsPage({
 
       if (!res.ok) {
         const data = await res.json();
-        alert(data.error || "Failed to export quiz");
+        toast.error("Failed to export quiz", {
+          description: data.error,
+        });
         return;
       }
 
@@ -298,9 +301,13 @@ export default function QuestionsPage({
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
+
+      toast.success("Quiz exported", {
+        description: "Your quiz and assets have been downloaded.",
+      });
     } catch (error) {
       console.error("Export error:", error);
-      alert("Failed to export quiz");
+      toast.error("Failed to export quiz");
     } finally {
       setExporting(false);
     }
