@@ -36,6 +36,12 @@ import {
   TabsTrigger,
 } from "@/components/ui/tabs";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   ArrowLeft,
   Plus,
   Trash2,
@@ -53,6 +59,11 @@ import {
   Zap,
   AlertCircle,
   Languages,
+  MoreHorizontal,
+  Lightbulb,
+  Users,
+  Sparkles,
+  Pencil,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -195,11 +206,11 @@ function SortableQuestionCard({
       >
         <CardHeader className="pb-2">
           <div className="flex items-start gap-4">
-            {/* Drag Handle */}
+            {/* Drag Handle - 44x44px touch target for accessibility */}
             <div
               {...attributes}
               {...listeners}
-              className="cursor-grab active:cursor-grabbing p-1 -m-1 text-muted-foreground hover:text-foreground transition-colors"
+              className="cursor-grab active:cursor-grabbing p-3 -m-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-lg transition-colors touch-manipulation"
             >
               <GripVertical className="w-5 h-5" />
             </div>
@@ -251,21 +262,23 @@ function SortableQuestionCard({
                 )}
               </CardDescription>
             </div>
-            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* Edit buttons - always visible for mobile accessibility */}
+            <div className="flex items-center gap-1 shrink-0">
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => onEdit(question)}
+                className="h-9 w-9"
               >
-                Edit
+                <Pencil className="w-4 h-4" />
               </Button>
               <Button
                 variant="ghost"
-                size="sm"
+                size="icon"
                 onClick={() => onDelete(question.id)}
-                className="text-destructive hover:text-destructive"
+                className="h-9 w-9 text-destructive hover:text-destructive hover:bg-destructive/10"
               >
-                <Trash2 className="w-3 h-3" />
+                <Trash2 className="w-4 h-4" />
               </Button>
             </div>
           </div>
@@ -1070,30 +1083,17 @@ export default function QuestionsPage({
             {quiz.questions.filter((q) => q.questionType !== "SECTION").length !== 1 ? "s" : ""}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
+          {/* Primary Actions */}
           <Link href={`/host?quizId=${quizId}`}>
-            <Button variant="outline" disabled={quiz.questions.filter((q) => q.questionType !== "SECTION").length === 0}>
+            <Button disabled={quiz.questions.filter((q) => q.questionType !== "SECTION").length === 0}>
               <Play className="w-4 h-4 mr-2" />
-              Play
+              <span className="hidden sm:inline">Play</span>
             </Button>
           </Link>
-          <Link href={`/admin/quiz/${quizId}/theme`}>
-            <Button variant="outline">
-              <Palette className="w-4 h-4 mr-2" />
-              Theme
-            </Button>
-          </Link>
-          <Button variant="outline" onClick={openTranslationsDialog}>
-            <Languages className="w-4 h-4 mr-2" />
-            Translations
-          </Button>
-          <Button variant="outline" onClick={handleExport} disabled={exporting || !quiz}>
-            <Download className="w-4 h-4 mr-2" />
-            {exporting ? "Exporting..." : "Export"}
-          </Button>
           <Button variant="outline" onClick={openSectionDialog}>
-            <Layers className="w-4 h-4 mr-2" />
-            Add Section
+            <Layers className="w-4 h-4 sm:mr-2" />
+            <span className="hidden sm:inline">Add Section</span>
           </Button>
           <Dialog
             open={dialogOpen}
@@ -1561,6 +1561,31 @@ export default function QuestionsPage({
             </DialogContent>
           </Dialog>
 
+          {/* Secondary Actions Dropdown */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="icon">
+                <MoreHorizontal className="w-4 h-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <Link href={`/admin/quiz/${quizId}/theme`}>
+                <DropdownMenuItem className="cursor-pointer">
+                  <Palette className="w-4 h-4 mr-2" />
+                  Theme
+                </DropdownMenuItem>
+              </Link>
+              <DropdownMenuItem onClick={openTranslationsDialog} className="cursor-pointer">
+                <Languages className="w-4 h-4 mr-2" />
+                Translations
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleExport} disabled={exporting || !quiz} className="cursor-pointer">
+                <Download className="w-4 h-4 mr-2" />
+                {exporting ? "Exporting..." : "Export Quiz"}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {/* Section Dialog */}
           <Dialog
             open={sectionDialogOpen}
@@ -1738,9 +1763,12 @@ export default function QuestionsPage({
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Hint Power-up */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5 flex-1">
-              <Label htmlFor="hint-count">💡 Hint</Label>
+              <Label htmlFor="hint-count" className="flex items-center gap-2">
+                <Lightbulb className="w-4 h-4 text-blue-500" />
+                Hint
+              </Label>
               <p className="text-sm text-muted-foreground">
                 Shows a hint for the question. All questions must have hints if enabled.
               </p>
@@ -1757,11 +1785,14 @@ export default function QuestionsPage({
           </div>
 
           {/* Copy Answer Power-up */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5 flex-1">
-              <Label htmlFor="copy-count">👥 Copy Answer</Label>
+              <Label htmlFor="copy-count" className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-purple-500" />
+                Copy Answer
+              </Label>
               <p className="text-sm text-muted-foreground">
-                Copy another player's answer (blind copy - no preview).
+                Copy another player&apos;s answer (blind copy - no preview).
               </p>
             </div>
             <Input
@@ -1776,9 +1807,12 @@ export default function QuestionsPage({
           </div>
 
           {/* Double Points Power-up */}
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-4">
             <div className="space-y-0.5 flex-1">
-              <Label htmlFor="double-count">⚡ Double Points</Label>
+              <Label htmlFor="double-count" className="flex items-center gap-2">
+                <Sparkles className="w-4 h-4 text-amber-500" />
+                Double Points
+              </Label>
               <p className="text-sm text-muted-foreground">
                 Doubles the final score for the question (after speed bonus).
               </p>

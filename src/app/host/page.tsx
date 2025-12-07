@@ -18,7 +18,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { ArrowLeft, Play, Monitor, Loader2 } from "lucide-react";
+import { Play, Monitor, Loader2 } from "lucide-react";
+import { NavHeader } from "@/components/nav-header";
 
 interface Quiz {
   id: string;
@@ -103,14 +104,6 @@ function HostPageContent() {
 
   return (
     <main className="container mx-auto px-4 py-8 max-w-2xl">
-      <Link
-        href="/"
-        className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-6"
-      >
-        <ArrowLeft className="w-4 h-4 mr-2" />
-        Back to Home
-      </Link>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -194,19 +187,7 @@ function HostPageContent() {
 export default function HostPage() {
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
-          <Link href="/" className="text-2xl font-bold text-primary">
-            Quiz0r
-          </Link>
-          <Link
-            href="/admin"
-            className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-          >
-            Manage Quizzes
-          </Link>
-        </div>
-      </header>
+      <NavHeader />
 
       <Suspense
         fallback={

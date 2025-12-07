@@ -14,7 +14,14 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ArrowLeft } from "lucide-react";
+import {
+  ArrowLeft,
+  Lightbulb,
+  Zap,
+  Languages,
+  Palette,
+  ChevronRight,
+} from "lucide-react";
 
 export default function NewQuizPage() {
   const router = useRouter();
@@ -68,7 +75,7 @@ export default function NewQuizPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Create New Quiz</CardTitle>
+          <CardTitle className="text-xl sm:text-2xl">Create New Quiz</CardTitle>
           <CardDescription>
             Give your quiz a name and description, then add questions.
           </CardDescription>
@@ -79,10 +86,11 @@ export default function NewQuizPage() {
               <Label htmlFor="title">Quiz Title</Label>
               <Input
                 id="title"
-                placeholder="Enter quiz title..."
+                placeholder="e.g., General Knowledge Challenge"
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 disabled={loading}
+                className="text-base"
               />
             </div>
 
@@ -100,12 +108,23 @@ export default function NewQuizPage() {
 
             {error && <p className="text-sm text-destructive">{error}</p>}
 
-            <div className="flex gap-4">
-              <Button type="submit" disabled={loading}>
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+              <Button
+                type="submit"
+                disabled={loading}
+                size="lg"
+                className="w-full sm:w-auto"
+              >
                 {loading ? "Creating..." : "Create & Add Questions"}
+                <ChevronRight className="w-4 h-4 ml-2" />
               </Button>
-              <Link href="/admin">
-                <Button type="button" variant="outline" disabled={loading}>
+              <Link href="/admin" className="w-full sm:w-auto">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={loading}
+                  className="w-full"
+                >
                   Cancel
                 </Button>
               </Link>
@@ -113,6 +132,80 @@ export default function NewQuizPage() {
           </form>
         </CardContent>
       </Card>
+
+      {/* What's next section */}
+      <Card className="bg-muted/50 border-dashed">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Lightbulb className="w-4 h-4 text-primary" />
+            What happens next?
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="pt-0">
+          <div className="grid gap-3 sm:gap-4 sm:grid-cols-2">
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                1
+              </div>
+              <div>
+                <p className="font-medium text-sm">Add Questions</p>
+                <p className="text-xs text-muted-foreground">
+                  Create single or multi-select questions with images
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                2
+              </div>
+              <div>
+                <p className="font-medium text-sm">Configure Power-ups</p>
+                <p className="text-xs text-muted-foreground">
+                  Enable hints, copy answers, and double points
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                3
+              </div>
+              <div>
+                <p className="font-medium text-sm">Customize Theme</p>
+                <p className="text-xs text-muted-foreground">
+                  Choose colors, backgrounds, and visual effects
+                </p>
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center text-xs font-semibold text-primary shrink-0">
+                4
+              </div>
+              <div>
+                <p className="font-medium text-sm">Host Your Game</p>
+                <p className="text-xs text-muted-foreground">
+                  Start a session and share the game code
+                </p>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Features preview */}
+      <div className="grid gap-3 sm:grid-cols-3">
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30">
+          <Zap className="w-4 h-4 text-amber-500" />
+          <span className="text-sm text-muted-foreground">Power-ups</span>
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30">
+          <Languages className="w-4 h-4 text-blue-500" />
+          <span className="text-sm text-muted-foreground">Multi-language</span>
+        </div>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted/30">
+          <Palette className="w-4 h-4 text-purple-500" />
+          <span className="text-sm text-muted-foreground">Custom themes</span>
+        </div>
+      </div>
     </div>
   );
 }

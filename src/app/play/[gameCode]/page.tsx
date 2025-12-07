@@ -25,7 +25,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode, type QuestionDataWithTranslations } from "@/types";
-import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock } from "lucide-react";
+import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock, Globe, ChevronUp } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
@@ -53,6 +53,7 @@ export default function PlayerGamePage({
   const [joinTheme, setJoinTheme] = useState<any>(null);
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("en");
   const [availableLanguages, setAvailableLanguages] = useState<LanguageCode[]>(["en"]);
+  const [showLanguageSelector, setShowLanguageSelector] = useState(false);
 
   // Power-up state
   const [powerUpState, setPowerUpState] = useState<PlayerPowerUpState>({
@@ -1011,58 +1012,39 @@ export default function PlayerGamePage({
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
           }}
         >
-          {/* Top bar: language and timer */}
-          <div className="px-4 sm:px-8 pt-4">
-            <div className="flex flex-col gap-2 rounded-xl bg-card/70 backdrop-blur-sm border border-border/60 px-3 py-3 shadow-sm">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {availableLanguages.length > 1 ? (
-                  <div className="flex items-center gap-2">
-                    <LanguagesIcon className="w-4 h-4 text-muted-foreground" />
-                    <Select
-                      value={selectedLanguage}
-                      onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
-                    >
-                      <SelectTrigger className="w-[170px] bg-background/80">
-                        <SelectValue>
-                          <span className="flex items-center gap-1.5 text-sm">
-                            {SupportedLanguages[selectedLanguage].flag} {SupportedLanguages[selectedLanguage].nativeName}
-                          </span>
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableLanguages.map((langCode) => (
-                          <SelectItem key={langCode} value={langCode}>
-                            <span className="flex items-center gap-2">
-                              {SupportedLanguages[langCode].flag} {SupportedLanguages[langCode].nativeName}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+          {/* Top bar: Timer only - more prominent (hidden during reveal) */}
+          {!isRevealing && (
+            <div className="px-3 sm:px-6 pt-3 sm:pt-4">
+              <div className="flex flex-col gap-2 rounded-xl bg-card/80 backdrop-blur-sm border border-border/60 px-4 py-3 shadow-lg">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium text-muted-foreground">
+                    Question {gameState.currentQuestionNumber} of {gameState.totalQuestions}
+                  </span>
+                  <div className={`
+                    flex items-center gap-2 px-3 py-1 rounded-full font-bold text-lg tabular-nums
+                    ${timeRemaining <= 5
+                      ? "bg-red-500/20 text-red-500 animate-pulse"
+                      : timeRemaining <= 10
+                        ? "bg-amber-500/20 text-amber-500"
+                        : "bg-primary/20 text-primary"}
+                  `}>
+                    <AlarmClock className="w-4 h-4" />
+                    {timeRemaining}s
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <LanguagesIcon className="w-4 h-4" />
-                    English only
-                  </div>
-                )}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>Question {gameState.currentQuestionIndex + 1}</span>
-                  <span className="text-base font-semibold text-primary">{timeRemaining}s</span>
                 </div>
+                {effectiveCurrentQuestion && (
+                  <Progress
+                    value={(timeRemaining / effectiveCurrentQuestion.timeLimit) * 100}
+                    className={`h-2.5 ${timeRemaining <= 5 ? "[&>div]:bg-red-500" : timeRemaining <= 10 ? "[&>div]:bg-amber-500" : ""}`}
+                  />
+                )}
               </div>
-              {effectiveCurrentQuestion && (
-                <Progress
-                  value={(timeRemaining / effectiveCurrentQuestion.timeLimit) * 100}
-                  className="h-2 bg-muted"
-                />
-              )}
             </div>
-          </div>
+          )}
 
           {/* Question */}
-          <div className="px-8 py-4">
-            <h2 className="text-xl font-bold text-center mb-2">
+          <div className="px-3 sm:px-8 py-3 sm:py-4">
+            <h2 className="text-lg sm:text-xl font-bold text-center mb-2 leading-tight">
               {getTranslatedContent(
                 effectiveCurrentQuestion?.questionText,
                 effectiveCurrentQuestion?.translations,
@@ -1073,11 +1055,11 @@ export default function PlayerGamePage({
               <img
                 src={effectiveCurrentQuestion.imageUrl}
                 alt="Question"
-                className="max-h-32 mx-auto rounded-lg mb-4"
+                className="max-h-24 sm:max-h-32 w-auto mx-auto rounded-lg mb-3 sm:mb-4"
               />
             )}
             {effectiveCurrentQuestion?.questionType === "MULTI_SELECT" && !hasSubmitted && (
-              <p className="text-sm text-center text-muted-foreground mb-2">
+              <p className="text-xs sm:text-sm text-center text-muted-foreground mb-2">
                 Select all that apply
               </p>
             )}
@@ -1102,13 +1084,13 @@ export default function PlayerGamePage({
 
           {/* Power-ups Section */}
           {gameState.status === "QUESTION" && !hasSubmitted && (powerUpState.hintsRemaining > 0 || powerUpState.copyRemaining > 0 || powerUpState.doubleRemaining > 0) && (
-            <div className="px-8 py-4 border-t border-border">
-              <div className="flex items-center gap-2 mb-3">
+            <div className="px-3 sm:px-8 py-3 sm:py-4 border-t border-border">
+              <div className="flex items-center gap-2 mb-2 sm:mb-3">
                 <Zap className="w-4 h-4" />
-                <span className="text-sm font-medium">Power-ups</span>
+                <span className="text-xs sm:text-sm font-medium">Power-ups</span>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-1.5 sm:gap-2">
                 {/* Hint Power-up */}
                 {powerUpState.hintsRemaining > 0 && (
                   <Button
@@ -1116,11 +1098,11 @@ export default function PlayerGamePage({
                     size="sm"
                     onClick={() => handlePowerUpToggle(PowerUpType.HINT)}
                     disabled={powerUpState.usedThisQuestion.has(PowerUpType.HINT)}
-                    className="flex flex-col h-auto py-2"
+                    className="flex flex-col h-auto py-2 px-1 sm:px-2 min-h-[68px] sm:min-h-[76px]"
                   >
-                    <Lightbulb className="w-5 h-5 mb-1" />
-                    <span className="text-xs">Hint</span>
-                    <span className="text-xs text-muted-foreground">
+                    <Lightbulb className="w-5 h-5 sm:w-5 sm:h-5 mb-0.5 sm:mb-1" />
+                    <span className="text-[10px] sm:text-xs">Hint</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                       {powerUpState.hintsRemaining} left
                     </span>
                   </Button>
@@ -1133,11 +1115,11 @@ export default function PlayerGamePage({
                     size="sm"
                     onClick={() => handlePowerUpToggle(PowerUpType.COPY)}
                     disabled={powerUpState.usedThisQuestion.has(PowerUpType.COPY)}
-                    className="flex flex-col h-auto py-2"
+                    className="flex flex-col h-auto py-2 px-1 sm:px-2 min-h-[68px] sm:min-h-[76px]"
                   >
-                    <Users className="w-5 h-5 mb-1" />
-                    <span className="text-xs">Copy</span>
-                    <span className="text-xs text-muted-foreground">
+                    <Users className="w-5 h-5 sm:w-5 sm:h-5 mb-0.5 sm:mb-1" />
+                    <span className="text-[10px] sm:text-xs">Copy</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                       {powerUpState.copyRemaining} left
                     </span>
                   </Button>
@@ -1150,11 +1132,11 @@ export default function PlayerGamePage({
                     size="sm"
                     onClick={() => handlePowerUpToggle(PowerUpType.DOUBLE)}
                     disabled={powerUpState.usedThisQuestion.has(PowerUpType.DOUBLE)}
-                    className="flex flex-col h-auto py-2"
+                    className="flex flex-col h-auto py-2 px-1 sm:px-2 min-h-[68px] sm:min-h-[76px]"
                   >
-                    <Sparkles className="w-5 h-5 mb-1" />
-                    <span className="text-xs">Double</span>
-                    <span className="text-xs text-muted-foreground">
+                    <Sparkles className="w-5 h-5 sm:w-5 sm:h-5 mb-0.5 sm:mb-1" />
+                    <span className="text-[10px] sm:text-xs">2x</span>
+                    <span className="text-[10px] sm:text-xs text-muted-foreground whitespace-nowrap">
                       {powerUpState.doubleRemaining} left
                     </span>
                   </Button>
@@ -1205,7 +1187,7 @@ export default function PlayerGamePage({
           )}
 
           {/* Answers */}
-          <div className="flex-1 px-8 py-4 space-y-4">
+          <div className="flex-1 px-3 sm:px-8 py-3 sm:py-4 space-y-2 sm:space-y-3">
             {effectiveCurrentQuestion?.answers.map((answer, index) => {
               const isSelected = selectedAnswers.has(answer.id);
               const isCorrect = correctIds.includes(answer.id);
@@ -1268,14 +1250,15 @@ export default function PlayerGamePage({
               }
 
               return (
-                <div key={answer.id} className="px-1">
+                <div key={answer.id} className="px-0.5 sm:px-1">
                   <button
                     onClick={() => toggleAnswer(answer.id)}
                     disabled={hasSubmitted || isRevealing}
                     className={`
-                      w-full p-4 text-lg font-medium
-                      transition-all duration-200 flex items-center gap-3
-                      ${!hasSubmitted && !isRevealing ? "active:scale-95" : ""}
+                      w-full p-3 sm:p-4 text-base sm:text-lg font-medium
+                      transition-all duration-200 flex items-center gap-2 sm:gap-3
+                      min-h-[52px] sm:min-h-[60px]
+                      ${!hasSubmitted && !isRevealing ? "active:scale-[0.98]" : ""}
                     `}
                   style={{
                     background,
@@ -1284,19 +1267,19 @@ export default function PlayerGamePage({
                     ...additionalStyles,
                   }}
                 >
-                  <span className="font-bold text-xl">
+                  <span className="font-bold text-lg sm:text-xl shrink-0">
                     {String.fromCharCode(65 + index)}
                   </span>
-                    <span className="flex-1 text-left">
+                    <span className="flex-1 text-left break-words hyphens-auto leading-tight">
                       {getTranslatedContent(
                         answer.answerText,
                         answer.translations,
                         "answerText"
                       )}
                     </span>
-                    {isRevealing && isCorrect && <Check className="w-6 h-6" />}
+                    {isRevealing && isCorrect && <Check className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />}
                     {isRevealing && wasSelected && !isCorrect && (
-                      <X className="w-6 h-6" />
+                      <X className="w-5 h-5 sm:w-6 sm:h-6 shrink-0" />
                     )}
                   </button>
                 </div>
@@ -1356,6 +1339,60 @@ export default function PlayerGamePage({
             <div className="px-8 py-4 text-center text-muted-foreground">
               <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
               Waiting for time to expire...
+            </div>
+          )}
+
+          {/* Collapsible Language Selector at bottom right */}
+          {availableLanguages.length > 1 && (
+            <div className="fixed bottom-4 right-4 z-20">
+              <div className={`
+                bg-card/95 backdrop-blur-sm border border-border rounded-xl shadow-lg
+                transition-all duration-200 overflow-hidden origin-bottom-right
+                ${showLanguageSelector ? "w-64 max-h-[70vh] overflow-y-auto" : "w-auto"}
+              `}>
+                {showLanguageSelector ? (
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium">Select Language</span>
+                      <button
+                        onClick={() => setShowLanguageSelector(false)}
+                        className="text-muted-foreground hover:text-foreground"
+                      >
+                        <ChevronUp className="w-4 h-4" />
+                      </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      {availableLanguages.map((langCode) => (
+                        <button
+                          key={langCode}
+                          onClick={() => {
+                            setSelectedLanguage(langCode);
+                            setShowLanguageSelector(false);
+                          }}
+                          className={`
+                            flex items-center gap-2 px-3 py-2 rounded-lg text-sm
+                            transition-colors
+                            ${selectedLanguage === langCode
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted hover:bg-muted/80"}
+                          `}
+                        >
+                          <span>{SupportedLanguages[langCode].flag}</span>
+                          <span className="truncate">{SupportedLanguages[langCode].nativeName}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setShowLanguageSelector(true)}
+                    className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium hover:bg-muted/50 transition-colors"
+                  >
+                    <Globe className="w-4 h-4" />
+                    <span>{SupportedLanguages[selectedLanguage].flag}</span>
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -1454,39 +1491,39 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
-          className="min-h-screen p-4 relative"
+          className="min-h-screen p-3 sm:p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
           }}
         >
           <BackgroundEffects theme={theme} />
           {/* My Position */}
-          <Card className="mb-6 relative z-10 shadow-xl border-2">
-            <CardContent className="pt-6 text-center">
+          <Card className="mb-4 sm:mb-6 relative z-10 shadow-xl border-2">
+            <CardContent className="pt-4 sm:pt-6 text-center">
               {myPosition <= 3 && isFinished && (
                 <div className="mb-2">
                   {myPosition === 1 && (
-                    <Trophy className="w-12 h-12 mx-auto text-yellow-500" />
+                    <Trophy className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-yellow-500" />
                   )}
                   {myPosition === 2 && (
-                    <Medal className="w-12 h-12 mx-auto text-gray-400" />
+                    <Medal className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-gray-400" />
                   )}
                   {myPosition === 3 && (
-                    <Award className="w-12 h-12 mx-auto text-amber-600" />
+                    <Award className="w-10 h-10 sm:w-12 sm:h-12 mx-auto text-amber-600" />
                   )}
                 </div>
               )}
-              <p className="text-4xl font-bold text-primary">#{myPosition}</p>
-              <p className="text-lg font-medium">{playerName}</p>
-              <p className="text-2xl font-bold mt-2">{myScore?.score || 0} pts</p>
+              <p className="text-3xl sm:text-4xl font-bold text-primary">#{myPosition}</p>
+              <p className="text-base sm:text-lg font-medium truncate max-w-full px-2">{playerName}</p>
+              <p className="text-xl sm:text-2xl font-bold mt-2">{myScore?.score || 0} pts</p>
             </CardContent>
           </Card>
 
           {/* Leaderboard */}
-          <h2 className="text-lg font-bold mb-3 relative z-10">
+          <h2 className="text-base sm:text-lg font-bold mb-2 sm:mb-3 relative z-10">
             {isFinished ? "Final Results" : "Leaderboard"}
           </h2>
-          <div className="space-y-2 relative z-10">
+          <div className="space-y-1.5 sm:space-y-2 relative z-10">
             {displayScores.slice(0, 10).map((player, index) => {
               const isMe =
                 player.name.toLowerCase() === playerName.toLowerCase();
@@ -1494,39 +1531,39 @@ export default function PlayerGamePage({
                 <div
                   key={player.playerId}
                   className={`
-                    flex items-center gap-3 p-3 rounded-lg shadow-lg
+                    flex items-center gap-2 sm:gap-3 p-2 sm:p-3 rounded-lg shadow-lg
                     ${isMe ? "bg-primary/10 ring-2 ring-primary" : "bg-card"}
                   `}
                 >
-                  <span className="font-bold w-6 text-center">{index + 1}</span>
+                  <span className="font-bold w-5 sm:w-6 text-center text-sm sm:text-base">{index + 1}</span>
                   {player.avatarEmoji?.startsWith("/") ? (
                     <img
                       src={player.avatarEmoji}
                       alt={player.name}
-                      className="w-8 h-8 rounded-full object-cover"
+                      className="w-7 h-7 sm:w-8 sm:h-8 rounded-full object-cover shrink-0"
                     />
                   ) : (
-                    <Avatar className="w-8 h-8">
+                    <Avatar className="w-7 h-7 sm:w-8 sm:h-8 shrink-0">
                       <AvatarFallback
                         style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
-                        className={player.avatarEmoji ? "text-xl" : "text-white text-xs"}
+                        className={player.avatarEmoji ? "text-lg sm:text-xl" : "text-white text-xs"}
                       >
                         {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                   )}
-                  <span className={`flex-1 ${isMe ? "font-bold" : ""}`}>
+                  <span className={`flex-1 truncate text-sm sm:text-base ${isMe ? "font-bold" : ""}`}>
                     {player.name}
                     {isMe && " (You)"}
                   </span>
 
                   {/* Power-up indicators */}
                   {"powerUpsUsed" in player && player.powerUpsUsed && player.powerUpsUsed.length > 0 && (
-                    <div className="flex gap-1">
-                      {player.powerUpsUsed.map((usage: { powerUpType: PowerUpType; questionNumber: number }, idx: number) => (
+                    <div className="flex gap-0.5 sm:gap-1 shrink-0">
+                      {player.powerUpsUsed.slice(0, 3).map((usage: { powerUpType: PowerUpType; questionNumber: number }, idx: number) => (
                         <span
                           key={idx}
-                          className="text-xs px-1.5 py-0.5 bg-muted rounded"
+                          className="text-[10px] sm:text-xs px-1 sm:px-1.5 py-0.5 bg-muted rounded"
                           title={`Q${usage.questionNumber}: ${usage.powerUpType}`}
                         >
                           {usage.powerUpType === "hint" && "💡"}
@@ -1534,18 +1571,21 @@ export default function PlayerGamePage({
                           {usage.powerUpType === "double" && "⚡"}
                         </span>
                       ))}
+                      {player.powerUpsUsed.length > 3 && (
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">+{player.powerUpsUsed.length - 3}</span>
+                      )}
                     </div>
                   )}
 
-                  <span className="font-bold text-primary">{player.score}</span>
+                  <span className="font-bold text-primary text-sm sm:text-base shrink-0">{player.score}</span>
                 </div>
               );
             })}
           </div>
 
           {isFinished && (
-            <div className="mt-8 text-center space-y-4">
-              <p className="text-muted-foreground">Thanks for playing!</p>
+            <div className="mt-6 sm:mt-8 text-center space-y-3 sm:space-y-4 relative z-10">
+              <p className="text-sm sm:text-base text-muted-foreground">Thanks for playing!</p>
 
               <CertificateDownloadButton
                 gameCode={gameCode}

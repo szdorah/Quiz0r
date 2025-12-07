@@ -44,8 +44,11 @@ import {
   Shield,
   Lightbulb,
   Sparkles,
+  Search,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
+import { DarkModeToggle } from "@/components/ui/dark-mode-toggle";
 
 export default function HostControlPage({
   params,
@@ -84,6 +87,7 @@ export default function HostControlPage({
   const [shortUrl, setShortUrl] = useState<string | null>(null);
   const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
   const [playerToRemove, setPlayerToRemove] = useState<{ id: string; name: string } | null>(null);
+  const [playerSearch, setPlayerSearch] = useState("");
 
   // Fetch tunnel URL on mount
   useEffect(() => {
@@ -300,48 +304,56 @@ export default function HostControlPage({
         change: 0,
       }));
 
+  // Filter players by search
+  const filteredDisplayScores = playerSearch
+    ? displayScores.filter((player) =>
+        player.name.toLowerCase().includes(playerSearch.toLowerCase())
+      )
+    : displayScores;
+
   return (
     <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-xl font-bold text-primary">
+        <div className="container mx-auto px-2 sm:px-4 py-2 sm:py-3 flex items-center justify-between">
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Link href="/" className="text-lg sm:text-xl font-bold text-primary">
               Quiz0r
             </Link>
-            <Separator orientation="vertical" className="h-6" />
-            <div className="flex items-center gap-2">
-              <span className="font-mono font-bold text-lg">{gameCode}</span>
-              <Badge className={statusColors[gameState.status]}>
+            <Separator orientation="vertical" className="h-4 sm:h-6 hidden sm:block" />
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="font-mono font-bold text-base sm:text-lg">{gameCode}</span>
+              <Badge className={`${statusColors[gameState.status]} text-xs sm:text-sm`}>
                 {gameState.status}
               </Badge>
             </div>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <DarkModeToggle showLabel={false} />
             {tunnelUrl && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={copyExternalUrl}
-                className="gap-2"
+                className="gap-1.5 sm:gap-2 px-2 sm:px-3"
               >
                 {copied ? (
                   <>
                     <Check className="w-4 h-4 text-green-500" />
-                    Copied!
+                    <span className="hidden sm:inline">Copied!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-4 h-4" />
-                    Copy Join URL
+                    <span className="hidden sm:inline">Copy URL</span>
                   </>
                 )}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={openDisplay}>
-              <Monitor className="w-4 h-4 mr-2" />
-              Open Display
-              <ExternalLink className="w-3 h-3 ml-2" />
+            <Button variant="outline" size="sm" onClick={openDisplay} className="px-2 sm:px-3">
+              <Monitor className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">Open Display</span>
+              <ExternalLink className="w-3 h-3 ml-1 sm:ml-2 hidden sm:inline" />
             </Button>
           </div>
         </div>
@@ -353,33 +365,76 @@ export default function HostControlPage({
           <div className="md:col-span-2 space-y-6">
             {/* Game Info */}
             <Card>
-              <CardHeader>
-                <CardTitle>{gameState.quizTitle}</CardTitle>
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg sm:text-xl">{gameState.quizTitle}</CardTitle>
+                  <Badge className={`${statusColors[gameState.status]} text-xs`}>
+                    {gameState.status}
+                  </Badge>
+                </div>
               </CardHeader>
-              <CardContent>
-                <div className="flex items-center gap-8 text-sm">
-                  <div>
-                    <span className="text-muted-foreground">Question: </span>
+              <CardContent className="space-y-4">
+                {/* Stats row */}
+                <div className="flex items-center gap-4 sm:gap-8 text-sm flex-wrap">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-muted-foreground">Q:</span>
                     <span className="font-medium">
-                      {gameState.currentQuestionNumber} /{" "}
-                      {gameState.totalQuestions}
+                      {gameState.currentQuestionNumber}/{gameState.totalQuestions}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-muted-foreground">Players: </span>
+                  <div className="flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-muted-foreground" />
                     <span className="font-medium">
                       {gameState.players.filter((p) => p.isActive).length}
                     </span>
                   </div>
-                  {gameState.status === "QUESTION" && (
-                    <div>
-                      <span className="text-muted-foreground">Time: </span>
-                      <span className="font-bold text-primary">
-                        {timeRemaining}s
-                      </span>
-                    </div>
-                  )}
                 </div>
+
+                {/* Prominent Timer during QUESTION status */}
+                {gameState.status === "QUESTION" && (
+                  <div className="space-y-3">
+                    <div className={`
+                      flex items-center justify-center gap-3 p-4 rounded-xl
+                      ${timeRemaining <= 5
+                        ? "bg-red-500/10 border-2 border-red-500"
+                        : timeRemaining <= 10
+                          ? "bg-amber-500/10 border-2 border-amber-500"
+                          : "bg-primary/10 border-2 border-primary/50"}
+                    `}>
+                      <span className={`
+                        text-4xl sm:text-5xl font-bold tabular-nums
+                        ${timeRemaining <= 5
+                          ? "text-red-500 animate-pulse"
+                          : timeRemaining <= 10
+                            ? "text-amber-500"
+                            : "text-primary"}
+                      `}>
+                        {timeRemaining}
+                      </span>
+                      <span className="text-muted-foreground text-sm">seconds</span>
+                    </div>
+
+                    {/* Answered progress */}
+                    {(() => {
+                      const activeAdmitted = gameState.players.filter(
+                        (p) => p.isActive && p.admissionStatus === "admitted"
+                      );
+                      const answeredCount = activeAdmitted.filter((p) => p.hasAnswered).length;
+                      const progressPercent = activeAdmitted.length > 0
+                        ? (answeredCount / activeAdmitted.length) * 100
+                        : 0;
+                      return (
+                        <div className="space-y-1.5">
+                          <div className="flex items-center justify-between text-sm">
+                            <span className="text-muted-foreground">Answered</span>
+                            <span className="font-medium">{answeredCount} / {activeAdmitted.length}</span>
+                          </div>
+                          <Progress value={progressPercent} className="h-2" />
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </CardContent>
             </Card>
 
@@ -790,37 +845,32 @@ export default function HostControlPage({
 
           {/* Sidebar - Players/Scores */}
           <div className="space-y-6">
-            {/* Admission Control Status */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Shield className="w-4 h-4" />
-                  Admission Control
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-2">
+            {/* Admission Control Status - Compact when auto-admit */}
+            {gameState.autoAdmit ? (
+              <div className="flex items-center gap-2 px-3 py-2 bg-green-100/50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                <Shield className="w-4 h-4 text-green-600 dark:text-green-400" />
+                <span className="text-sm text-green-700 dark:text-green-400">Auto-admit enabled</span>
+              </div>
+            ) : (
+              <Card className="border-yellow-300 dark:border-yellow-700">
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Shield className="w-4 h-4 text-yellow-600" />
+                    Admission Control
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-0">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">Player Admission:</span>
-                    <span className={`text-sm px-2 py-1 rounded-md ${
-                      gameState.autoAdmit
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400"
-                        : "bg-yellow-100 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400"
-                    }`}>
-                      {gameState.autoAdmit ? "Automatic" : "Requires Approval"}
-                    </span>
+                    <span className="text-sm">Requires Approval</span>
+                    {admissionRequests.length > 0 && (
+                      <Badge variant="destructive" className="animate-pulse">
+                        {admissionRequests.length} pending
+                      </Badge>
+                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    {gameState.autoAdmit
-                      ? "New players join automatically"
-                      : "New players require host approval before joining"}
-                  </p>
-                  <p className="text-xs text-muted-foreground italic">
-                    Configure this setting when creating the quiz
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Admission Requests */}
             {admissionRequests.length > 0 && (
@@ -868,15 +918,42 @@ export default function HostControlPage({
             )}
 
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="w-4 h-4" />
-                  Players ({gameState.players.filter((p) => p.isActive).length})
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Users className="w-4 h-4" />
+                    Players ({gameState.players.filter((p) => p.isActive).length})
+                  </div>
+                  {playerSearch && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setPlayerSearch("")}
+                      className="h-7 px-2 text-xs"
+                    >
+                      Clear
+                    </Button>
+                  )}
                 </CardTitle>
+                {/* Search input - always visible */}
+                <div className="relative mt-2">
+                  <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Search players..."
+                    value={playerSearch}
+                    onChange={(e) => setPlayerSearch(e.target.value)}
+                    className="pl-9 h-9"
+                  />
+                </div>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {displayScores.map((player, index) => {
+                  {filteredDisplayScores.length === 0 && playerSearch && (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      No players match "{playerSearch}"
+                    </p>
+                  )}
+                  {filteredDisplayScores.map((player, index) => {
                     const playerInfo = gameState.players.find(
                       (p) => p.id === player.playerId
                     );
@@ -885,96 +962,106 @@ export default function HostControlPage({
                       <div
                         key={player.playerId}
                         className={`
-                          flex items-center gap-3 p-2 rounded-lg
+                          flex items-center gap-3 p-3 rounded-xl border
                           ${!isActive ? "opacity-50" : ""}
-                          ${index === 0 && gameState.status !== "WAITING" ? "bg-yellow-50 dark:bg-yellow-900/10" : ""}
+                          ${index === 0 && gameState.status !== "WAITING"
+                            ? "bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800"
+                            : "bg-card border-border hover:border-primary/30"}
+                          transition-colors
                         `}
                       >
-                        <span className="text-sm font-bold w-5 text-center text-muted-foreground">
+                        <span className="text-base font-bold w-6 text-center text-muted-foreground">
                           {index + 1}
                         </span>
                         {player.avatarEmoji?.startsWith("/") ? (
                           <img
                             src={player.avatarEmoji}
                             alt={player.name}
-                            className="w-8 h-8 rounded-full object-cover"
+                            className="w-10 h-10 rounded-full object-cover ring-2 ring-border"
                           />
                         ) : (
-                          <Avatar className="w-8 h-8">
+                          <Avatar className="w-10 h-10 ring-2 ring-border">
                             <AvatarFallback
                               style={{ backgroundColor: player.avatarEmoji ? "transparent" : player.avatarColor }}
-                              className={player.avatarEmoji ? "text-xl" : "text-white text-xs"}
+                              className={player.avatarEmoji ? "text-2xl" : "text-white text-sm font-medium"}
                             >
                               {player.avatarEmoji || player.name.charAt(0).toUpperCase()}
                             </AvatarFallback>
                           </Avatar>
                         )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium truncate flex items-center gap-1.5">
-                            {player.name}
+                        <div className="flex-1 min-w-0 overflow-hidden">
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold truncate max-w-[120px] sm:max-w-[160px]" title={player.name}>
+                              {player.name}
+                            </p>
                             {player.languageCode && player.languageCode !== "en" && (
                               <span
-                                className="text-sm"
+                                className="text-base shrink-0"
                                 title={SupportedLanguages[player.languageCode]?.nativeName || player.languageCode}
                               >
                                 {SupportedLanguages[player.languageCode]?.flag || ""}
                               </span>
                             )}
-                          </p>
+                          </div>
                           {!isActive && (
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-destructive">
                               Disconnected
                             </p>
                           )}
                         </div>
 
-                        {/* Download Progress Indicator */}
-                        {playerInfo?.downloadStatus?.status === 'loading' && (
-                          <div className="flex items-center gap-2 mr-2">
-                            <Progress
-                              value={playerInfo.downloadStatus.percentage}
-                              className="w-16 h-2"
-                            />
-                            <span className="text-xs text-muted-foreground w-10 text-right">
-                              {Math.round(playerInfo.downloadStatus.percentage)}%
-                            </span>
-                          </div>
-                        )}
-                        {playerInfo?.downloadStatus?.status === 'complete' && (
-                          <Check className="w-4 h-4 text-green-500 mr-2" />
-                        )}
-
-                        {/* Easter Egg Indicator */}
-                        {currentQuestion?.easterEggEnabled &&
-                          easterEggClicks.get(currentQuestion.id)?.some((click) => click.playerId === player.playerId) && (
-                            <span className="text-sm mr-2" title="Clicked easter egg">
-                              🥚
+                        {/* Indicators container */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          {/* Answered indicator during question */}
+                          {gameState.status === "QUESTION" && playerInfo?.hasAnswered && (
+                            <span title="Answered">
+                              <CheckCircle2 className="w-4 h-4 text-green-500" />
                             </span>
                           )}
 
-                        {/* Power-up Indicators */}
-                        {currentQuestion && powerUpUsages.get(currentQuestion.id)
-                          ?.filter((usage) => usage.playerId === player.playerId)
-                          .map((usage, idx) => (
-                            <span
-                              key={idx}
-                              className="text-sm mr-1"
-                              title={`Used ${usage.powerUpType} power-up`}
-                            >
-                              {usage.powerUpType === "hint" && "💡"}
-                              {usage.powerUpType === "copy" && "👥"}
-                              {usage.powerUpType === "double" && "⚡"}
-                            </span>
-                          ))}
+                          {/* Download Progress - compact */}
+                          {playerInfo?.downloadStatus?.status === 'loading' && (
+                            <div className="w-12 h-2 bg-muted rounded-full overflow-hidden" title={`${Math.round(playerInfo.downloadStatus.percentage)}%`}>
+                              <div
+                                className="h-full bg-primary transition-all"
+                                style={{ width: `${playerInfo.downloadStatus.percentage}%` }}
+                              />
+                            </div>
+                          )}
+                          {playerInfo?.downloadStatus?.status === 'complete' && (
+                            <Check className="w-4 h-4 text-green-500" />
+                          )}
 
-                        <span className="font-bold text-primary mr-2">
+                          {/* Easter Egg Indicator */}
+                          {currentQuestion?.easterEggEnabled &&
+                            easterEggClicks.get(currentQuestion.id)?.some((click) => click.playerId === player.playerId) && (
+                              <span className="text-sm" title="Clicked easter egg">🥚</span>
+                            )}
+
+                          {/* Power-up Indicators - using lucide icons */}
+                          {currentQuestion && powerUpUsages.get(currentQuestion.id)
+                            ?.filter((usage) => usage.playerId === player.playerId)
+                            .map((usage, idx) => (
+                              <span
+                                key={idx}
+                                className="flex items-center justify-center w-5 h-5 rounded bg-muted"
+                                title={`Used ${usage.powerUpType} power-up`}
+                              >
+                                {usage.powerUpType === "hint" && <Lightbulb className="w-3 h-3 text-blue-500" />}
+                                {usage.powerUpType === "copy" && <Users className="w-3 h-3 text-purple-500" />}
+                                {usage.powerUpType === "double" && <Sparkles className="w-3 h-3 text-amber-500" />}
+                              </span>
+                            ))}
+                        </div>
+
+                        <span className="font-bold text-primary text-base shrink-0 ml-1 min-w-[40px] text-right">
                           {player.score}
                         </span>
 
                         {/* Remove Player Button */}
                         <button
                           onClick={() => handleRemovePlayer(player.playerId, player.name)}
-                          className="text-destructive hover:bg-destructive/10 p-1 rounded transition-colors"
+                          className="text-destructive hover:bg-destructive/10 p-1.5 rounded-lg transition-colors shrink-0"
                           title="Remove player"
                         >
                           <Trash2 className="w-4 h-4" />
