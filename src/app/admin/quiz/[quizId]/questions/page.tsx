@@ -64,6 +64,7 @@ import {
   Users,
   Sparkles,
   Pencil,
+  Copy,
 } from "lucide-react";
 
 // DnD Kit imports
@@ -385,12 +386,23 @@ export default function QuestionsPage({
   const [activeTranslationTab, setActiveTranslationTab] = useState<string>("en");
   const [availableTranslationLanguages, setAvailableTranslationLanguages] = useState<LanguageCode[]>(["en"]);
   const [savingTranslation, setSavingTranslation] = useState<LanguageCode | null>(null);
+  const [autoTranslatingQuestion, setAutoTranslatingQuestion] = useState<LanguageCode | null>(null);
 
   // Translations dialog state
   const [translationsDialogOpen, setTranslationsDialogOpen] = useState(false);
   const [translationStatuses, setTranslationStatuses] = useState<any[]>([]);
   const [loadingTranslations, setLoadingTranslations] = useState(false);
-  const [translatingLanguage, setTranslatingLanguage] = useState<string | null>(null);
+  const [translatingLanguage, setTranslatingLanguage] = useState<LanguageCode | null>(null);
+  const [confirmTranslateLanguage, setConfirmTranslateLanguage] = useState<LanguageCode | null>(null);
+  const [translationResult, setTranslationResult] = useState<{
+    success: boolean;
+    translated?: number;
+    failed?: number;
+    error?: string;
+  } | null>(null);
+  const [confirmDeleteLanguage, setConfirmDeleteLanguage] = useState<LanguageCode | null>(null);
+  const [deletingLanguage, setDeletingLanguage] = useState<LanguageCode | null>(null);
+  const [deleteResult, setDeleteResult] = useState<{ success: boolean; error?: string } | null>(null);
 
   // DnD sensors
   const sensors = useSensors(
@@ -510,12 +522,18 @@ export default function QuestionsPage({
     }
   }
 
-  async function handleTranslateQuiz(targetLanguage: LanguageCode) {
-    if (!confirm(`Translate entire quiz to ${SupportedLanguages[targetLanguage].name}? This may take a few minutes and will use OpenAI API credits.`)) {
-      return;
-    }
+  function handleTranslateQuiz(targetLanguage: LanguageCode) {
+    setConfirmTranslateLanguage(targetLanguage);
+  }
 
+  async function executeTranslateQuiz() {
+    if (!confirmTranslateLanguage) return;
+
+    const targetLanguage = confirmTranslateLanguage;
+    setConfirmTranslateLanguage(null);
     setTranslatingLanguage(targetLanguage);
+    setTranslationResult(null);
+
     try {
       const res = await fetch(`/api/quizzes/${quizId}/translate`, {
         method: "POST",
@@ -526,23 +544,43 @@ export default function QuestionsPage({
       const data = await res.json();
 
       if (res.ok) {
-        alert(`Success! Translated ${data.translated} question(s) to ${SupportedLanguages[targetLanguage].name}`);
+        setTranslationResult({
+          success: true,
+          translated: data.translated || 0,
+          failed: data.failed || 0,
+        });
         await fetchTranslationStatus();
       } else {
-        alert(data.error || "Translation failed");
+        setTranslationResult({
+          success: false,
+          error: data.error || "Translation failed",
+        });
       }
     } catch (error) {
       console.error("Translation error:", error);
-      alert("Failed to translate quiz");
-    } finally {
-      setTranslatingLanguage(null);
+      setTranslationResult({
+        success: false,
+        error: "Failed to translate quiz. Please try again.",
+      });
     }
   }
 
-  async function handleDeleteLanguage(targetLanguage: LanguageCode) {
-    if (!confirm(`Delete all ${SupportedLanguages[targetLanguage].name} translations? This cannot be undone.`)) {
-      return;
-    }
+  function closeTranslationProgress() {
+    setTranslatingLanguage(null);
+    setTranslationResult(null);
+  }
+
+  function handleDeleteLanguage(targetLanguage: LanguageCode) {
+    setConfirmDeleteLanguage(targetLanguage);
+  }
+
+  async function executeDeleteLanguage() {
+    if (!confirmDeleteLanguage) return;
+
+    const targetLanguage = confirmDeleteLanguage;
+    setConfirmDeleteLanguage(null);
+    setDeletingLanguage(targetLanguage);
+    setDeleteResult(null);
 
     try {
       const res = await fetch(`/api/quizzes/${quizId}/translations/${targetLanguage}`, {
@@ -550,15 +588,20 @@ export default function QuestionsPage({
       });
 
       if (res.ok) {
-        alert(`Successfully deleted ${SupportedLanguages[targetLanguage].name} translations`);
+        setDeleteResult({ success: true });
         await fetchTranslationStatus();
       } else {
-        alert("Failed to delete translations");
+        setDeleteResult({ success: false, error: "Failed to delete translations" });
       }
     } catch (error) {
       console.error("Delete error:", error);
-      alert("Failed to delete translations");
+      setDeleteResult({ success: false, error: "Failed to delete translations" });
     }
+  }
+
+  function closeDeleteProgress() {
+    setDeletingLanguage(null);
+    setDeleteResult(null);
   }
 
   function openTranslationsDialog() {
@@ -642,6 +685,88 @@ export default function QuestionsPage({
       }
     } catch (error) {
       console.error("Failed to load translations:", error);
+    }
+  }
+
+  function addTranslationLanguage(lang: LanguageCode) {
+    if (!availableTranslationLanguages.includes(lang)) {
+      setAvailableTranslationLanguages(prev => [...prev, lang]);
+      setActiveTranslationTab(lang);
+      setQuestionTranslations(prev => ({
+        ...prev,
+        [lang]: { questionText: "", hostNotes: "", hint: "", easterEggButtonText: "" }
+      }));
+    }
+  }
+
+  function getTranslationStatus(lang: LanguageCode): "complete" | "partial" | "empty" {
+    const qt = questionTranslations[lang];
+    if (!qt?.questionText) return "empty";
+
+    const hasAllAnswers = answers.every(a =>
+      answerTranslations[a.id || `answer-${answers.indexOf(a)}`]?.[lang]
+    );
+
+    return qt.questionText && hasAllAnswers ? "complete" : "partial";
+  }
+
+  function copyToTranslation(field: string, value: string, lang: LanguageCode) {
+    setQuestionTranslations(prev => ({
+      ...prev,
+      [lang]: { ...prev[lang], [field]: value }
+    }));
+  }
+
+  function copyAnswerToTranslation(answer: Answer, lang: LanguageCode) {
+    const key = answer.id || `answer-${answers.indexOf(answer)}`;
+    setAnswerTranslations(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), [lang]: answer.answerText }
+    }));
+  }
+
+  function updateQuestionTranslation(lang: LanguageCode, field: string, value: string) {
+    setQuestionTranslations(prev => ({
+      ...prev,
+      [lang]: { ...prev[lang], [field]: value }
+    }));
+  }
+
+  function updateAnswerTranslation(answer: Answer, lang: LanguageCode, value: string) {
+    const key = answer.id || `answer-${answers.indexOf(answer)}`;
+    setAnswerTranslations(prev => ({
+      ...prev,
+      [key]: { ...(prev[key] || {}), [lang]: value }
+    }));
+  }
+
+  async function autoTranslateQuestion(lang: LanguageCode) {
+    if (!editingQuestion) return;
+
+    setAutoTranslatingQuestion(lang);
+    try {
+      const res = await fetch(
+        `/api/quizzes/${quizId}/questions/${editingQuestion.id}/translate`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ targetLanguage: lang }),
+        }
+      );
+
+      if (res.ok) {
+        // Reload translations to get the new AI-translated content
+        await loadQuestionTranslations(editingQuestion.id);
+        setActiveTranslationTab(lang);
+      } else {
+        const data = await res.json();
+        alert(data.error || "Failed to auto-translate question");
+      }
+    } catch (error) {
+      console.error("Failed to auto-translate:", error);
+      alert("Failed to auto-translate question");
+    } finally {
+      setAutoTranslatingQuestion(null);
     }
   }
 
@@ -1119,15 +1244,46 @@ export default function QuestionsPage({
               </DialogHeader>
 
               <Tabs value={activeTranslationTab} onValueChange={setActiveTranslationTab} className="py-4">
-                {/* Show translation tabs only when editing and translations exist */}
-                {editingQuestion && availableTranslationLanguages.length > 1 && (
-                  <TabsList className="grid w-full" style={{ gridTemplateColumns: `repeat(${availableTranslationLanguages.length}, minmax(0, 1fr))` }}>
-                    {availableTranslationLanguages.map((lang) => (
-                      <TabsTrigger key={lang} value={lang}>
-                        {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
-                      </TabsTrigger>
-                    ))}
-                  </TabsList>
+                {/* Translation tabs with Add Language button */}
+                {editingQuestion && (
+                  <div className="flex items-center gap-2 mb-2">
+                    {availableTranslationLanguages.length > 1 && (
+                      <TabsList className="grid" style={{ gridTemplateColumns: `repeat(${availableTranslationLanguages.length}, minmax(0, 1fr))` }}>
+                        {availableTranslationLanguages.map((lang) => (
+                          <TabsTrigger key={lang} value={lang} className="flex items-center gap-1.5">
+                            {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
+                            {lang !== "en" && (
+                              getTranslationStatus(lang) === "complete" ? (
+                                <Check className="w-3 h-3 text-green-500" />
+                              ) : getTranslationStatus(lang) === "partial" ? (
+                                <div className="w-2 h-2 rounded-full bg-yellow-500" />
+                              ) : (
+                                <div className="w-2 h-2 rounded-full bg-muted-foreground/30" />
+                              )
+                            )}
+                          </TabsTrigger>
+                        ))}
+                      </TabsList>
+                    )}
+                    {/* Add Language dropdown */}
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                          <Plus className="w-4 h-4 mr-1" />
+                          Add Language
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent>
+                        {(Object.keys(SupportedLanguages) as LanguageCode[])
+                          .filter(lang => lang !== "en" && !availableTranslationLanguages.includes(lang))
+                          .map(lang => (
+                            <DropdownMenuItem key={lang} onClick={() => addTranslationLanguage(lang)}>
+                              {SupportedLanguages[lang].flag} {SupportedLanguages[lang].name}
+                            </DropdownMenuItem>
+                          ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
                 )}
 
                 {/* English (original) tab */}
@@ -1446,103 +1602,199 @@ export default function QuestionsPage({
                 </div>
                 </TabsContent>
 
-                {/* Translation tabs for other languages */}
+                {/* Translation tabs for other languages - Side by Side Layout */}
                 {availableTranslationLanguages
                   .filter((lang) => lang !== "en")
                   .map((lang) => (
-                    <TabsContent key={lang} value={lang} className="space-y-6 mt-4">
-                      <div className="p-4 bg-muted/50 rounded-lg space-y-4">
-                        <p className="text-sm text-muted-foreground mb-4">
-                          {SupportedLanguages[lang].flag} Editing {SupportedLanguages[lang].nativeName} translation
+                    <TabsContent key={lang} value={lang} className="space-y-4 mt-4">
+                      <div className="p-4 bg-muted/30 rounded-lg space-y-6">
+                        <p className="text-sm font-medium">
+                          {SupportedLanguages[lang].flag} {SupportedLanguages[lang].nativeName} Translation
                         </p>
 
-                        {/* Question Text Translation */}
+                        {/* Question Text - Side by Side */}
                         <div className="space-y-2">
                           <Label>Question</Label>
-                          <Textarea
-                            placeholder={`Enter question in ${SupportedLanguages[lang].nativeName}...`}
-                            value={questionTranslations[lang]?.questionText || ""}
-                            onChange={(e) => {
-                              setQuestionTranslations((prev) => ({
-                                ...prev,
-                                [lang]: {
-                                  ...prev[lang],
-                                  questionText: e.target.value,
-                                },
-                              }));
-                            }}
-                            rows={2}
-                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* English (left) */}
+                            <div className="relative">
+                              <div className="text-sm p-3 bg-muted rounded-lg border min-h-[80px]">
+                                <span className="text-xs text-muted-foreground block mb-1">English</span>
+                                <p className="text-foreground">{questionText}</p>
+                              </div>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="sm"
+                                className="absolute top-2 right-2 h-6 w-6 p-0"
+                                onClick={() => copyToTranslation("questionText", questionText, lang)}
+                                title="Copy to translation"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </Button>
+                            </div>
+                            {/* Translation (right) */}
+                            <Textarea
+                              placeholder={`Enter question in ${SupportedLanguages[lang].nativeName}...`}
+                              value={questionTranslations[lang]?.questionText || ""}
+                              onChange={(e) => updateQuestionTranslation(lang, "questionText", e.target.value)}
+                              rows={3}
+                              className="min-h-[80px]"
+                            />
+                          </div>
                         </div>
 
-                        {/* Host Notes Translation */}
-                        <div className="space-y-2">
-                          <Label>Host Notes (optional)</Label>
-                          <Textarea
-                            placeholder={`Enter host notes in ${SupportedLanguages[lang].nativeName}...`}
-                            value={questionTranslations[lang]?.hostNotes || ""}
-                            onChange={(e) => {
-                              setQuestionTranslations((prev) => ({
-                                ...prev,
-                                [lang]: {
-                                  ...prev[lang],
-                                  hostNotes: e.target.value,
-                                },
-                              }));
-                            }}
-                            rows={2}
-                          />
-                        </div>
+                        {/* Host Notes - Side by Side (only if English has content) */}
+                        {hostNotes && (
+                          <div className="space-y-2">
+                            <Label>Host Notes</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="relative">
+                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[60px]">
+                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
+                                  <p className="text-foreground text-sm">{hostNotes}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-2 right-2 h-6 w-6 p-0"
+                                  onClick={() => copyToTranslation("hostNotes", hostNotes, lang)}
+                                  title="Copy to translation"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                placeholder={`Enter host notes in ${SupportedLanguages[lang].nativeName}...`}
+                                value={questionTranslations[lang]?.hostNotes || ""}
+                                onChange={(e) => updateQuestionTranslation(lang, "hostNotes", e.target.value)}
+                                rows={2}
+                                className="min-h-[60px]"
+                              />
+                            </div>
+                          </div>
+                        )}
 
-                        {/* Hint Translation */}
-                        <div className="space-y-2">
-                          <Label>Hint (optional)</Label>
-                          <Textarea
-                            placeholder={`Enter hint in ${SupportedLanguages[lang].nativeName}...`}
-                            value={questionTranslations[lang]?.hint || ""}
-                            onChange={(e) => {
-                              setQuestionTranslations((prev) => ({
-                                ...prev,
-                                [lang]: {
-                                  ...prev[lang],
-                                  hint: e.target.value,
-                                },
-                              }));
-                            }}
-                            rows={2}
-                          />
-                        </div>
+                        {/* Hint - Side by Side (only if English has content) */}
+                        {hint && (
+                          <div className="space-y-2">
+                            <Label>Hint</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="relative">
+                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[60px]">
+                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
+                                  <p className="text-foreground text-sm">{hint}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-2 right-2 h-6 w-6 p-0"
+                                  onClick={() => copyToTranslation("hint", hint, lang)}
+                                  title="Copy to translation"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <Textarea
+                                placeholder={`Enter hint in ${SupportedLanguages[lang].nativeName}...`}
+                                value={questionTranslations[lang]?.hint || ""}
+                                onChange={(e) => updateQuestionTranslation(lang, "hint", e.target.value)}
+                                rows={2}
+                                className="min-h-[60px]"
+                              />
+                            </div>
+                          </div>
+                        )}
 
-                        {/* Answer Translations */}
-                        <div className="space-y-2">
+                        {/* Easter Egg Button Text - Side by Side (only if enabled) */}
+                        {easterEggEnabled && easterEggButtonText && (
+                          <div className="space-y-2">
+                            <Label>Easter Egg Button Text</Label>
+                            <div className="grid grid-cols-2 gap-3">
+                              <div className="relative">
+                                <div className="text-sm p-3 bg-muted rounded-lg border min-h-[40px]">
+                                  <span className="text-xs text-muted-foreground block mb-1">English</span>
+                                  <p className="text-foreground text-sm">{easterEggButtonText}</p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-2 right-2 h-6 w-6 p-0"
+                                  onClick={() => copyToTranslation("easterEggButtonText", easterEggButtonText, lang)}
+                                  title="Copy to translation"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
+                              <Input
+                                placeholder={`Button text in ${SupportedLanguages[lang].nativeName}...`}
+                                value={questionTranslations[lang]?.easterEggButtonText || ""}
+                                onChange={(e) => updateQuestionTranslation(lang, "easterEggButtonText", e.target.value)}
+                              />
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Answers - Side by Side */}
+                        <div className="space-y-3">
                           <Label>Answers</Label>
                           {answers.map((answer, index) => (
-                            <div key={index} className="space-y-1">
-                              <Label className="text-xs text-muted-foreground">Answer {index + 1}</Label>
+                            <div key={index} className="grid grid-cols-2 gap-3 items-center">
+                              <div className="relative">
+                                <div className="text-sm p-2 bg-muted rounded-lg border flex items-center gap-2">
+                                  {answer.isCorrect && <Check className="w-3 h-3 text-green-500 flex-shrink-0" />}
+                                  <span className="text-foreground">{answer.answerText}</span>
+                                </div>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="sm"
+                                  className="absolute top-1 right-1 h-6 w-6 p-0"
+                                  onClick={() => copyAnswerToTranslation(answer, lang)}
+                                  title="Copy to translation"
+                                >
+                                  <Copy className="w-3 h-3" />
+                                </Button>
+                              </div>
                               <Input
-                                placeholder={`Enter answer in ${SupportedLanguages[lang].nativeName}...`}
+                                placeholder={`Answer in ${SupportedLanguages[lang].nativeName}...`}
                                 value={answerTranslations[answer.id || `answer-${index}`]?.[lang] || ""}
-                                onChange={(e) => {
-                                  const key = answer.id || `answer-${index}`;
-                                  setAnswerTranslations((prev) => ({
-                                    ...prev,
-                                    [key]: {
-                                      ...(prev[key] || {}),
-                                      [lang]: e.target.value,
-                                    },
-                                  }));
-                                }}
+                                onChange={(e) => updateAnswerTranslation(answer, lang, e.target.value)}
                               />
                             </div>
                           ))}
                         </div>
 
-                        <div className="flex justify-end">
+                        {/* Action Buttons */}
+                        <div className="flex justify-between items-center pt-2">
+                          {/* Auto Translate Button */}
                           <Button
                             type="button"
-                            size="sm"
+                            variant="outline"
+                            onClick={() => autoTranslateQuestion(lang)}
+                            disabled={autoTranslatingQuestion === lang || savingTranslation === lang}
+                          >
+                            {autoTranslatingQuestion === lang ? (
+                              <>
+                                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                Translating...
+                              </>
+                            ) : (
+                              <>
+                                <Sparkles className="w-4 h-4 mr-2" />
+                                Auto Translate
+                              </>
+                            )}
+                          </Button>
+
+                          {/* Save Button */}
+                          <Button
+                            type="button"
                             onClick={() => saveTranslationForLanguage(lang)}
-                            disabled={savingTranslation === lang}
+                            disabled={savingTranslation === lang || autoTranslatingQuestion === lang}
                           >
                             {savingTranslation === lang ? (
                               <>
@@ -1905,15 +2157,15 @@ export default function QuestionsPage({
 
       {/* Translations Dialog */}
       <Dialog open={translationsDialogOpen} onOpenChange={setTranslationsDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col overflow-hidden">
+          <DialogHeader className="flex-shrink-0">
             <DialogTitle>Quiz Translations</DialogTitle>
             <DialogDescription>
               Translate your quiz into multiple languages using AI. Players can select their preferred language when joining.
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4 py-4">
+          <div className="space-y-4 py-4 overflow-y-auto flex-1">
             {loadingTranslations ? (
               <div className="flex items-center justify-center py-8">
                 <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
@@ -1959,45 +2211,31 @@ export default function QuestionsPage({
                               </div>
                             </div>
                             <div className="flex gap-2">
-                              {status && isComplete ? (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => handleTranslateQuiz(languageCode)}
-                                    disabled={isTranslating}
-                                  >
-                                    {isTranslating ? (
-                                      <>
-                                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                        Translating...
-                                      </>
-                                    ) : (
-                                      "Re-translate"
-                                    )}
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleDeleteLanguage(languageCode)}
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </Button>
-                                </>
-                              ) : (
+                              <Button
+                                variant={status?.translatedFields > 0 ? "outline" : "default"}
+                                size="sm"
+                                onClick={() => handleTranslateQuiz(languageCode)}
+                                disabled={isTranslating}
+                              >
+                                {isTranslating ? (
+                                  <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Translating...
+                                  </>
+                                ) : status?.translatedFields > 0 ? (
+                                  "Re-translate"
+                                ) : (
+                                  "Translate"
+                                )}
+                              </Button>
+                              {status?.translatedFields > 0 && (
                                 <Button
-                                  onClick={() => handleTranslateQuiz(languageCode)}
-                                  disabled={isTranslating}
+                                  variant="ghost"
                                   size="sm"
+                                  onClick={() => handleDeleteLanguage(languageCode)}
+                                  title="Delete translation"
                                 >
-                                  {isTranslating ? (
-                                    <>
-                                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                                      Translating...
-                                    </>
-                                  ) : (
-                                    "Translate"
-                                  )}
+                                  <Trash2 className="w-4 h-4 text-destructive" />
                                 </Button>
                               )}
                             </div>
@@ -2019,6 +2257,266 @@ export default function QuestionsPage({
               </p>
             </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Translation Dialog */}
+      <Dialog open={!!confirmTranslateLanguage} onOpenChange={(open) => !open && setConfirmTranslateLanguage(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="w-5 h-5 text-primary" />
+              Translate Quiz
+            </DialogTitle>
+            <DialogDescription>
+              {confirmTranslateLanguage && (
+                <>
+                  Translate all questions to{" "}
+                  <strong>
+                    {SupportedLanguages[confirmTranslateLanguage].flag}{" "}
+                    {SupportedLanguages[confirmTranslateLanguage].name}
+                  </strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4 space-y-3">
+            <div className="flex items-start gap-3 p-3 bg-muted rounded-lg">
+              <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-foreground">This action will:</p>
+                <ul className="mt-1 text-muted-foreground space-y-1">
+                  <li>• Take a few minutes to complete</li>
+                  <li>• Use OpenAI API credits</li>
+                  <li>• Overwrite any existing translations for this language</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmTranslateLanguage(null)}>
+              Cancel
+            </Button>
+            <Button onClick={executeTranslateQuiz}>
+              <Sparkles className="w-4 h-4 mr-2" />
+              Start Translation
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Translation Progress Dialog */}
+      <Dialog open={!!translatingLanguage} onOpenChange={(open) => !open && translationResult && closeTranslationProgress()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {!translationResult ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                  Translating...
+                </>
+              ) : translationResult.success ? (
+                <>
+                  <Check className="w-5 h-5 text-green-500" />
+                  Translation Complete
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  Translation Failed
+                </>
+              )}
+            </DialogTitle>
+            {translatingLanguage && (
+              <DialogDescription>
+                {SupportedLanguages[translatingLanguage].flag}{" "}
+                {SupportedLanguages[translatingLanguage].name}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="py-4">
+            {!translationResult ? (
+              // Progress state
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-6">
+                  <div className="relative">
+                    <div className="w-16 h-16 rounded-full border-4 border-muted" />
+                    <div className="absolute inset-0 w-16 h-16 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+                    <Sparkles className="absolute inset-0 m-auto w-6 h-6 text-primary" />
+                  </div>
+                </div>
+                <p className="text-sm text-muted-foreground text-center">
+                  Translating questions using AI...
+                </p>
+                <p className="text-xs text-muted-foreground text-center">
+                  This may take a few minutes depending on the number of questions.
+                </p>
+              </div>
+            ) : translationResult.success ? (
+              // Success state
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <Check className="w-8 h-8 text-green-500" />
+                  </div>
+                </div>
+                <div className="text-center space-y-1">
+                  {(translationResult.translated ?? 0) > 0 ? (
+                    <p className="text-lg font-medium">
+                      {translationResult.translated} question{translationResult.translated !== 1 ? 's' : ''} translated successfully
+                    </p>
+                  ) : (
+                    <p className="text-lg font-medium">
+                      Translation complete
+                    </p>
+                  )}
+                  {(translationResult.failed ?? 0) > 0 && (
+                    <p className="text-sm text-amber-600 dark:text-amber-400">
+                      {translationResult.failed} question{translationResult.failed !== 1 ? 's' : ''} failed
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              // Error state
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <X className="w-8 h-8 text-destructive" />
+                  </div>
+                </div>
+                <p className="text-sm text-center text-muted-foreground">
+                  {translationResult.error}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {translationResult && (
+            <div className="flex justify-end">
+              <Button onClick={closeTranslationProgress}>
+                Done
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Confirm Delete Translation Dialog */}
+      <Dialog open={!!confirmDeleteLanguage} onOpenChange={(open) => !open && setConfirmDeleteLanguage(null)}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-destructive" />
+              Delete Translation
+            </DialogTitle>
+            <DialogDescription>
+              {confirmDeleteLanguage && (
+                <>
+                  Delete all translations for{" "}
+                  <strong>
+                    {SupportedLanguages[confirmDeleteLanguage].flag}{" "}
+                    {SupportedLanguages[confirmDeleteLanguage].name}
+                  </strong>
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <div className="flex items-start gap-3 p-3 bg-destructive/10 rounded-lg">
+              <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="text-sm">
+                <p className="font-medium text-foreground">This action cannot be undone.</p>
+                <p className="mt-1 text-muted-foreground">
+                  All translated content for this language will be permanently deleted.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setConfirmDeleteLanguage(null)}>
+              Cancel
+            </Button>
+            <Button variant="destructive" onClick={executeDeleteLanguage}>
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Translation
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete Progress/Result Dialog */}
+      <Dialog open={!!deletingLanguage} onOpenChange={(open) => !open && deleteResult && closeDeleteProgress()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {!deleteResult ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin text-destructive" />
+                  Deleting...
+                </>
+              ) : deleteResult.success ? (
+                <>
+                  <Check className="w-5 h-5 text-green-500" />
+                  Translation Deleted
+                </>
+              ) : (
+                <>
+                  <AlertCircle className="w-5 h-5 text-destructive" />
+                  Delete Failed
+                </>
+              )}
+            </DialogTitle>
+            {deletingLanguage && (
+              <DialogDescription>
+                {SupportedLanguages[deletingLanguage].flag}{" "}
+                {SupportedLanguages[deletingLanguage].name}
+              </DialogDescription>
+            )}
+          </DialogHeader>
+
+          <div className="py-4">
+            {!deleteResult ? (
+              <div className="flex items-center justify-center py-6">
+                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+              </div>
+            ) : deleteResult.success ? (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+                    <Check className="w-8 h-8 text-green-500" />
+                  </div>
+                </div>
+                <p className="text-center text-muted-foreground">
+                  Translation has been successfully deleted.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-center py-4">
+                  <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+                    <X className="w-8 h-8 text-destructive" />
+                  </div>
+                </div>
+                <p className="text-sm text-center text-muted-foreground">
+                  {deleteResult.error}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {deleteResult && (
+            <div className="flex justify-end">
+              <Button onClick={closeDeleteProgress}>
+                Done
+              </Button>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

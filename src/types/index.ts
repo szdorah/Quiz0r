@@ -20,7 +20,7 @@ export type PowerUpType = (typeof PowerUpType)[keyof typeof PowerUpType];
 
 // Supported languages
 export const SupportedLanguages = {
-  en: { code: 'en', name: 'English', flag: '🇺🇸', nativeName: 'English' },
+  en: { code: 'en', name: 'English', flag: '🇬🇧', nativeName: 'English' },
   es: { code: 'es', name: 'Spanish', flag: '🇪🇸', nativeName: 'Español' },
   fr: { code: 'fr', name: 'French', flag: '🇫🇷', nativeName: 'Français' },
   de: { code: 'de', name: 'German', flag: '🇩🇪', nativeName: 'Deutsch' },
