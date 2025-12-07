@@ -75,7 +75,7 @@ export async function encryptSettings(
   // Create payload with checksum
   const payload: EncryptedPayload = {
     settings,
-    exportedBy: "Quiz Master Settings",
+    exportedBy: "Quiz0r Settings",
     timestamp: new Date().toISOString(),
     checksum: await calculateChecksum(JSON.stringify(settings)),
   };

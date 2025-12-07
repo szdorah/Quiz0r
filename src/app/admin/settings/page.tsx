@@ -178,7 +178,7 @@ export default function SettingsPage() {
       if (res.ok) {
         setMessage({ type: "success", text: "Tunnel stopped" });
         // Clear cached URL from localStorage
-        localStorage.removeItem("quiz-master-base-url");
+        localStorage.removeItem("quiz0r-base-url");
         fetchSettings();
       }
     } catch {

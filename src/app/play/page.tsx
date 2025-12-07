@@ -59,7 +59,7 @@ export default function JoinPage() {
         <Card className="w-full max-w-sm">
           <CardHeader className="text-center">
             <CardTitle className="text-3xl font-bold text-primary">
-              Quiz Master
+              Quiz0r
             </CardTitle>
           </CardHeader>
           <CardContent>

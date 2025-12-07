@@ -354,7 +354,7 @@ export async function generateHostCertificate(
             marginBottom: 10,
           }}
         >
-          QUIZ MASTER
+          QUIZ0R
         </div>
         <div
           style={{
@@ -408,7 +408,7 @@ export async function generateHostCertificate(
           opacity: 0.7,
         }}
       >
-        Powered by Quiz Master
+        Powered by Quiz0r
       </div>
     </div>
   );
@@ -543,7 +543,7 @@ export async function generatePlayerCertificate(
           opacity: 0.7,
         }}
       >
-        Powered by Quiz Master
+        Powered by Quiz0r
       </div>
     </div>
   );

@@ -1,4 +1,4 @@
-# Quiz Master
+# Quiz0r
 
 A real-time multiplayer quiz game application built with Next.js, Socket.io, and Prisma. Host interactive quizzes where players join via QR code on their mobile devices.
 
@@ -69,7 +69,7 @@ The app will be available at http://localhost:3000
 
 ### Customizing Themes
 
-Quiz Master supports three ways to customize your quiz theme:
+Quiz0r supports three ways to customize your quiz theme:
 
 1. **Presets** - Choose from pre-built themes (Ocean, Sunset, Forest, Neon, etc.)
 2. **AI Wizard** - Answer questions and get a custom prompt for ChatGPT/Claude

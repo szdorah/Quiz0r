@@ -11,7 +11,7 @@ export default function AdminLayout({
       <header className="border-b bg-card">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
           <Link href="/admin" className="text-2xl font-bold text-primary">
-            Quiz Master
+            Quiz0r
           </Link>
           <nav className="flex items-center gap-4">
             <Link

@@ -12,7 +12,7 @@ export interface SettingsExportFile {
 
 export interface EncryptedPayload {
   settings: Record<string, string>;
-  exportedBy: "Quiz Master Settings";
+  exportedBy: "Quiz0r Settings";
   timestamp: string;
   checksum: string;
 }

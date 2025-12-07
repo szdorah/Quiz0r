@@ -109,7 +109,7 @@ export async function generateImportPreview(
 // Generate filename with timestamp
 export function generateExportFilename(): string {
   const timestamp = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
-  return `quiz-master-settings-${timestamp}.json`;
+  return `quiz0r-settings-${timestamp}.json`;
 }
 
 // Download file to browser

@@ -1,6 +1,6 @@
 services:
-  quiz-master:
-    container_name: quiz-master
+  quiz0r:
+    container_name: quiz0r
     build: .
     ports:
       - "3000:3000"

@@ -307,7 +307,7 @@ export default function HostControlPage({
         <div className="container mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Link href="/" className="text-xl font-bold text-primary">
-              Quiz Master
+              Quiz0r
             </Link>
             <Separator orientation="vertical" className="h-6" />
             <div className="flex items-center gap-2">
