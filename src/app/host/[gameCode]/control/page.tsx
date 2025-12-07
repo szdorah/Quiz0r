@@ -45,6 +45,7 @@ import {
   Lightbulb,
   Sparkles,
 } from "lucide-react";
+import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
 
 export default function HostControlPage({
   params,
@@ -677,6 +678,10 @@ export default function HostControlPage({
                     <p className="text-xl font-bold text-green-600">
                       Game Complete!
                     </p>
+                    <CertificateDownloadButton
+                      gameCode={gameCode}
+                      type="host"
+                    />
                     <Link href="/host">
                       <Button size="lg" className="w-full">
                         Start New Game

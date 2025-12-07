@@ -28,6 +28,7 @@ import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode,
 import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
+import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
 import { getContrastingTextColor } from "@/lib/color-utils";
 
@@ -1543,8 +1544,16 @@ export default function PlayerGamePage({
           </div>
 
           {isFinished && (
-            <div className="mt-8 text-center">
-              <p className="text-muted-foreground mb-4">Thanks for playing!</p>
+            <div className="mt-8 text-center space-y-4">
+              <p className="text-muted-foreground">Thanks for playing!</p>
+
+              <CertificateDownloadButton
+                gameCode={gameCode}
+                playerId={playerId}
+                playerName={playerName}
+                type="player"
+              />
+
               <Button onClick={() => router.push("/play")}>Play Again</Button>
             </div>
           )}
