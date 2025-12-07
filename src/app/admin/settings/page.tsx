@@ -33,7 +33,12 @@ import {
   ExternalLink,
   Copy,
   Link2,
+  Download,
+  Upload,
+  AlertTriangle,
 } from "lucide-react";
+import { ExportDialog } from "@/components/settings/ExportDialog";
+import { ImportDialog } from "@/components/settings/ImportDialog";
 
 interface SettingsData {
   ngrokToken: string | null;
@@ -65,6 +70,8 @@ export default function SettingsPage() {
   const [showOpenai, setShowOpenai] = useState(false);
   const [savingOpenai, setSavingOpenai] = useState(false);
   const [showRemoveOpenaiDialog, setShowRemoveOpenaiDialog] = useState(false);
+  const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -334,6 +341,40 @@ export default function SettingsPage() {
           {message.text}
         </div>
       )}
+
+      {/* Backup & Restore Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Download className="w-5 h-5" />
+            Backup & Restore
+          </CardTitle>
+          <CardDescription>
+            Export your API keys and settings to an encrypted file for backup or
+            migration.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => setExportDialogOpen(true)}>
+              <Download className="mr-2 h-4 w-4" />
+              Export Settings
+            </Button>
+            <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
+              <Upload className="mr-2 h-4 w-4" />
+              Import Settings
+            </Button>
+          </div>
+
+          <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
+            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+            <p className="text-amber-900 dark:text-amber-100">
+              Your export file is encrypted with a password. Keep your password
+              safe - it cannot be recovered.
+            </p>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Tunnel Card */}
       <Card>
@@ -737,6 +778,33 @@ export default function SettingsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Export/Import Dialogs */}
+      <ExportDialog
+        open={exportDialogOpen}
+        onOpenChange={setExportDialogOpen}
+        settings={{
+          ngrok_token: settings?.ngrokToken || "",
+          shortio_api_key: settings?.shortioApiKey || "",
+          shortio_domain: settings?.shortioDomain || "",
+          openai_api_key: settings?.openaiApiKey || "",
+        }}
+      />
+
+      <ImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        currentSettings={{
+          ngrok_token: settings?.ngrokToken || "",
+          shortio_api_key: settings?.shortioApiKey || "",
+          shortio_domain: settings?.shortioDomain || "",
+          openai_api_key: settings?.openaiApiKey || "",
+        }}
+        onImportSuccess={() => {
+          // Refresh settings after import
+          fetchSettings();
+        }}
+      />
     </div>
   );
 }
