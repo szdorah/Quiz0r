@@ -29,6 +29,7 @@ interface UseSocketOptions {
   role: "host" | "player";
   playerName?: string;
   languageCode?: LanguageCode;
+  enabled?: boolean;  // Allow conditional connection
 }
 
 interface UseSocketReturn {
@@ -71,6 +72,7 @@ export function useSocket({
   role,
   playerName,
   languageCode,
+  enabled = true,  // Default to true for backwards compatibility
 }: UseSocketOptions): UseSocketReturn {
   const socketRef = useRef<TypedSocket | null>(null);
   const latestPlayerName = useRef(playerName);
@@ -118,6 +120,11 @@ export function useSocket({
   }, [languageCode]);
 
   useEffect(() => {
+    // Don't connect if explicitly disabled
+    if (enabled === false) {
+      return;
+    }
+
     // Initialize socket
     const socket: TypedSocket = io({
       transports: ["websocket", "polling"],
@@ -358,7 +365,7 @@ export function useSocket({
     return () => {
       socket.disconnect();
     };
-  }, [gameCode, role]);
+  }, [gameCode, role, enabled]);
 
   // Emit language change without reconnecting
   useEffect(() => {

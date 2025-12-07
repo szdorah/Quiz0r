@@ -21,6 +21,12 @@ export default function AdminLayout({
               Quizzes
             </Link>
             <Link
+              href="/admin/games"
+              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Games
+            </Link>
+            <Link
               href="/host"
               className="text-sm text-muted-foreground hover:text-foreground transition-colors"
             >
