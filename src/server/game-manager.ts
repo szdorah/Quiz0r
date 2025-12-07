@@ -807,8 +807,46 @@ export class GameManager {
       winners,
     });
 
+    // Start certificate generation in background
+    this.startCertificateGeneration(gameCode);
+
     // Clean up
     this.activeGames.delete(gameCode);
+  }
+
+  /**
+   * Start background certificate generation
+   */
+  private async startCertificateGeneration(gameCode: string) {
+    try {
+      // Import dynamically to avoid circular dependencies
+      const { CertificateService } = await import("@/lib/certificate-service");
+
+      // Generate certificates with progress updates
+      const result = await CertificateService.generateAllCertificates({
+        gameCode,
+        onProgress: (data) => {
+          // Emit progress to clients
+          this.io.to(`game:${gameCode}`).emit("certificates:progress", data);
+        },
+      });
+
+      // Check if any failed after auto-retry
+      if (result.failed > 0) {
+        this.io.to(`game:${gameCode}`).emit("certificates:failed", {
+          failedCount: result.failed,
+          certificateIds: result.failedCertificates,
+        });
+      }
+
+      // Emit completion event
+      this.io.to(`game:${gameCode}`).emit("certificates:ready");
+    } catch (error) {
+      console.error("Certificate generation error:", error);
+      this.io.to(`game:${gameCode}`).emit("certificates:error", {
+        message: "Failed to generate certificates",
+      });
+    }
   }
 
   private async handleCancelGame(socket: TypedSocket, data: { gameCode: string }) {

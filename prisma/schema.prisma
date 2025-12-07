@@ -97,7 +97,8 @@ model GameSession {
   updatedAt DateTime  @updatedAt
   endedAt   DateTime?
 
-  players Player[]
+  players      Player[]
+  certificates Certificate[]
 
   @@index([gameCode])
   @@index([status])
@@ -126,6 +127,7 @@ model Player {
   answers         PlayerAnswer[]
   easterEggClicks EasterEggClick[]
   powerUpUsages   PowerUpUsage[]
+  certificates    Certificate[]
 
   @@unique([gameSessionId, name])
   @@index([gameSessionId])
@@ -221,6 +223,31 @@ model AnswerTranslation {
   @@unique([answerId, languageCode])
   @@index([answerId])
   @@index([languageCode])
+}
+
+// Certificate tracking for game completion
+model Certificate {
+  id            String      @id @default(cuid())
+  gameSessionId String
+  gameSession   GameSession @relation(fields: [gameSessionId], references: [id], onDelete: Cascade)
+
+  type      String  // "host" | "player"
+  playerId  String?
+  player    Player? @relation(fields: [playerId], references: [id], onDelete: Cascade)
+
+  filePath     String? // e.g., "/uploads/certificates/ABC123/host-certificate.jpg"
+  status       String  @default("pending") // "pending" | "generating" | "completed" | "failed"
+  errorMessage String?
+  aiMessage    String? // Cached AI congratulations message for player certificates
+  retryCount   Int     @default(0) // Track retry attempts
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  completedAt DateTime?
+
+  @@unique([gameSessionId, type, playerId])
+  @@index([gameSessionId])
+  @@index([status])
 }
 
 // App settings (key-value store)

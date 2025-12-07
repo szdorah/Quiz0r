@@ -29,6 +29,7 @@ import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Z
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
+import { CertificateStatusBanner } from "@/components/certificate/CertificateStatusBanner";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
 import { getContrastingTextColor } from "@/lib/color-utils";
 
@@ -1587,6 +1588,10 @@ export default function PlayerGamePage({
             <div className="mt-6 sm:mt-8 text-center space-y-3 sm:space-y-4 relative z-10">
               <p className="text-sm sm:text-base text-muted-foreground">Thanks for playing!</p>
 
+              {/* Certificate Status Banner */}
+              <CertificateStatusBanner gameCode={gameCode} />
+
+              {/* Download Button */}
               <CertificateDownloadButton
                 gameCode={gameCode}
                 playerId={playerId}

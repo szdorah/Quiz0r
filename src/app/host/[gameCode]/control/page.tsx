@@ -48,6 +48,8 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
+import { CertificateStatusBanner } from "@/components/certificate/CertificateStatusBanner";
+import { CertificateRegenerationPanel } from "@/components/certificate/CertificateRegenerationPanel";
 import { DarkModeToggle } from "@/components/ui/dark-mode-toggle";
 
 export default function HostControlPage({
@@ -733,10 +735,19 @@ export default function HostControlPage({
                     <p className="text-xl font-bold text-green-600">
                       Game Complete!
                     </p>
+
+                    {/* Certificate Status Banner */}
+                    <CertificateStatusBanner gameCode={gameCode} />
+
+                    {/* Download Button */}
                     <CertificateDownloadButton
                       gameCode={gameCode}
                       type="host"
                     />
+
+                    {/* Certificate Regeneration Panel */}
+                    <CertificateRegenerationPanel gameCode={gameCode} />
+
                     <Link href="/host">
                       <Button size="lg" className="w-full">
                         Start New Game

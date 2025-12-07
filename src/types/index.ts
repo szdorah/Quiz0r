@@ -263,6 +263,18 @@ export interface ServerToClientEvents {
     powerUpType: PowerUpType;
     reason: string;
   }) => void;
+  "certificates:progress": (data: {
+    completed: number;
+    total: number;
+    percentage: number;
+    estimatedSecondsRemaining: number;
+  }) => void;
+  "certificates:ready": () => void;
+  "certificates:error": (data: { message: string }) => void;
+  "certificates:failed": (data: {
+    failedCount: number;
+    certificateIds: string[];
+  }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
