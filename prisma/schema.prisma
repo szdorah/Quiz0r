@@ -7,6 +7,16 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Saved themes (user-created)
+model Theme {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  theme       String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
 // Quiz template - reusable for multiple game sessions
 model Quiz {
   id          String        @id @default(cuid())

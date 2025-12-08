@@ -18,6 +18,7 @@ import {
   Upload,
   Loader2,
   FileArchive,
+  Palette,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -144,6 +145,12 @@ export default function AdminDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Link href="/admin/themes">
+            <Button variant="outline">
+              <Palette className="w-4 h-4 mr-2" />
+              Manage Themes
+            </Button>
+          </Link>
           <Button variant="outline" onClick={() => setImportDialogOpen(true)}>
             <Upload className="w-4 h-4 mr-2" />
             Import Quiz
