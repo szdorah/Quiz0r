@@ -27,6 +27,10 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [certStatus, setCertStatus] = useState<{
+    host?: { status: string; errorMessage?: string };
+    players: Record<string, { status: string; errorMessage?: string }>;
+  }>({ players: {} });
 
   // WebSocket for live updates (only for running games)
   const isRunning = game?.status !== "FINISHED";
@@ -61,6 +65,44 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
 
     fetchGameDetails();
   }, [gameId]);
+
+  // Fetch certificate status for finished games
+  useEffect(() => {
+    async function fetchCertificates() {
+      if (!game || game.status !== "FINISHED") return;
+      try {
+        const res = await fetch(
+          `/api/games/${game.gameCode}/certificates/status`,
+          { headers: { "ngrok-skip-browser-warning": "true" } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const hostCert = data.certificates.find((c: any) => c.type === "host");
+        const players: Record<string, { status: string; errorMessage?: string }> =
+          {};
+        data.certificates
+          .filter((c: any) => c.type === "player")
+          .forEach((c: any) => {
+            if (c.playerId) {
+              players[c.playerId] = {
+                status: c.status,
+                errorMessage: c.errorMessage || undefined,
+              };
+            }
+          });
+        setCertStatus({
+          host: hostCert
+            ? { status: hostCert.status, errorMessage: hostCert.errorMessage }
+            : undefined,
+          players,
+        });
+      } catch (error) {
+        console.error("Failed to fetch certificate status:", error);
+      }
+    }
+
+    fetchCertificates();
+  }, [game]);
 
   // Update scores from WebSocket
   useEffect(() => {
@@ -153,12 +195,17 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
 
             {/* Actions */}
             <div className="space-y-2">
-              {!isRunning && (
-                <CertificateDownloadButton
-                  gameCode={game.gameCode}
-                  type="host"
-                />
-              )}
+              {!isRunning &&
+                (certStatus.host?.status === "completed" ? (
+                  <CertificateDownloadButton
+                    gameCode={game.gameCode}
+                    type="host"
+                  />
+                ) : (
+                  <div className="text-sm text-muted-foreground">
+                    Host certificate {certStatus.host ? "not ready" : "unavailable"}
+                  </div>
+                ))}
 
               {!isRunning && (
                 <Button
@@ -227,15 +274,25 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
                       </p>
                     </div>
 
-                    {!isRunning && (
-                      <CertificateDownloadButton
-                        gameCode={game.gameCode}
-                        playerId={player.id}
-                        playerName={player.name}
-                        type="player"
-                        size="sm"
-                      />
-                    )}
+                    {!isRunning &&
+                      (certStatus.players[player.id]?.status === "completed" ? (
+                        <CertificateDownloadButton
+                          gameCode={game.gameCode}
+                          playerId={player.id}
+                          playerName={player.name}
+                          type="player"
+                          size="sm"
+                        />
+                      ) : (
+                        <div className="text-xs text-muted-foreground text-right leading-snug">
+                          Certificate unavailable
+                          <div className="text-[11px]">
+                            {certStatus.players[player.id]?.status
+                              ? `Status: ${certStatus.players[player.id]?.status}`
+                              : "Player not eligible or left early"}
+                          </div>
+                        </div>
+                      ))}
                   </div>
                 ))}
               </div>
