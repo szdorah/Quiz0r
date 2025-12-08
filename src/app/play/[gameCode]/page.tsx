@@ -1966,15 +1966,24 @@ export default function PlayerGamePage({
               {/* Certificate Status Banner */}
               <CertificateStatusBanner gameCode={gameCode} />
 
-              {/* Download Button */}
-              <CertificateDownloadButton
-                gameCode={gameCode}
-                playerId={playerId}
-                playerName={playerName}
-                type="player"
-              />
+              <div className="flex flex-col sm:flex-row sm:justify-center sm:items-center gap-3 sm:gap-4">
+                {/* Download Button */}
+                <CertificateDownloadButton
+                  gameCode={gameCode}
+                  playerId={playerId}
+                  playerName={playerName}
+                  type="player"
+                  className="w-full sm:w-auto"
+                />
 
-              <Button onClick={() => router.push("/play")}>Play Again</Button>
+                <Button
+                  size="lg"
+                  className="w-full sm:w-auto"
+                  onClick={() => router.push("/play")}
+                >
+                  Play Again
+                </Button>
+              </div>
             </div>
           )}
         </div>

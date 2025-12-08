@@ -13,6 +13,7 @@ interface CertificateDownloadButtonProps {
   type: "host" | "player";
   disabled?: boolean;
   size?: "default" | "sm" | "lg"; // Button size
+  className?: string;
 }
 
 export function CertificateDownloadButton({
@@ -22,6 +23,7 @@ export function CertificateDownloadButton({
   type,
   disabled,
   size = "lg", // Default to lg for backwards compatibility
+  className,
 }: CertificateDownloadButtonProps) {
   const [state, setState] = useState<
     "checking" | "ready" | "downloading" | "success" | "error" | "generating"
@@ -195,6 +197,7 @@ export function CertificateDownloadButton({
       disabled={isDisabled}
       variant={state === "success" ? "default" : "outline"}
       size={size}
+      className={className}
     >
       {state === "checking" && (
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
