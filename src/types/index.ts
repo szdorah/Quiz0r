@@ -194,6 +194,50 @@ export interface QuizPreloadData {
   availableLanguages: LanguageCode[];
 }
 
+export type PlayerViewStage =
+  | "connecting"
+  | "waiting"
+  | "section"
+  | "question"
+  | "awaiting-reveal"
+  | "reveal"
+  | "scoreboard"
+  | "finished"
+  | "cancelled"
+  | "removed";
+
+export interface PlayerViewState {
+  stage: PlayerViewStage;
+  playerId: string;
+  playerName: string;
+  languageCode?: LanguageCode;
+  question?: {
+    id: string;
+    questionText: string;
+    questionType: QuestionType;
+    answers: Array<{ id: string; answerText: string; imageUrl?: string | null }>;
+    imageUrl?: string | null;
+    points?: number;
+    questionNumber?: number;
+    totalQuestions?: number;
+  };
+  selectedAnswerIds?: string[];
+  hasSubmitted?: boolean;
+  awaitingReveal?: boolean;
+  timeRemaining?: number;
+  correctAnswerIds?: string[];
+  answerResult?: { correct: boolean; points: number; position: number } | null;
+  score?: number;
+  downloadStatus?: {
+    percentage: number;
+    status: 'idle' | 'loading' | 'complete' | 'error';
+  };
+  scoreboard?: { scores: PlayerScore[]; phase?: "mid" | "final" };
+  message?: string;
+  isActive?: boolean;
+  screenshot?: string | null;
+}
+
 // Socket events - Server to Client
 export interface ServerToClientEvents {
   "game:state": (state: GameState) => void;
@@ -275,6 +319,9 @@ export interface ServerToClientEvents {
     failedCount: number;
     certificateIds: string[];
   }) => void;
+  "monitor:playerViewUpdate": (data: { playerId: string; viewState: PlayerViewState }) => void;
+  "monitor:playerViewSnapshot": (data: { views: Record<string, PlayerViewState> }) => void;
+  "monitor:playerViewRemove": (data: { playerId: string }) => void;
   error: (data: { message: string; code: string }) => void;
 }
 
@@ -290,6 +337,7 @@ export interface ClientToServerEvents {
   "host:skipTimer": (data: { gameCode: string }) => void;
   "host:revealAnswers": (data: { gameCode: string }) => void;
   "host:cancelGame": (data: { gameCode: string }) => void;
+  "host:requestPlayerViews": (data: { gameCode: string }) => void;
   "player:join": (data: { gameCode: string; name: string; languageCode?: LanguageCode }) => void;
   "player:answer": (data: {
     gameCode: string;
@@ -320,4 +368,5 @@ export interface ClientToServerEvents {
     powerUpType: PowerUpType;
     copiedPlayerId?: string;
   }) => void;
+  "player:viewUpdate": (data: { gameCode: string; playerId: string; viewState: PlayerViewState }) => void;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useSocket } from "@/hooks/useSocket";
 import { useQuizPreloader } from "@/hooks/useQuizPreloader";
@@ -24,7 +24,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode, type QuestionDataWithTranslations } from "@/types";
+import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode, type QuestionDataWithTranslations, type PlayerViewState } from "@/types";
 import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock, Globe, ChevronUp, Target } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
@@ -55,6 +55,10 @@ export default function PlayerGamePage({
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>("en");
   const [availableLanguages, setAvailableLanguages] = useState<LanguageCode[]>(["en"]);
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
+  const [knownPlayerId, setKnownPlayerId] = useState<string | null>(null);
+  const screenRef = useRef<HTMLDivElement | null>(null);
+  const latestScreenshot = useRef<string | null>(null);
+  const CAPTURE_INTERVAL_MS = 800;
 
   // Power-up state
   const [powerUpState, setPowerUpState] = useState<PlayerPowerUpState>({
@@ -199,6 +203,17 @@ export default function PlayerGamePage({
     (p) => p.name.toLowerCase() === playerName.toLowerCase()
   )?.id;
 
+  const playerInfo = useMemo(
+    () => gameState?.players.find((p) => p.id === playerId) || null,
+    [gameState?.players, playerId]
+  );
+
+  useEffect(() => {
+    if (playerId) {
+      setKnownPlayerId(playerId);
+    }
+  }, [playerId]);
+
   // Initialize quiz preloader
   const { quizData } = useQuizPreloader({
     gameCode,
@@ -276,6 +291,180 @@ export default function PlayerGamePage({
     // Fallback to original content (English)
     return content;
   };
+
+  const renderedQuestion = useMemo(() => {
+    if (!effectiveCurrentQuestion || !gameState) return null;
+
+    return {
+      id: effectiveCurrentQuestion.id,
+      questionText: getTranslatedContent(
+        effectiveCurrentQuestion.questionText,
+        effectiveCurrentQuestion.translations,
+        "questionText"
+      ),
+      questionType: effectiveCurrentQuestion.questionType,
+      answers: effectiveCurrentQuestion.answers.map((answer) => ({
+        id: answer.id,
+        answerText: getTranslatedContent(
+          answer.answerText,
+          answer.translations,
+          "answerText"
+        ),
+        imageUrl: answer.imageUrl,
+      })),
+      imageUrl: effectiveCurrentQuestion.imageUrl,
+      points: effectiveCurrentQuestion.points,
+      questionNumber: gameState.currentQuestionNumber,
+      totalQuestions: gameState.totalQuestions,
+    };
+  }, [effectiveCurrentQuestion, gameState, selectedLanguage]);
+
+  const monitorViewState = useMemo<PlayerViewState | null>(() => {
+    const resolvedPlayerId = playerId || knownPlayerId;
+    if (!resolvedPlayerId || !playerName) return null;
+
+    if (gameCancelled) {
+      return {
+        stage: "cancelled",
+        playerId: resolvedPlayerId,
+        playerName,
+        languageCode: selectedLanguage,
+        message: "Game cancelled by host",
+        isActive: false,
+      };
+    }
+
+    if (playerRemoved) {
+      return {
+        stage: "removed",
+        playerId: resolvedPlayerId,
+        playerName,
+        languageCode: selectedLanguage,
+        message: removalReason || "You have been removed from the game",
+        isActive: false,
+      };
+    }
+
+    if (!gameState || !connected) {
+      return {
+        stage: "connecting",
+        playerId: resolvedPlayerId,
+        playerName,
+        languageCode: selectedLanguage,
+        message: "Connecting...",
+        isActive: !!playerInfo?.isActive,
+      };
+    }
+
+    let stage: PlayerViewState["stage"] = "waiting";
+    if (gameState.status === "SECTION") {
+      stage = "section";
+    } else if (gameState.status === "QUESTION") {
+      stage = "question";
+    } else if (gameState.status === "REVEALING") {
+      stage = awaitingReveal ? "awaiting-reveal" : "reveal";
+    } else if (gameState.status === "SCOREBOARD") {
+      stage = "scoreboard";
+    } else if (gameState.status === "FINISHED") {
+      stage = "finished";
+    } else if (gameState.status === "WAITING") {
+      stage = "waiting";
+    }
+
+    const scoreboardData =
+      gameState.status === "SCOREBOARD" || gameState.status === "FINISHED"
+        ? { scores, phase: gameState.status === "FINISHED" ? "final" : "mid" as const }
+        : undefined;
+
+    return {
+      stage,
+      playerId: resolvedPlayerId,
+      playerName,
+      languageCode: selectedLanguage,
+      question: renderedQuestion || undefined,
+      selectedAnswerIds: Array.from(selectedAnswers),
+      hasSubmitted,
+      awaitingReveal,
+      timeRemaining,
+      correctAnswerIds: questionEnded?.correctAnswerIds,
+      answerResult,
+      score: playerInfo?.score,
+      downloadStatus: playerInfo?.downloadStatus,
+      scoreboard: scoreboardData,
+      message: removalReason || undefined,
+      isActive: playerInfo?.isActive,
+    };
+  }, [
+    answerResult,
+    awaitingReveal,
+    connected,
+    gameCancelled,
+    gameState,
+    hasSubmitted,
+    playerId,
+    knownPlayerId,
+    playerInfo,
+    playerName,
+    playerRemoved,
+    removalReason,
+    renderedQuestion,
+    scores,
+    selectedAnswers,
+    selectedLanguage,
+    questionEnded,
+    timeRemaining,
+  ]);
+
+  useEffect(() => {
+    if (!socket || !monitorViewState) return;
+
+    socket.emit("player:viewUpdate", {
+      gameCode: gameCode.toUpperCase(),
+      playerId: monitorViewState.playerId,
+      viewState: monitorViewState,
+    });
+  }, [socket, monitorViewState, gameCode]);
+
+  // Capture visual snapshot for monitor (best-effort)
+  useEffect(() => {
+    let interval: NodeJS.Timeout | null = null;
+    let cancelled = false;
+
+    async function captureAndSend() {
+      if (!screenRef.current || !socket || !monitorViewState) return;
+      try {
+        const html2canvas = (await import("html2canvas")).default;
+        const canvas = await html2canvas(screenRef.current, {
+          useCORS: true,
+          logging: false,
+          scale: 0.5,
+          backgroundColor: null,
+          ignoreElements: (el) => el.getAttribute("data-ignore-monitor") === "true",
+        });
+        const screenshot = canvas.toDataURL("image/jpeg", 0.7);
+        latestScreenshot.current = screenshot;
+        if (!cancelled) {
+          socket.emit("player:viewUpdate", {
+            gameCode: gameCode.toUpperCase(),
+            playerId: monitorViewState.playerId,
+            viewState: { ...monitorViewState, screenshot },
+          });
+        }
+      } catch (err) {
+        // fail silently - monitor will show fallback state
+        console.error("Failed to capture monitor view", err);
+      }
+    }
+
+    // Initial capture and then regular cadence
+    captureAndSend();
+    interval = setInterval(captureAndSend, CAPTURE_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      if (interval) clearInterval(interval);
+    };
+  }, [socket, monitorViewState, gameCode]);
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -457,6 +646,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -492,6 +682,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -525,6 +716,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -558,6 +750,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -584,6 +777,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={joinTheme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: joinTheme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -609,6 +803,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={joinTheme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: joinTheme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -631,6 +826,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={joinTheme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: joinTheme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -659,6 +855,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={joinTheme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: joinTheme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -687,6 +884,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={joinTheme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center p-4 relative"
           style={{
             background: joinTheme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -864,6 +1062,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen flex items-center justify-center relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -895,6 +1094,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen relative overflow-hidden"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -1096,6 +1296,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
             <div
+              ref={screenRef}
               className="min-h-screen flex items-center justify-center p-4 relative"
               style={{
                 background: theme?.gradients?.sectionSlide || 'linear-gradient(135deg, hsl(0 0% 35%) 0%, hsl(0 0% 25%) 100%)',
@@ -1150,6 +1351,7 @@ export default function PlayerGamePage({
         <ThemeProvider theme={theme}>
           <BackgroundEffects theme={theme} />
           <div
+            ref={screenRef}
             className="min-h-screen flex flex-col items-center justify-center text-center px-6"
             style={{
               background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -1171,6 +1373,7 @@ export default function PlayerGamePage({
       <ThemeProvider theme={theme}>
         <BackgroundEffects theme={theme} />
         <div
+          ref={screenRef}
           className="min-h-screen flex flex-col overflow-x-hidden"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',
@@ -1655,6 +1858,7 @@ export default function PlayerGamePage({
     return (
       <ThemeProvider theme={theme}>
         <div
+          ref={screenRef}
           className="min-h-screen p-3 sm:p-4 relative"
           style={{
             background: theme?.gradients?.pageBackground || 'linear-gradient(135deg, hsl(0 0% 25%) 0%, hsl(0 0% 15%) 100%)',

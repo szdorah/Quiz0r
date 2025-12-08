@@ -208,12 +208,36 @@ export default function HostControlPage({
   }
 
   function openDisplay() {
-    window.open(
-      `/host/${gameCode}/display`,
+    if (typeof window === "undefined") return;
+    const win = window.open(
+      "",
       "quiz-display",
       "width=1280,height=720"
     );
+    win?.location.replace(`/host/${gameCode}/display`);
   }
+
+  function openMonitor() {
+    if (typeof window === "undefined") return;
+    const win = window.open(
+      "",
+      "quiz-playermonitor",
+      "width=1400,height=900"
+    );
+    win?.location.replace(`/host/${gameCode}/playermonitor`);
+  }
+
+  function handleStartGame() {
+    openDisplay();
+    openMonitor();
+    startGame();
+  }
+
+  useEffect(() => {
+    if (gameState?.status === "ACTIVE" || gameState?.status === "QUESTION" || gameState?.status === "SECTION") {
+      openMonitor();
+    }
+  }, [gameState?.status]);
 
   function handleRemovePlayer(playerId: string, playerName: string) {
     setPlayerToRemove({ id: playerId, name: playerName });
@@ -352,6 +376,11 @@ export default function HostControlPage({
                 )}
               </Button>
             )}
+            <Button variant="outline" size="sm" onClick={openMonitor} className="px-2 sm:px-3">
+              <Eye className="w-4 h-4" />
+              <span className="hidden sm:inline ml-2">Player Monitor</span>
+              <ExternalLink className="w-3 h-3 ml-1 sm:ml-2 hidden sm:inline" />
+            </Button>
             <Button variant="outline" size="sm" onClick={openDisplay} className="px-2 sm:px-3">
               <Monitor className="w-4 h-4" />
               <span className="hidden sm:inline ml-2">Open Display</span>
@@ -456,7 +485,7 @@ export default function HostControlPage({
                           } ready`}
                     </p>
                     <Button
-                      onClick={startGame}
+                      onClick={handleStartGame}
                       disabled={gameState.players.length === 0}
                       size="lg"
                       className="w-full"

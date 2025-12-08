@@ -81,12 +81,20 @@ function HostPageContent() {
 
       if (res.ok) {
         const game = await res.json();
-        // Open display window
-        window.open(
-          `/host/${game.gameCode}/display`,
+        // Open windows synchronously to avoid popup blockers
+        const monitorWin = window.open(
+          "",
+          "quiz-playermonitor",
+          "width=1400,height=900"
+        );
+        monitorWin?.location.replace(`/host/${game.gameCode}/playermonitor`);
+
+        const displayWin = window.open(
+          "",
           "quiz-display",
           "width=1280,height=720"
         );
+        displayWin?.location.replace(`/host/${game.gameCode}/display`);
         // Navigate to control panel
         router.push(`/host/${game.gameCode}/control`);
       } else {
