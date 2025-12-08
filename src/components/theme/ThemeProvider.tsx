@@ -11,9 +11,11 @@ import {
 interface ThemeProviderProps {
   theme: QuizTheme | null;
   children: React.ReactNode;
+  className?: string;
+  fullHeight?: boolean;
 }
 
-export function ThemeProvider({ theme, children }: ThemeProviderProps) {
+export function ThemeProvider({ theme, children, className, fullHeight = true }: ThemeProviderProps) {
   const effectiveTheme = theme || DEFAULT_THEME;
 
   // Generate CSS custom properties from theme
@@ -114,13 +116,20 @@ export function ThemeProvider({ theme, children }: ThemeProviderProps) {
     `;
   }, [effectiveTheme]);
 
+  const containerClasses = useMemo(() => {
+    return ["theme-root", fullHeight ? "min-h-screen" : "", className]
+      .filter(Boolean)
+      .join(" ");
+  }, [className, fullHeight]);
+
   return (
     <div
-      className="theme-root min-h-screen"
+      className={containerClasses}
       style={{
         ...cssVariables,
         background: effectiveTheme.gradients?.pageBackground,
         color: effectiveTheme.colors?.foreground ? `hsl(${effectiveTheme.colors.foreground})` : undefined,
+        minHeight: fullHeight ? "100vh" : "auto",
       }}
       data-theme-blur={effectiveTheme.effects?.blur}
       data-celebration={effectiveTheme.animations?.correctCelebration}
