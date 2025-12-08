@@ -46,6 +46,7 @@ import {
   Download,
   Upload,
   AlertTriangle,
+  Image,
 } from "lucide-react";
 import { ExportDialog } from "@/components/settings/ExportDialog";
 import { ImportDialog } from "@/components/settings/ImportDialog";
@@ -60,6 +61,8 @@ interface SettingsData {
   shortioDomain: string | null;
   openaiApiKey: string | null;
   hasOpenaiApiKey: boolean;
+  unsplashApiKey: string | null;
+  hasUnsplashApiKey: boolean;
 }
 
 export default function SettingsPage() {
@@ -80,6 +83,10 @@ export default function SettingsPage() {
   const [showOpenai, setShowOpenai] = useState(false);
   const [savingOpenai, setSavingOpenai] = useState(false);
   const [showRemoveOpenaiDialog, setShowRemoveOpenaiDialog] = useState(false);
+  const [unsplashApiKeyInput, setUnsplashApiKeyInput] = useState("");
+  const [showUnsplash, setShowUnsplash] = useState(false);
+  const [savingUnsplash, setSavingUnsplash] = useState(false);
+  const [showRemoveUnsplashDialog, setShowRemoveUnsplashDialog] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [removeTokenDialogOpen, setRemoveTokenDialogOpen] = useState(false);
@@ -142,8 +149,9 @@ export default function SettingsPage() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "Token removed" });
-        fetchSettings();
-      }
+    fetchSettings();
+  }
+
     } catch {
       setMessage({ type: "error", text: "Failed to remove token" });
     } finally {
@@ -309,6 +317,58 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to remove OpenAI API key" });
     } finally {
       setSavingOpenai(false);
+    }
+  }
+
+  async function saveUnsplashSettings() {
+    setSavingUnsplash(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unsplashApiKey: unsplashApiKeyInput,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Unsplash API key saved successfully!" });
+        setUnsplashApiKeyInput("");
+        setShowUnsplash(false);
+        fetchSettings();
+      } else {
+        const data = await res.json();
+        setMessage({ type: "error", text: data.error || "Failed to save Unsplash API key" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to save Unsplash API key" });
+    } finally {
+      setSavingUnsplash(false);
+    }
+  }
+
+  async function confirmRemoveUnsplashSettings() {
+    setSavingUnsplash(true);
+    setMessage(null);
+    setShowRemoveUnsplashDialog(false);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unsplashApiKey: "" }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Unsplash API key removed" });
+        fetchSettings();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to remove Unsplash API key" });
+    } finally {
+      setSavingUnsplash(false);
     }
   }
 
@@ -728,6 +788,99 @@ export default function SettingsPage() {
         </CardContent>
       </Card>
 
+      {/* Unsplash Images Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Image className="w-5 h-5" />
+            Unsplash Images
+          </CardTitle>
+          <CardDescription>
+            Provide an Unsplash Access Key to let AI-created quizzes include real images.
+            Get a key at{" "}
+            <a
+              href="https://unsplash.com/developers"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              unsplash.com/developers
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-muted-foreground" />
+              <Label>Unsplash Access Key</Label>
+            </div>
+
+            {settings?.hasUnsplashApiKey ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
+                    {settings.unsplashApiKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRemoveUnsplashDialog(true)}
+                    disabled={savingUnsplash}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  AI quiz creation will fetch topical images from Unsplash.
+                </p>
+              </div>
+            ) : showUnsplash ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Paste your Unsplash access key..."
+                    value={unsplashApiKeyInput}
+                    onChange={(e) => setUnsplashApiKeyInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Stored securely and only used server-side for image lookup.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={saveUnsplashSettings}
+                    disabled={!unsplashApiKeyInput || savingUnsplash}
+                  >
+                    {savingUnsplash ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowUnsplash(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => setShowUnsplash(true)}>
+                <Key className="w-4 h-4 mr-2" />
+                Add Unsplash Access Key
+              </Button>
+            )}
+          </div>
+
+          {settings?.hasUnsplashApiKey && (
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                AI quiz creation will attach images to sections and many questions automatically.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       <AlertDialog open={removeTokenDialogOpen} onOpenChange={setRemoveTokenDialogOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -815,6 +968,38 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Remove Unsplash Confirmation Dialog */}
+      <Dialog open={showRemoveUnsplashDialog} onOpenChange={setShowRemoveUnsplashDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Unsplash Access Key?</DialogTitle>
+            <DialogDescription>
+              AI quiz creation will stop attaching Unsplash images if you remove this key.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveUnsplashDialog(false)}
+              disabled={savingUnsplash}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveUnsplashSettings}
+              disabled={savingUnsplash}
+            >
+              {savingUnsplash ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Remove API Key"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Export/Import Dialogs */}
       <ExportDialog
         open={exportDialogOpen}
@@ -824,6 +1009,7 @@ export default function SettingsPage() {
           shortio_api_key: settings?.shortioApiKey || "",
           shortio_domain: settings?.shortioDomain || "",
           openai_api_key: settings?.openaiApiKey || "",
+          unsplash_api_key: settings?.unsplashApiKey || "",
         }}
       />
 
@@ -835,6 +1021,7 @@ export default function SettingsPage() {
           shortio_api_key: settings?.shortioApiKey || "",
           shortio_domain: settings?.shortioDomain || "",
           openai_api_key: settings?.openaiApiKey || "",
+          unsplash_api_key: settings?.unsplashApiKey || "",
         }}
         onImportSuccess={() => {
           // Refresh settings after import

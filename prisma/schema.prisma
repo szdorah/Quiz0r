@@ -24,6 +24,7 @@ model Quiz {
   description String?
   theme       String?       // JSON string containing QuizTheme
   autoAdmit   Boolean       @default(true) // Auto-admit players by default
+  aiGenerated Boolean       @default(false)
 
   // Power-up Configuration (default: all disabled)
   hintCount          Int @default(0)

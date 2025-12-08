@@ -32,6 +32,11 @@ export async function GET() {
       where: { key: "openai_api_key" },
     });
 
+    // Get Unsplash settings
+    const unsplashApiKeySetting = await prisma.setting.findUnique({
+      where: { key: "unsplash_api_key" },
+    });
+
     const hasToken = !!tokenSetting?.value;
     const maskedToken = tokenSetting?.value
       ? `${tokenSetting.value.slice(0, 8)}...${tokenSetting.value.slice(-4)}`
@@ -48,6 +53,10 @@ export async function GET() {
     const maskedOpenaiApiKey = openaiApiKeySetting?.value
       ? `${openaiApiKeySetting.value.slice(0, 8)}...${openaiApiKeySetting.value.slice(-4)}`
       : null;
+    const hasUnsplashApiKey = !!unsplashApiKeySetting?.value;
+    const maskedUnsplashApiKey = unsplashApiKeySetting?.value
+      ? `${unsplashApiKeySetting.value.slice(0, 8)}...${unsplashApiKeySetting.value.slice(-4)}`
+      : null;
 
     return NextResponse.json({
       ngrokToken: maskedToken,
@@ -59,6 +68,8 @@ export async function GET() {
       shortioDomain,
       openaiApiKey: maskedOpenaiApiKey,
       hasOpenaiApiKey,
+      unsplashApiKey: maskedUnsplashApiKey,
+      hasUnsplashApiKey,
     });
   } catch (error) {
     console.error("Failed to get settings:", error);
@@ -73,7 +84,7 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { ngrokToken, shortioApiKey, shortioDomain, openaiApiKey } = body;
+    const { ngrokToken, shortioApiKey, shortioDomain, openaiApiKey, unsplashApiKey } = body;
 
     if (ngrokToken !== undefined) {
       if (ngrokToken) {
@@ -143,6 +154,20 @@ export async function POST(request: Request) {
         // Remove OpenAI API key
         await prisma.setting.deleteMany({
           where: { key: "openai_api_key" },
+        });
+      }
+    }
+
+    if (unsplashApiKey !== undefined) {
+      if (unsplashApiKey) {
+        await prisma.setting.upsert({
+          where: { key: "unsplash_api_key" },
+          update: { value: unsplashApiKey },
+          create: { key: "unsplash_api_key", value: unsplashApiKey },
+        });
+      } else {
+        await prisma.setting.deleteMany({
+          where: { key: "unsplash_api_key" },
         });
       }
     }

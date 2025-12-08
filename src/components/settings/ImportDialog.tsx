@@ -114,6 +114,9 @@ export function ImportDialog({
       if (newSettings.openai_api_key !== undefined) {
         payload.openaiApiKey = newSettings.openai_api_key;
       }
+      if (newSettings.unsplash_api_key !== undefined) {
+        payload.unsplashApiKey = newSettings.unsplash_api_key;
+      }
 
       // Save settings to database via API
       const response = await fetch("/api/settings", {

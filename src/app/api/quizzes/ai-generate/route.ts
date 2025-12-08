@@ -1,0 +1,58 @@
+import { NextRequest, NextResponse } from "next/server";
+import { generateQuizWithAI } from "@/lib/openai-quiz-generator";
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const {
+      topic,
+      difficulty = "medium",
+      questionCount = 10,
+      sectionCount = 2,
+      additionalNotes,
+    } = body;
+
+    if (!topic || typeof topic !== "string") {
+      return NextResponse.json(
+        { error: "Topic is required to generate a quiz" },
+        { status: 400 }
+      );
+    }
+
+    const parsedQuestionCount = Number(questionCount);
+    const parsedSectionCount = Number(sectionCount);
+
+    const result = await generateQuizWithAI({
+      topic,
+      difficulty,
+      questionCount: Number.isFinite(parsedQuestionCount)
+        ? parsedQuestionCount
+        : 10,
+      sectionCount: Number.isFinite(parsedSectionCount)
+        ? parsedSectionCount
+        : 2,
+      additionalNotes,
+    });
+
+    return NextResponse.json(
+      {
+        ...result,
+        message:
+          "Quiz created by AI. Review every question and answer carefully before hosting.",
+      },
+      { status: 201 }
+    );
+  } catch (error: unknown) {
+    console.error("Failed to generate quiz with AI:", error);
+    const message =
+      error instanceof Error ? error.message : "Failed to generate quiz with AI";
+
+    const status =
+      message.includes("OpenAI API key not configured") ||
+      message.includes("OpenAI API key")
+        ? 400
+        : 500;
+
+    return NextResponse.json({ error: message }, { status });
+  }
+}

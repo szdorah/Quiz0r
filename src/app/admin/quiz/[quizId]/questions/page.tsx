@@ -71,6 +71,7 @@ interface Quiz {
   copyAnswerCount: number;
   doublePointsCount: number;
   questions: Question[];
+  aiGenerated?: boolean;
 }
 
 interface SectionGroup {

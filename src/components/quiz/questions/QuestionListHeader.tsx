@@ -11,6 +11,7 @@ import {
   Languages,
   Download,
   Loader2,
+  Sparkles,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,6 +22,7 @@ import {
 } from "@/components/ui/tooltip";
 import { QuestionStatsBar } from "./QuestionStatsBar";
 import type { TranslationStatus } from "@/types";
+import { Badge } from "@/components/ui/badge";
 
 interface Question {
   id: string;
@@ -36,6 +38,7 @@ interface Quiz {
   title: string;
   hintCount: number;
   questions: Question[];
+  aiGenerated?: boolean;
 }
 
 interface QuestionListHeaderProps {
@@ -78,7 +81,18 @@ export function QuestionListHeader({
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Quizzes
           </Link>
-          <h1 className="text-2xl sm:text-3xl font-bold">{quiz.title}</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl sm:text-3xl font-bold">{quiz.title}</h1>
+            {quiz.aiGenerated && (
+              <Badge
+                variant="outline"
+                className="flex items-center gap-1 text-primary border-primary/40"
+              >
+                <Sparkles className="w-3 h-3" />
+                AI
+              </Badge>
+            )}
+          </div>
         </div>
 
         {/* Action Buttons */}
