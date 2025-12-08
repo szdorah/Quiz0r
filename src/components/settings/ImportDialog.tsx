@@ -100,11 +100,26 @@ export function ImportDialog({
       const exportFile = validateExportFile(fileContent);
       const newSettings = await importSettingsFromFile(exportFile, password);
 
+      // Map snake_case settings from the export into the camelCase API payload
+      const payload: Record<string, string> = {};
+      if (newSettings.ngrok_token !== undefined) {
+        payload.ngrokToken = newSettings.ngrok_token;
+      }
+      if (newSettings.shortio_api_key !== undefined) {
+        payload.shortioApiKey = newSettings.shortio_api_key;
+      }
+      if (newSettings.shortio_domain !== undefined) {
+        payload.shortioDomain = newSettings.shortio_domain;
+      }
+      if (newSettings.openai_api_key !== undefined) {
+        payload.openaiApiKey = newSettings.openai_api_key;
+      }
+
       // Save settings to database via API
       const response = await fetch("/api/settings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(newSettings),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
