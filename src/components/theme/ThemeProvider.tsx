@@ -244,8 +244,10 @@ export function getSelectedAnswerStyle(
   if (!isSelected) return {};
 
   const effectiveTheme = theme || DEFAULT_THEME;
+  // Cap scale so selected answers don't overflow small screens
+  const clampedScale = Math.min(effectiveTheme.selectedAnswer.scale, 1.02);
   return {
     boxShadow: `0 0 0 ${effectiveTheme.selectedAnswer.ringWidth} ${effectiveTheme.selectedAnswer.ringColor}, ${effectiveTheme.selectedAnswer.glow}`,
-    transform: `scale(${effectiveTheme.selectedAnswer.scale})`,
+    transform: `scale(${clampedScale})`,
   };
 }
