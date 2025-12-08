@@ -10,20 +10,23 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { X, ExternalLink } from "lucide-react";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
 import { GameDetail } from "@/types/admin";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface GameSidePanelProps {
   gameId: string | null;
   onClose: () => void;
+  onDeleted: (gameId: string) => void;
 }
 
-export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
+export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps) {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   // WebSocket for live updates (only for running games)
   const isRunning = game?.status !== "FINISHED";
@@ -80,6 +83,36 @@ export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
     }
   }, [scores, game]);
 
+  async function handleDelete() {
+    if (!game) return;
+    const confirmed = confirm(
+      "Delete this game from history? This will remove all player data and certificates."
+    );
+    if (!confirmed) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/games/${game.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success("Game deleted from history");
+        onDeleted(game.id);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      const errorMessage = data?.error || "Failed to delete game";
+      toast.error(errorMessage);
+    } catch (error) {
+      console.error("Failed to delete game:", error);
+      toast.error("Failed to delete game");
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   if (!gameId) return null;
 
   return (
@@ -125,6 +158,22 @@ export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
                   gameCode={game.gameCode}
                   type="host"
                 />
+              )}
+
+              {!isRunning && (
+                <Button
+                  variant="destructive"
+                  className="w-full"
+                  onClick={handleDelete}
+                  disabled={deleting}
+                >
+                  {deleting ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Trash2 className="w-4 h-4 mr-2" />
+                  )}
+                  Delete Game
+                </Button>
               )}
 
               {isRunning && (

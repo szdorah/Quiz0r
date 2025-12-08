@@ -67,3 +67,38 @@ export async function GET(
     );
   }
 }
+
+export async function DELETE(
+  _request: NextRequest,
+  { params }: { params: { gameId: string } }
+) {
+  try {
+    const game = await prisma.gameSession.findUnique({
+      where: { id: params.gameId },
+      select: { status: true }
+    });
+
+    if (!game) {
+      return Response.json({ error: "Game not found" }, { status: 404 });
+    }
+
+    if (game.status !== "FINISHED") {
+      return Response.json(
+        { error: "Only finished games can be deleted" },
+        { status: 400 }
+      );
+    }
+
+    await prisma.gameSession.delete({
+      where: { id: params.gameId }
+    });
+
+    return Response.json({ success: true });
+  } catch (error) {
+    console.error("Failed to delete game:", error);
+    return Response.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
+  }
+}
