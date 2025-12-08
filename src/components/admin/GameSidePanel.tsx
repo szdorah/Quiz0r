@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { X, ExternalLink } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
@@ -162,11 +162,13 @@ export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
                       {player.position}.
                     </span>
 
-                    <Avatar
-                      style={{ backgroundColor: player.avatarColor }}
-                      className="w-10 h-10"
-                    >
-                      {player.avatarEmoji || player.name.charAt(0)}
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback
+                        style={{ backgroundColor: player.avatarColor }}
+                        className="text-lg flex items-center justify-center"
+                      >
+                        {player.avatarEmoji || player.name.charAt(0)}
+                      </AvatarFallback>
                     </Avatar>
 
                     <div className="flex-1">

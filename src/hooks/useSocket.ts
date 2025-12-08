@@ -364,15 +364,30 @@ export function useSocket({
     socket.on("monitor:playerViewUpdate", ({ playerId, viewState }) => {
       setPlayerViews((prev) => {
         const map = new Map(prev);
-        map.set(playerId, viewState);
+        const previous = map.get(playerId);
+        map.set(playerId, {
+          ...previous,
+          ...viewState,
+          // Preserve the last screenshot when updates omit it to avoid flicker
+          screenshot: viewState.screenshot ?? previous?.screenshot ?? null,
+        });
         return map;
       });
     });
 
     socket.on("monitor:playerViewSnapshot", ({ views }) => {
-      const map = new Map<string, PlayerViewState>();
-      Object.entries(views || {}).forEach(([id, view]) => map.set(id, view));
-      setPlayerViews(map);
+      setPlayerViews((prev) => {
+        const map = new Map<string, PlayerViewState>();
+        Object.entries(views || {}).forEach(([id, view]) => {
+          const previous = prev.get(id);
+          map.set(id, {
+            ...previous,
+            ...view,
+            screenshot: view.screenshot ?? previous?.screenshot ?? null,
+          });
+        });
+        return map;
+      });
     });
 
     socket.on("monitor:playerViewRemove", ({ playerId }) => {

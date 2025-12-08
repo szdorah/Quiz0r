@@ -236,8 +236,12 @@ export default function PlayerGamePage({
   // Use preloaded question if available, otherwise fall back to socket-provided question
   const effectiveCurrentQuestion = useMemo<QuestionDataWithTranslations | null>(() => {
     if (quizData && gameState?.currentQuestionIndex !== undefined) {
-      // Use preloaded question data (with translations)
-      return quizData.questions[gameState.currentQuestionIndex];
+      // Preloaded questions may start at a non-zero index when joining mid-game
+      const offset = (quizData.startIndex ?? 0);
+      const localIndex = gameState.currentQuestionIndex - offset;
+      if (localIndex >= 0 && localIndex < quizData.questions.length) {
+        return quizData.questions[localIndex];
+      }
     }
     // Fall back to socket-provided question (cast to include potential translations)
     return currentQuestion as QuestionDataWithTranslations | null;
