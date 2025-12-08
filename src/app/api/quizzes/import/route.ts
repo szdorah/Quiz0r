@@ -88,14 +88,19 @@ export async function POST(request: NextRequest) {
 
     // 6. Upload images and create mapping
     const imageMapping = new Map<string, string>(); // ref -> new URL
-    const imageFiles = Object.keys(zip.files).filter(f => f.startsWith("images/") && !zip.files[f].dir);
+    const imageFiles = Object.keys(zip.files).filter(
+      (f) => f.startsWith("images/") && !zip.files[f].dir && !f.includes("__MACOSX")
+    );
+    console.log(`[quiz-import] Found ${imageFiles.length} images in ZIP`);
 
     for (const imagePath of imageFiles) {
       const imageFile = zip.file(imagePath);
       if (!imageFile) continue;
 
       try {
-        const imageBuffer = await imageFile.async("nodebuffer");
+        // Use uint8array to avoid environment-specific buffer issues, then wrap in Buffer
+        const imageBytes = await imageFile.async("uint8array");
+        const imageBuffer = Buffer.from(imageBytes);
         const newUrl = await uploadImageToStorage(imageBuffer, imagePath);
         imageMapping.set(imagePath, newUrl);
       } catch (error) {
@@ -103,6 +108,7 @@ export async function POST(request: NextRequest) {
         // Continue - image will be null in quiz
       }
     }
+    console.log(`[quiz-import] Uploaded ${imageMapping.size} images`);
 
     // 7. Create new quiz in database
     const newQuiz = await prisma.quiz.create({

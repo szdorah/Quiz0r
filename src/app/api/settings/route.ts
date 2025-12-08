@@ -84,7 +84,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { ngrokToken, shortioApiKey, shortioDomain, openaiApiKey, unsplashApiKey } = body;
+    // Normalize incoming values to avoid persisting accidental whitespace/newlines
+    const normalize = (value: unknown) =>
+      typeof value === "string" ? value.trim() : value;
+
+    const ngrokToken = normalize(body.ngrokToken) as string | undefined;
+    const shortioApiKey = normalize(body.shortioApiKey) as string | undefined;
+    const shortioDomain = normalize(body.shortioDomain) as string | undefined;
+    const openaiApiKey = normalize(body.openaiApiKey) as string | undefined;
+    const unsplashApiKey = normalize(body.unsplashApiKey) as string | undefined;
 
     if (ngrokToken !== undefined) {
       if (ngrokToken) {
