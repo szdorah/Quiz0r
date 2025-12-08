@@ -9,6 +9,16 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ThemePreview, ThemePreviewMini } from "@/components/admin/ThemePreview";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { QuizTheme, DEFAULT_THEME } from "@/types/theme";
 import { parseTheme, validateThemeJson, stringifyTheme } from "@/lib/theme";
 import { THEME_PRESETS, PRESET_LIST } from "@/lib/theme-presets";
@@ -72,6 +82,7 @@ export default function ThemeBuilderPage({ params }: Props) {
   const [generationError, setGenerationError] = useState<string | null>(null);
   const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [wizardAnswers, setWizardAnswers] = useState<ThemeWizardAnswers>({
     topic: "",
     mood: "",
@@ -235,7 +246,6 @@ export default function ThemeBuilderPage({ params }: Props) {
 
   const deleteTheme = async () => {
     if (isNew) return;
-    if (!confirm("Delete this theme? This cannot be undone.")) return;
 
     setDeleting(true);
     try {
@@ -247,6 +257,7 @@ export default function ThemeBuilderPage({ params }: Props) {
       console.error("Failed to delete theme:", err);
     } finally {
       setDeleting(false);
+      setDeleteDialogOpen(false);
     }
   };
 
@@ -282,7 +293,11 @@ export default function ThemeBuilderPage({ params }: Props) {
           <div className="flex flex-col items-end gap-1">
             <div className="flex gap-2">
               {!isNew && (
-                <Button variant="outline" onClick={deleteTheme} disabled={deleting}>
+                <Button
+                  variant="outline"
+                  onClick={() => setDeleteDialogOpen(true)}
+                  disabled={deleting}
+                >
                   <Trash2 className="w-4 h-4 mr-2" />
                   Delete
                 </Button>
@@ -567,6 +582,35 @@ export default function ThemeBuilderPage({ params }: Props) {
           </div>
         </div>
       </main>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this theme?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove this theme from your library. Any quiz using it will fall back to the
+              default theme.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteTheme}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Theme"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

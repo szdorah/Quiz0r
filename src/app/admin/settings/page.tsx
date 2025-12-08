@@ -12,6 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -72,6 +82,7 @@ export default function SettingsPage() {
   const [showRemoveOpenaiDialog, setShowRemoveOpenaiDialog] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [removeTokenDialogOpen, setRemoveTokenDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -119,8 +130,6 @@ export default function SettingsPage() {
   }
 
   async function removeToken() {
-    if (!confirm("Are you sure you want to remove your ngrok token?")) return;
-
     setSaving(true);
     setMessage(null);
 
@@ -139,6 +148,7 @@ export default function SettingsPage() {
       setMessage({ type: "error", text: "Failed to remove token" });
     } finally {
       setSaving(false);
+      setRemoveTokenDialogOpen(false);
     }
   }
 
@@ -404,12 +414,17 @@ export default function SettingsPage() {
               <Label>ngrok Auth Token</Label>
             </div>
 
-            {settings?.hasToken ? (
+              {settings?.hasToken ? (
               <div className="flex items-center gap-4">
                 <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
                   {settings.ngrokToken}
                 </code>
-                <Button variant="outline" size="sm" onClick={removeToken} disabled={saving}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRemoveTokenDialogOpen(true)}
+                  disabled={saving}
+                >
                   Remove
                 </Button>
               </div>
@@ -712,6 +727,27 @@ export default function SettingsPage() {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog open={removeTokenDialogOpen} onOpenChange={setRemoveTokenDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove ngrok token?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop your external tunnel until you add a new token. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={removeToken}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={saving}
+            >
+              {saving ? "Removing..." : "Remove Token"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Remove Short.io Confirmation Dialog */}
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>

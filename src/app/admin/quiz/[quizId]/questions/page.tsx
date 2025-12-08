@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   AlertCircle,
@@ -167,6 +177,8 @@ export default function QuestionsPage({
 
   // Question translation status for individual cards
   const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>>(new Map());
+  const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
 
   useEffect(() => {
     fetchQuiz();
@@ -442,7 +454,7 @@ export default function QuestionsPage({
 
   async function saveTranslationForLanguage(lang: LanguageCode) {
     if (!editingQuestion?.id) {
-      alert("Save the question before editing translations.");
+      toast.error("Save the question before editing translations.");
       return;
     }
 
@@ -477,15 +489,15 @@ export default function QuestionsPage({
       );
 
       if (res.ok) {
-        alert(`Saved ${SupportedLanguages[lang].name} translation`);
+        toast.success(`Saved ${SupportedLanguages[lang].name} translation`);
         await loadQuestionTranslations(editingQuestion.id);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save translation");
+        toast.error(data.error || "Failed to save translation");
       }
     } catch (error) {
       console.error("Failed to save translation:", error);
-      alert("Failed to save translation");
+      toast.error("Failed to save translation");
     } finally {
       setSavingTranslation((current) => (current === lang ? null : current));
     }
@@ -599,11 +611,11 @@ export default function QuestionsPage({
         setActiveTranslationTab(lang);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to auto-translate question");
+        toast.error(data.error || "Failed to auto-translate question");
       }
     } catch (error) {
       console.error("Failed to auto-translate:", error);
-      alert("Failed to auto-translate question");
+      toast.error("Failed to auto-translate question");
     } finally {
       setAutoTranslatingQuestion(null);
     }
@@ -655,7 +667,7 @@ export default function QuestionsPage({
 
   async function saveSection() {
     if (!questionText.trim()) {
-      alert("Section title is required");
+      toast.error("Section title is required");
       return;
     }
 
@@ -691,11 +703,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save section");
+        toast.error(data.error || "Failed to save section");
       }
     } catch (error) {
       console.error("Failed to save section:", error);
-      alert("Failed to save section");
+      toast.error("Failed to save section");
     }
   }
 
@@ -718,11 +730,11 @@ export default function QuestionsPage({
         setImageUrl(data.url);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to upload image");
+        toast.error(data.error || "Failed to upload image");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload image");
+      toast.error("Failed to upload image");
     } finally {
       setUploading(false);
     }
@@ -734,35 +746,35 @@ export default function QuestionsPage({
 
   async function saveQuestion() {
     if (!questionText.trim()) {
-      alert("Question text is required");
+      toast.error("Question text is required");
       return;
     }
 
     const validAnswers = answers.filter((a) => a.answerText.trim());
 
     if (validAnswers.length < 2) {
-      alert("At least 2 answers are required");
+      toast.error("At least 2 answers are required");
       return;
     }
 
     if (!validAnswers.some((a) => a.isCorrect)) {
-      alert("At least one answer must be marked as correct");
+      toast.error("At least one answer must be marked as correct");
       return;
     }
 
     if (easterEggEnabled) {
       if (!easterEggButtonText.trim()) {
-        alert("Easter egg button text is required");
+        toast.error("Easter egg button text is required");
         return;
       }
       if (!easterEggUrl.trim() || !easterEggUrl.match(/^https?:\/\/.+/)) {
-        alert("Easter egg URL must be a valid HTTP/HTTPS URL");
+        toast.error("Easter egg URL must be a valid HTTP/HTTPS URL");
         return;
       }
     }
 
     if (quiz && quiz.hintCount > 0 && !hint.trim()) {
-      alert("Hint is required when Hint power-up is enabled");
+      toast.error("Hint is required when Hint power-up is enabled");
       return;
     }
 
@@ -803,11 +815,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save question");
+        toast.error(data.error || "Failed to save question");
       }
     } catch (error) {
       console.error("Failed to save question:", error);
-      alert("Failed to save question");
+      toast.error("Failed to save question");
     }
   }
 
@@ -843,18 +855,33 @@ export default function QuestionsPage({
     }
   }
 
-  async function deleteQuestion(questionId: string) {
-    if (!confirm("Are you sure you want to delete this question?")) return;
+  function requestDeleteQuestion(questionId: string) {
+    if (!quiz) return;
+    const question = quiz.questions.find((q) => q.id === questionId) || null;
+    setQuestionToDelete(question);
+  }
+
+  async function deleteQuestion() {
+    if (!questionToDelete) return;
+    setDeletingQuestion(true);
 
     try {
-      const res = await fetch(`/api/quizzes/${quizId}/questions/${questionId}`, {
+      const res = await fetch(`/api/quizzes/${quizId}/questions/${questionToDelete.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
+        toast.success("Question deleted");
         fetchQuiz();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || "Failed to delete question");
       }
     } catch (error) {
       console.error("Failed to delete question:", error);
+      toast.error("Failed to delete question");
+    } finally {
+      setDeletingQuestion(false);
+      setQuestionToDelete(null);
     }
   }
 
@@ -889,11 +916,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to duplicate question");
+        toast.error(data.error || "Failed to duplicate question");
       }
     } catch (error) {
       console.error("Failed to duplicate question:", error);
-      alert("Failed to duplicate question");
+      toast.error("Failed to duplicate question");
     }
   }
 
@@ -1033,13 +1060,43 @@ export default function QuestionsPage({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onEdit={openEditDialog}
-        onDelete={deleteQuestion}
+        onDelete={requestDeleteQuestion}
         onDuplicate={duplicateQuestion}
         onAddQuestion={() => {
           resetForm();
           setDialogOpen(true);
         }}
       />
+
+      <AlertDialog open={!!questionToDelete} onOpenChange={(open) => !open && setQuestionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this question?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <strong>{questionToDelete?.questionText || "this question"}</strong>{" "}
+              from the quiz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingQuestion}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteQuestion}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingQuestion}
+            >
+              {deletingQuestion ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Question"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Settings Sidebar */}
       <QuizSettingsSidebar

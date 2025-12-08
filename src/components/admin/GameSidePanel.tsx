@@ -7,6 +7,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -27,6 +37,7 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [certStatus, setCertStatus] = useState<{
     host?: { status: string; errorMessage?: string };
     players: Record<string, { status: string; errorMessage?: string }>;
@@ -127,10 +138,6 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
 
   async function handleDelete() {
     if (!game) return;
-    const confirmed = confirm(
-      "Delete this game from history? This will remove all player data and certificates."
-    );
-    if (!confirmed) return;
 
     setDeleting(true);
     try {
@@ -152,154 +159,186 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
       toast.error("Failed to delete game");
     } finally {
       setDeleting(false);
+      setDeleteDialogOpen(false);
     }
   }
 
   if (!gameId) return null;
 
   return (
-    <Dialog open={!!gameId} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Game: {game?.gameCode}</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={!!gameId} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Game: {game?.gameCode}</DialogTitle>
+          </DialogHeader>
 
-        {loading ? (
-          <div className="py-8 text-center text-muted-foreground">
-            Loading...
-          </div>
-        ) : game ? (
-          <div className="space-y-6">
-            {/* Game Info */}
-            <div>
-              <h3 className="font-bold text-lg">{game.quiz.title}</h3>
-              <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                <Badge variant={isRunning ? "default" : "secondary"}>
-                  {isRunning ? "Running" : "Finished"}
-                </Badge>
-                <span>•</span>
-                <span>{game.playerCount} players</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {game.endedAt
-                  ? `Ended ${format(
-                      new Date(game.endedAt),
-                      "MMM d, yyyy 'at' h:mm a"
-                    )}`
-                  : `Started ${format(
-                      new Date(game.createdAt),
-                      "MMM d, yyyy 'at' h:mm a"
-                    )}`}
-              </p>
+          {loading ? (
+            <div className="py-8 text-center text-muted-foreground">
+              Loading...
             </div>
-
-            {/* Actions */}
-            <div className="space-y-2">
-              {!isRunning &&
-                (certStatus.host?.status === "completed" ? (
-                  <CertificateDownloadButton
-                    gameCode={game.gameCode}
-                    type="host"
-                  />
-                ) : (
-                  <div className="text-sm text-muted-foreground">
-                    Host certificate {certStatus.host ? "not ready" : "unavailable"}
-                  </div>
-                ))}
-
-              {!isRunning && (
-                <Button
-                  variant="destructive"
-                  className="w-full"
-                  onClick={handleDelete}
-                  disabled={deleting}
-                >
-                  {deleting ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Trash2 className="w-4 h-4 mr-2" />
-                  )}
-                  Delete Game
-                </Button>
-              )}
-
-              {isRunning && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() =>
-                    window.open(`/host/${game.gameCode}/control`, "_blank")
-                  }
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Resume Host Control
-                </Button>
-              )}
-            </div>
-
-            {/* Leaderboard */}
-            <div>
-              <h4 className="font-semibold mb-3 flex items-center gap-2">
-                Leaderboard
-                {isRunning && connected && (
-                  <Badge variant="outline" className="text-xs">
-                    Live
+          ) : game ? (
+            <div className="space-y-6">
+              {/* Game Info */}
+              <div>
+                <h3 className="font-bold text-lg">{game.quiz.title}</h3>
+                <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                  <Badge variant={isRunning ? "default" : "secondary"}>
+                    {isRunning ? "Running" : "Finished"}
                   </Badge>
-                )}
-              </h4>
+                  <span>•</span>
+                  <span>{game.playerCount} players</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {game.endedAt
+                    ? `Ended ${format(
+                        new Date(game.endedAt),
+                        "MMM d, yyyy 'at' h:mm a"
+                      )}`
+                    : `Started ${format(
+                        new Date(game.createdAt),
+                        "MMM d, yyyy 'at' h:mm a"
+                      )}`}
+                </p>
+              </div>
 
+              {/* Actions */}
               <div className="space-y-2">
-                {game.allPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card border"
-                  >
-                    <span className="font-bold text-sm w-8">
-                      {player.position}.
-                    </span>
-
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback
-                        style={{ backgroundColor: player.avatarColor }}
-                        className="text-lg flex items-center justify-center"
-                      >
-                        {player.avatarEmoji || player.name.charAt(0)}
-                      </AvatarFallback>
-                    </Avatar>
-
-                    <div className="flex-1">
-                      <p className="font-medium">{player.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {player.totalScore} points
-                      </p>
+                {!isRunning &&
+                  (certStatus.host?.status === "completed" ? (
+                    <CertificateDownloadButton
+                      gameCode={game.gameCode}
+                      type="host"
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Host certificate {certStatus.host ? "not ready" : "unavailable"}
                     </div>
+                  ))}
 
-                    {!isRunning &&
-                      (certStatus.players[player.id]?.status === "completed" ? (
-                        <CertificateDownloadButton
-                          gameCode={game.gameCode}
-                          playerId={player.id}
-                          playerName={player.name}
-                          type="player"
-                          size="sm"
-                        />
-                      ) : (
-                        <div className="text-xs text-muted-foreground text-right leading-snug">
-                          Certificate unavailable
-                          <div className="text-[11px]">
-                            {certStatus.players[player.id]?.status
-                              ? `Status: ${certStatus.players[player.id]?.status}`
-                              : "Player not eligible or left early"}
+                {!isRunning && (
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
+                    )}
+                    Delete Game
+                  </Button>
+                )}
+
+                {isRunning && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() =>
+                      window.open(`/host/${game.gameCode}/control`, "_blank")
+                    }
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Resume Host Control
+                  </Button>
+                )}
+              </div>
+
+              {/* Leaderboard */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  Leaderboard
+                  {isRunning && connected && (
+                    <Badge variant="outline" className="text-xs">
+                      Live
+                    </Badge>
+                  )}
+                </h4>
+
+                <div className="space-y-2">
+                  {game.allPlayers.map((player) => (
+                    <div
+                      key={player.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-card border"
+                    >
+                      <span className="font-bold text-sm w-8">
+                        {player.position}.
+                      </span>
+
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback
+                          style={{ backgroundColor: player.avatarColor }}
+                          className="text-lg flex items-center justify-center"
+                        >
+                          {player.avatarEmoji || player.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1">
+                        <p className="font-medium">{player.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {player.totalScore} points
+                        </p>
+                      </div>
+
+                      {!isRunning &&
+                        (certStatus.players[player.id]?.status === "completed" ? (
+                          <CertificateDownloadButton
+                            gameCode={game.gameCode}
+                            playerId={player.id}
+                            playerName={player.name}
+                            type="player"
+                            size="sm"
+                          />
+                        ) : (
+                          <div className="text-xs text-muted-foreground text-right leading-snug">
+                            Certificate unavailable
+                            <div className="text-[11px]">
+                              {certStatus.players[player.id]?.status
+                                ? `Status: ${certStatus.players[player.id]?.status}`
+                                : "Player not eligible or left early"}
+                            </div>
                           </div>
-                        </div>
-                      ))}
-                  </div>
-                ))}
+                        ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this game?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all player data and certificates for game{" "}
+              <strong>{game?.gameCode}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Game"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

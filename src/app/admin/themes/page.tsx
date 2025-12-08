@@ -10,6 +10,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { ThemePreviewMini } from "@/components/admin/ThemePreview";
 import { DEFAULT_THEME } from "@/types/theme";
 import { THEME_PRESETS, PRESET_LIST } from "@/lib/theme-presets";
@@ -28,6 +38,7 @@ export default function ThemeLibraryPage() {
   const [customThemes, setCustomThemes] = useState<ThemeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [themeToDelete, setThemeToDelete] = useState<ThemeRecord | null>(null);
 
   useEffect(() => {
     fetchThemes();
@@ -48,14 +59,15 @@ export default function ThemeLibraryPage() {
     }
   }
 
-  async function deleteTheme(themeId: string) {
-    if (!confirm("Delete this theme? This cannot be undone.")) return;
+  async function deleteTheme() {
+    if (!themeToDelete) return;
 
-    setDeletingId(themeId);
+    setDeletingId(themeToDelete.id);
     try {
-      const res = await fetch(`/api/themes/${themeId}`, { method: "DELETE" });
+      const res = await fetch(`/api/themes/${themeToDelete.id}`, { method: "DELETE" });
       if (res.ok) {
-        setCustomThemes((prev) => prev.filter((t) => t.id !== themeId));
+        setCustomThemes((prev) => prev.filter((t) => t.id !== themeToDelete.id));
+        setThemeToDelete(null);
       }
     } catch (err) {
       console.error("Failed to delete theme:", err);
@@ -166,7 +178,7 @@ export default function ThemeLibraryPage() {
                           <Button
                             variant="ghost"
                             size="icon"
-                            onClick={() => deleteTheme(theme.id)}
+                            onClick={() => setThemeToDelete(theme)}
                             disabled={!!deletingId}
                           >
                             <Trash2 className="w-4 h-4 text-destructive" />
@@ -181,6 +193,28 @@ export default function ThemeLibraryPage() {
           </CardContent>
         </Card>
       </div>
+
+      <AlertDialog open={!!themeToDelete} onOpenChange={(open) => !open && setThemeToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this theme?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove the theme <strong>{themeToDelete?.name}</strong>. Quizzes using it will fall
+              back to the default styling.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteTheme}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!!deletingId}
+            >
+              {deletingId ? "Deleting..." : "Delete Theme"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -11,6 +11,16 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Plus,
   Pencil,
   Trash2,
@@ -48,6 +58,8 @@ export default function AdminDashboard() {
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [quizToDelete, setQuizToDelete] = useState<Quiz | null>(null);
+  const [deletingQuizId, setDeletingQuizId] = useState<string | null>(null);
 
   useEffect(() => {
     fetchQuizzes();
@@ -67,18 +79,22 @@ export default function AdminDashboard() {
     }
   }
 
-  async function deleteQuiz(quizId: string) {
-    if (!confirm("Are you sure you want to delete this quiz?")) return;
+  async function deleteQuiz() {
+    if (!quizToDelete) return;
+    setDeletingQuizId(quizToDelete.id);
 
     try {
-      const res = await fetch(`/api/quizzes/${quizId}`, {
+      const res = await fetch(`/api/quizzes/${quizToDelete.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
-        setQuizzes(quizzes.filter((q) => q.id !== quizId));
+        setQuizzes((prev) => prev.filter((q) => q.id !== quizToDelete.id));
+        setQuizToDelete(null);
       }
     } catch (error) {
       console.error("Failed to delete quiz:", error);
+    } finally {
+      setDeletingQuizId(null);
     }
   }
 
@@ -305,8 +321,9 @@ export default function AdminDashboard() {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => deleteQuiz(quiz.id)}
+                    onClick={() => setQuizToDelete(quiz)}
                     className="text-destructive hover:text-destructive"
+                    disabled={deletingQuizId === quiz.id}
                   >
                     <Trash2 className="w-3 h-3" />
                   </Button>
@@ -316,6 +333,28 @@ export default function AdminDashboard() {
           ))}
         </div>
       )}
+
+      <AlertDialog open={!!quizToDelete} onOpenChange={(open) => !open && setQuizToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this quiz?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete <strong>{quizToDelete?.title}</strong> and all of its questions.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={!!deletingQuizId}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteQuiz}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={!!deletingQuizId}
+            >
+              {deletingQuizId ? "Deleting..." : "Delete Quiz"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
