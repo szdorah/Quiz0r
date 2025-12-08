@@ -47,6 +47,7 @@ import {
   Upload,
   AlertTriangle,
   Image,
+  Wand2,
 } from "lucide-react";
 import { ExportDialog } from "@/components/settings/ExportDialog";
 import { ImportDialog } from "@/components/settings/ImportDialog";
@@ -699,11 +700,11 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5" />
-            OpenAI Translation
+            <Wand2 className="w-5 h-5" />
+            OpenAI
           </CardTitle>
           <CardDescription>
-            Enable quiz translation to multiple languages using OpenAI GPT-4o.
+            Power AI-written quizzes, theme generation, translations, and certificate messages with OpenAI GPT-4o.
             Get an API key at{" "}
             <a
               href="https://platform.openai.com/api-keys"
@@ -779,9 +780,10 @@ export default function SettingsPage() {
           {settings?.hasOpenaiApiKey && (
             <div className="pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                With OpenAI translation enabled, you can translate quizzes to 10+ languages
-                including Spanish, French, German, Hebrew, Japanese, Chinese, Arabic, Portuguese,
-                Russian, and Italian. Players can select their preferred language when joining.
+                With OpenAI enabled, you can auto-write quizzes, generate themes from wizard answers,
+                translate quizzes to 10+ languages (Spanish, French, German, Hebrew, Japanese, Chinese,
+                Arabic, Portuguese, Russian, Italian), and craft AI congratulatory certificate messages.
+                Players can select their preferred language when joining.
               </p>
             </div>
           )}
