@@ -1459,9 +1459,9 @@ export class GameManager {
     const payload: Record<string, PlayerViewState> = {};
 
     if (views) {
-      for (const [playerId, view] of views.entries()) {
+      views.forEach((view, playerId) => {
         payload[playerId] = view;
-      }
+      });
     }
 
     socket.emit("monitor:playerViewSnapshot", { views: payload });

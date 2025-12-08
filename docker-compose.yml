@@ -1,7 +1,10 @@
 services:
   quiz0r:
+    image: quiz0r:latest
     container_name: quiz0r
-    build: .
+    build:
+      context: .
+      target: runner
     ports:
       - "3000:3000"
     volumes:

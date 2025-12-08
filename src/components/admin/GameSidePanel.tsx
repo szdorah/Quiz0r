@@ -122,14 +122,18 @@ export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps
         prev
           ? {
               ...prev,
-              allPlayers: scores.map((s, idx) => ({
-                id: s.playerId,
-                name: s.name,
-                avatarColor: s.avatarColor,
-                avatarEmoji: s.avatarEmoji || null,
-                totalScore: s.score,
-                position: idx + 1,
-              })),
+              allPlayers: scores.map((s, idx) => {
+                const existing = prev.allPlayers.find((p) => p.id === s.playerId);
+                return {
+                  id: s.playerId,
+                  name: s.name,
+                  avatarColor: s.avatarColor,
+                  avatarEmoji: s.avatarEmoji || null,
+                  totalScore: s.score,
+                  position: idx + 1,
+                  isActive: existing?.isActive ?? true,
+                };
+              }),
             }
           : null
       );

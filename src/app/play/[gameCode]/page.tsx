@@ -377,7 +377,11 @@ export default function PlayerGamePage({
 
     const scoreboardData =
       gameState.status === "SCOREBOARD" || gameState.status === "FINISHED"
-        ? { scores, phase: gameState.status === "FINISHED" ? "final" : "mid" as const }
+        ? (() => {
+            const phase: "mid" | "final" =
+              gameState.status === "FINISHED" ? "final" : "mid";
+            return { scores, phase };
+          })()
         : undefined;
 
     return {
