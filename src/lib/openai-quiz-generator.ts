@@ -166,7 +166,7 @@ function buildPrompt(options: QuizGenerationOptions, targetQuestionCount: number
   const notes = options.additionalNotes?.trim();
   const sectionCount = Math.max(0, options.sectionCount);
 
-  return `You are an experienced quiz master. Create a fully-written trivia quiz in ENGLISH ONLY (US English).
+  return `You are an experienced quiz master. Create a fully-written trivia quiz in ENGLISH ONLY (UK English).
 
 Quiz requirements:
 - Theme: ${safeTopic}
@@ -381,7 +381,7 @@ export async function generateQuizWithAI(options: QuizGenerationOptions) {
       {
         role: "system",
         content:
-          "You generate structured quiz JSON for a trivia game. Always respond with strict JSON and keep every string in English (US).",
+          "You generate structured quiz JSON for a trivia game. Always respond with strict JSON and keep every string in English (UK).",
       },
       { role: "user", content: prompt },
     ],
