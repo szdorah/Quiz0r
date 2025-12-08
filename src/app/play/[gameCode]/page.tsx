@@ -1003,7 +1003,7 @@ export default function PlayerGamePage({
                   <div className="space-y-2">
                     <label className="text-sm font-medium flex items-center gap-2">
                       <LanguagesIcon className="w-4 h-4" />
-                      Select Language
+                      Select Quiz Questions/Answer Language
                     </label>
                     <Select
                       value={selectedLanguage}
@@ -1719,8 +1719,8 @@ export default function PlayerGamePage({
               `}>
                 {showLanguageSelector ? (
                   <div className="p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">Select Language</span>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium">Select Quiz Questions/Answer Language</span>
                       <button
                         onClick={() => setShowLanguageSelector(false)}
                         className="text-muted-foreground hover:text-foreground"
