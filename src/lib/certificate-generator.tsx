@@ -402,13 +402,16 @@ export async function generateHostCertificate(
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
           marginTop: "auto",
           paddingTop: 40,
           fontSize: 20,
           opacity: 0.7,
         }}
       >
-        Powered by Quiz0r
+        <div>Powered by Quiz0r</div>
+        <div style={{ fontSize: 16 }}>Available at quiz0r.dev</div>
       </div>
     </div>
   );
@@ -537,13 +540,16 @@ export async function generatePlayerCertificate(
       <div
         style={{
           display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
           marginTop: "auto",
           paddingTop: 40,
           fontSize: 20,
           opacity: 0.7,
         }}
       >
-        Powered by Quiz0r
+        <div>Powered by Quiz0r</div>
+        <div style={{ fontSize: 16 }}>Available at quiz0r.dev</div>
       </div>
     </div>
   );
