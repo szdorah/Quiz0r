@@ -54,15 +54,19 @@ import { ImportDialog } from "@/components/settings/ImportDialog";
 
 interface SettingsData {
   ngrokToken: string | null;
+  ngrokTokenRaw: string | null;
   hasToken: boolean;
   tunnelRunning: boolean;
   tunnelUrl: string | null;
   shortioApiKey: string | null;
+  shortioApiKeyRaw: string | null;
   hasShortioApiKey: boolean;
   shortioDomain: string | null;
   openaiApiKey: string | null;
+  openaiApiKeyRaw: string | null;
   hasOpenaiApiKey: boolean;
   unsplashApiKey: string | null;
+  unsplashApiKeyRaw: string | null;
   hasUnsplashApiKey: boolean;
 }
 
@@ -1007,11 +1011,11 @@ export default function SettingsPage() {
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         settings={{
-          ngrok_token: settings?.ngrokToken || "",
-          shortio_api_key: settings?.shortioApiKey || "",
+          ngrok_token: settings?.ngrokTokenRaw || "",
+          shortio_api_key: settings?.shortioApiKeyRaw || "",
           shortio_domain: settings?.shortioDomain || "",
-          openai_api_key: settings?.openaiApiKey || "",
-          unsplash_api_key: settings?.unsplashApiKey || "",
+          openai_api_key: settings?.openaiApiKeyRaw || "",
+          unsplash_api_key: settings?.unsplashApiKeyRaw || "",
         }}
       />
 
@@ -1019,11 +1023,11 @@ export default function SettingsPage() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         currentSettings={{
-          ngrok_token: settings?.ngrokToken || "",
-          shortio_api_key: settings?.shortioApiKey || "",
+          ngrok_token: settings?.ngrokTokenRaw || "",
+          shortio_api_key: settings?.shortioApiKeyRaw || "",
           shortio_domain: settings?.shortioDomain || "",
-          openai_api_key: settings?.openaiApiKey || "",
-          unsplash_api_key: settings?.unsplashApiKey || "",
+          openai_api_key: settings?.openaiApiKeyRaw || "",
+          unsplash_api_key: settings?.unsplashApiKeyRaw || "",
         }}
         onImportSuccess={() => {
           // Refresh settings after import

@@ -41,34 +41,42 @@ export async function GET() {
     const maskedToken = tokenSetting?.value
       ? `${tokenSetting.value.slice(0, 8)}...${tokenSetting.value.slice(-4)}`
       : null;
+    const rawToken = tokenSetting?.value || null;
     const tunnelUrl = tunnelSetting?.value || null;
 
     const hasShortioApiKey = !!shortioApiKeySetting?.value;
     const maskedShortioApiKey = shortioApiKeySetting?.value
       ? `${shortioApiKeySetting.value.slice(0, 8)}...${shortioApiKeySetting.value.slice(-4)}`
       : null;
+    const rawShortioApiKey = shortioApiKeySetting?.value || null;
     const shortioDomain = shortioDomainSetting?.value || null;
 
     const hasOpenaiApiKey = !!openaiApiKeySetting?.value;
     const maskedOpenaiApiKey = openaiApiKeySetting?.value
       ? `${openaiApiKeySetting.value.slice(0, 8)}...${openaiApiKeySetting.value.slice(-4)}`
       : null;
+    const rawOpenaiApiKey = openaiApiKeySetting?.value || null;
     const hasUnsplashApiKey = !!unsplashApiKeySetting?.value;
     const maskedUnsplashApiKey = unsplashApiKeySetting?.value
       ? `${unsplashApiKeySetting.value.slice(0, 8)}...${unsplashApiKeySetting.value.slice(-4)}`
       : null;
+    const rawUnsplashApiKey = unsplashApiKeySetting?.value || null;
 
     return NextResponse.json({
       ngrokToken: maskedToken,
+      ngrokTokenRaw: rawToken,
       hasToken,
       tunnelRunning: !!tunnelUrl,
       tunnelUrl,
       shortioApiKey: maskedShortioApiKey,
+      shortioApiKeyRaw: rawShortioApiKey,
       hasShortioApiKey,
       shortioDomain,
       openaiApiKey: maskedOpenaiApiKey,
+      openaiApiKeyRaw: rawOpenaiApiKey,
       hasOpenaiApiKey,
       unsplashApiKey: maskedUnsplashApiKey,
+      unsplashApiKeyRaw: rawUnsplashApiKey,
       hasUnsplashApiKey,
     });
   } catch (error) {
