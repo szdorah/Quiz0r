@@ -1,180 +1,99 @@
 # Quiz0r
 
-A real-time multiplayer quiz game application built with Next.js, Socket.io, and Prisma. Host interactive quizzes where players join via QR code on their mobile devices.
+![Next.js](https://img.shields.io/badge/Next.js-14-black?logo=next.js&logoColor=white)
+![Node](https://img.shields.io/badge/Node-%E2%89%A518.17-339933?logo=node.js&logoColor=white)
+![Socket.io](https://img.shields.io/badge/Realtime-Socket.io-010101?logo=socketdotio&logoColor=white)
+![Prisma](https://img.shields.io/badge/DB-Prisma%20%2B%20SQLite-2D3748?logo=prisma&logoColor=white)
+![Docker](https://img.shields.io/badge/Ready-Docker-2496ED?logo=docker&logoColor=white)
+[![Vibe coded with Claude](https://img.shields.io/badge/Vibe%20coded-Anthropic%20Claude-8A63F9?logo=anthropic&logoColor=BD653E)](https://claude.ai)
+[![Vibe coded with OpenAI](https://img.shields.io/badge/Vibe%20coded-OpenAI-00A67E?logo=openai&logoColor=white)](https://openai.com)
+[![License](https://img.shields.io/badge/License-Custom-orange?logo=open-source-initiative&logoColor=white)](https://github.com/err0r-dev/.github/blob/main/profile/license.md)
+
+If you want a beginner-friendly walkthrough, start with [Non Techie Readme.md](Non Techie Readme.md). This README is for people who are comfortable running commands and want details on how the app works.
+
+## Overview
+- Real-time multiplayer quiz game built with Next.js 14 (App Router), Socket.io, Prisma, and Tailwind.
+- Admin builds quizzes (with AI assist, themes, media, translations), hosts games, and shares a QR/join link.
+- Players join via code/QR, answer in real time, and see live leaderboards; certificates can be generated and downloaded.
+- Built-in ngrok support to expose player routes publicly while keeping admin/host routes local-only.
 
 ## Features
+- Quiz editing: create/import/export quizzes (ZIP with media), reorder questions, rich media, power-ups, host notes, theme presets/JSON editing.
+- AI helpers: AI quiz generator (OpenAI) and Unsplash image sourcing.
+- Translations: translation status indicators; copy English answers into translations.
+- Game flow: real-time scoreboard, host display + control panel, QR/join links, admission controls, delete previous games.
+- Certificates: host/player certificate generation and download.
+- Safety: middleware blocks admin/host APIs from ngrok/public; player routes stay open.
 
-- 🎯 **Real-time Multiplayer** - Multiple players compete simultaneously
-- 📱 **Mobile-First** - Players join via QR code on their devices
-- 🎨 **Custom Themes** - Pre-built themes, AI wizard, or custom JSON
-- 📤 **Import/Export** - Share quizzes as ZIP files with images
-- 🖼️ **Rich Media** - Add images to questions and answers
-- 📊 **Live Results** - Real-time scoring and leaderboard
-- 🔒 **Secure Hosting** - Admin/host routes protected from external access
-- 🌐 **ngrok Integration** - Easy external access with automatic tunnel setup
-- 👤 **Player Avatars** - Emoji or image avatars for players
-- 📝 **Host Notes** - Private notes visible only to the host
-- 🎯 **Question Types** - Single-select, multi-select, and section dividers
+## Stack
+- Next.js 14, React 18, TypeScript
+- Socket.io for realtime play
+- Prisma + SQLite (local file database)
+- Tailwind + shadcn/ui for UI
+- ngrok for tunneling
 
-## Quick Start
+## Prerequisites
+- Node.js 18.17+ and npm
+- SQLite (bundled via Prisma; no external DB needed)
+- Docker (optional) for containerized runs
 
-### Prerequisites
-
-- Node.js 18.17.0 or higher
-- npm or yarn
-
-### Development
-
-1. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-2. Generate Prisma client and set up the local SQLite database (stored at `data/quiz.db` and ignored by git):
-   ```bash
-   npm run db:push
-   ```
-   This repo intentionally omits Prisma migration history—`schema.prisma` is the source of truth. If you need SQL migrations for a deployment target, generate fresh ones with:
-   ```bash
-   npx prisma migrate dev --name init
-   ```
-
-3. Start the development server:
-   ```bash
-   npm run dev
-   ```
-
-4. Open http://localhost:3000
-
-### Production (Docker)
-
-Build and run the Docker container:
-
+## Project setup (local)
 ```bash
-docker-compose up -d --build
+# 1) Install dependencies
+npm install
+
+# 2) Create .env with the SQLite URL if it does not exist
+echo 'DATABASE_URL="file:./data/quiz.db"' > .env   # only if .env is missing
+
+# 3) Apply schema (repo ships without migrations)
+npx prisma db push
+
+# 4) Start the dev server
+npm run dev
+# App: http://localhost:3000
 ```
 
-The app will be available at http://localhost:3000
+`npm run setup` runs the above steps (install, ensure .env, db push) for convenience.
 
-## Usage
-
-### Creating a Quiz
-
-1. Go to http://localhost:3000/admin
-2. Click "New Quiz" or "Import Quiz" (to import from a ZIP file)
-3. Add questions with multiple choice answers
-4. Mark correct answers for each question
-5. Optionally add images to questions and answers
-6. Add host notes for private reminders during the game
-7. Reorder questions by dragging and dropping
-8. Click "Theme" to customize the visual appearance
-9. Click "Export" to save the quiz as a ZIP file
-
-### Customizing Themes
-
-Quiz0r supports three ways to customize your quiz theme:
-
-1. **Presets** - Choose from pre-built themes (Ocean, Sunset, Forest, Neon, etc.)
-2. **AI Wizard** - Answer questions and get a custom prompt for ChatGPT/Claude
-3. **JSON Editor** - Manually edit the theme JSON for full control
-
-Themes control colors, gradients, animations, fonts, and celebration effects.
-
-### Hosting a Game
-
-1. Go to http://localhost:3000/host
-2. Select a quiz and click "Start Game"
-3. Two windows open:
-   - **Display Window** - Shows QR code, questions, and scoreboard (share on screen/projector)
-   - **Control Panel** - Manage game flow, preview questions, see host notes (keep on your device)
-4. Use the "Copy Join URL" button to share the ngrok link
-5. Click "Next" to advance through questions, "Show Results" to reveal answers
-
-### Joining a Game (Players)
-
-1. Scan the QR code or go to the join URL
-2. Enter the 6-character game code
-3. Choose an avatar (emoji or upload an image)
-4. Enter your name and wait for the game to start
-5. Answer questions and watch your score on the leaderboard
-
-## External Access (ngrok)
-
-To allow players outside your local network to join:
-
-1. Get a free ngrok auth token at https://dashboard.ngrok.com/get-started/your-authtoken
-2. Go to http://localhost:3000/admin/settings
-3. Add your ngrok token (tunnel auto-starts and persists across restarts)
-
-The QR code on the display screen automatically uses the ngrok URL when available.
-
-**Note:** Players will see an ngrok warning page on first visit (ngrok free tier limitation). After clicking through once, ngrok sets a cookie and the warning won't appear again.
-
-### Security
-
-When using ngrok, only the player routes are accessible externally:
-- `/play` - Game code entry
-- `/play/[gameCode]` - Join and play the quiz
-
-All admin and host routes are blocked from external access.
-
-## Project Structure
-
+## Running with Docker
+```bash
+docker compose up -d --build
+docker compose logs -f   # wait for "Ready on http://localhost:3000"
 ```
-src/
-├── app/                          # Next.js app router pages
-│   ├── admin/                    # Quiz management (protected)
-│   │   ├── quiz/[quizId]/
-│   │   │   ├── questions/        # Question editor
-│   │   │   └── theme/            # Theme customization
-│   │   └── settings/             # ngrok configuration
-│   ├── host/                     # Game hosting (protected)
-│   │   └── [gameCode]/
-│   │       ├── control/          # Host control panel
-│   │       └── display/          # Public display screen
-│   ├── play/                     # Player join/play (public)
-│   │   └── [gameCode]/           # Game interface
-│   └── api/                      # API routes
-│       ├── games/                # Game session management
-│       ├── quizzes/              # Quiz CRUD + export/import
-│       ├── settings/             # Settings management
-│       ├── tunnel/               # ngrok tunnel status
-│       └── upload/               # Image upload
-├── components/                   # Reusable UI components
-│   ├── admin/                    # Admin-specific components
-│   ├── theme/                    # Theme system components
-│   └── ui/                       # shadcn/ui components
-├── hooks/                        # Custom React hooks
-│   └── useSocket.ts              # Socket.io hook
-├── lib/                          # Utility functions
-│   ├── db.ts                     # Prisma client
-│   ├── tunnel.ts                 # ngrok tunnel management
-│   ├── theme.ts                  # Theme parsing/validation
-│   ├── theme-presets.ts          # Pre-built themes
-│   ├── theme-template.ts         # AI wizard prompt generator
-│   ├── validate-import.ts        # Import validation
-│   └── sanitize.ts               # XSS prevention
-├── types/                        # TypeScript type definitions
-│   ├── index.ts                  # Core types
-│   ├── theme.ts                  # Theme types
-│   └── export.ts                 # Export/import types
-├── server/                       # Server-side code
-│   └── game-manager.ts           # Socket.io game logic
-└── middleware.ts                 # Route protection
-```
+- The image entrypoint runs `npx prisma migrate deploy`; if you see migration errors, replace that with `npx prisma db push` for a migration-less setup.
+- For persistent data, align the DB path with the mounted volume. Easiest: set `DATABASE_URL=file:./prisma/data/quiz.db` in `docker-compose.yml` to match the `/app/prisma/data` volume.
+- App URL: http://localhost:3000
 
-## Environment Variables
+## Environment variables
+- `DATABASE_URL` (required): e.g., `file:./data/quiz.db` or `file:./prisma/data/quiz.db` when matching the Docker volume.
+- Optional (used in admin/settings):
+  - `OPENAI_API_KEY` (AI quiz generator)
+  - `UNSPLASH_API_KEY` (image sourcing)
+  - `NGROK_AUTHTOKEN` can also be saved via the UI.
 
-Create a `.env` file in the root directory:
+## ngrok (external access)
+- Add your authtoken in the admin UI: `http://localhost:3000/admin/settings`.
+- The server auto-starts a tunnel when a token is saved or present at boot (`src/lib/tunnel.ts`).
+- QR/join links use the tunnel URL for players. Admin/host routes remain local-only (`src/middleware.ts`).
+- Players may see ngrok’s one-time warning page; after clicking through, the cookie suppresses it.
 
-```env
-DATABASE_URL="file:./data/quiz.db"
-```
+## Key scripts
+- `npm run dev` — start Next.js + Socket.io server (tsx `server.ts`).
+- `npm run build` — Next build.
+- `npm run start` — production start (uses `NODE_ENV=production tsx server.ts`).
+- `npm run db:push` — apply Prisma schema to SQLite.
+- `npm run db:studio` — Prisma Studio.
+- `npm run lint` — Next lint.
+- `node scripts/cleanup-old-games.ts` — delete sessions older than 1 hour (manual/cron).
 
-## Tech Stack
+## Data and storage
+- Default SQLite file: `data/quiz.db` (ignored by git).
+- Uploaded media lives under `public/uploads`; compose mounts `quiz-uploads` volume there.
+- When changing DB paths, update both `DATABASE_URL` and any Docker volume mappings.
 
-- **Framework**: Next.js 14 (App Router)
-- **Database**: SQLite with Prisma ORM
-- **Real-time**: Socket.io
-- **Styling**: Tailwind CSS + shadcn/ui
-- **Tunneling**: ngrok
+## Security and routing
+- Player-facing routes (`/play`, `/play/[gameCode]` and related APIs) stay accessible over ngrok.
+- Admin/host routes (`/admin`, `/host`, `/api/quizzes`, `/api/settings`, `/api/tunnel`) are blocked from external/ngrok traffic by middleware (`src/middleware.ts`).
+
+## License
+This project is licensed under the [ERROR.DEV OPEN USE LICENSE](https://github.com/err0r-dev/.github/blob/main/profile/license.md)
