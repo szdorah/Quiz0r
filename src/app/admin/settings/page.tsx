@@ -93,6 +93,7 @@ export default function SettingsPage() {
   const [savingUnsplash, setSavingUnsplash] = useState(false);
   const [showRemoveUnsplashDialog, setShowRemoveUnsplashDialog] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [showExportNotice, setShowExportNotice] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [removeTokenDialogOpen, setRemoveTokenDialogOpen] = useState(false);
 
@@ -441,13 +442,15 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
-            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-amber-900 dark:text-amber-100">
-              Your export file is encrypted with a password. Keep your password
-              safe - it cannot be recovered.
-            </p>
-          </div>
+          {showExportNotice && (
+            <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-amber-900 dark:text-amber-100">
+                Your export file is encrypted with a password. Keep your password
+                safe - it cannot be recovered.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1017,6 +1020,7 @@ export default function SettingsPage() {
           openai_api_key: settings?.openaiApiKeyRaw || "",
           unsplash_api_key: settings?.unsplashApiKeyRaw || "",
         }}
+        onExportSuccess={() => setShowExportNotice(true)}
       />
 
       <ImportDialog
