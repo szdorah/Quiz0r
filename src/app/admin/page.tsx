@@ -34,6 +34,7 @@ import {
   Wand2,
   Image as ImageIcon,
   AlertTriangle,
+  Globe,
 } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -56,6 +57,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
+import { SupportedLanguages, type LanguageCode } from "@/types";
 
 interface Quiz {
   id: string;
@@ -65,6 +67,7 @@ interface Quiz {
   updatedAt: string;
   questionCount: number;
   aiGenerated?: boolean;
+  translationLanguages?: LanguageCode[];
 }
 
 export default function AdminDashboard() {
@@ -654,6 +657,25 @@ export default function AdminDashboard() {
                     {quiz.description}
                   </p>
                 )}
+                <div className="flex flex-wrap items-center gap-2 mb-4">
+                  <Badge variant="secondary" className="flex items-center gap-1">
+                    <Globe className="w-3 h-3" />
+                    {quiz.translationLanguages?.length ? "Translated" : "English only"}
+                  </Badge>
+                  {quiz.translationLanguages?.slice(0, 4).map((lang) => (
+                    <Badge key={lang} variant="outline" className="flex items-center gap-1">
+                      <span>{SupportedLanguages[lang]?.flag || lang.toUpperCase()}</span>
+                      <span className="hidden sm:inline text-xs">
+                        {SupportedLanguages[lang]?.nativeName || SupportedLanguages[lang]?.name || lang.toUpperCase()}
+                      </span>
+                    </Badge>
+                  ))}
+                  {quiz.translationLanguages && quiz.translationLanguages.length > 4 && (
+                    <span className="text-xs text-muted-foreground">
+                      +{quiz.translationLanguages.length - 4} more
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2">
                   <Link
                     href={`/admin/quiz/${quiz.id}/questions`}

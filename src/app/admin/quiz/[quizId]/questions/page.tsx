@@ -185,7 +185,16 @@ export default function QuestionsPage({
   const [deleteResult, setDeleteResult] = useState<{ success: boolean; error?: string } | null>(null);
 
   // Question translation status for individual cards
-  const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>>(new Map());
+  const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<
+    Map<
+      string,
+      {
+        status: "complete" | "partial" | "none";
+        completeLanguages: LanguageCode[];
+        partialLanguages: LanguageCode[];
+      }
+    >
+  >(new Map());
   const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
   const [deletingQuestion, setDeletingQuestion] = useState(false);
 
@@ -204,7 +213,14 @@ export default function QuestionsPage({
         setQuizDescriptionInput(data.description || "");
 
         // Compute per-question/section translation status
-        const statusMap = new Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>();
+        const statusMap = new Map<
+          string,
+          {
+            status: "complete" | "partial" | "none";
+            completeLanguages: LanguageCode[];
+            partialLanguages: LanguageCode[];
+          }
+        >();
 
         if (data.questions) {
           for (const question of data.questions) {
@@ -218,9 +234,14 @@ export default function QuestionsPage({
               });
 
               if (langCodes.size === 0) {
-                statusMap.set(question.id, { status: "none", languages: [] });
+                statusMap.set(question.id, {
+                  status: "none",
+                  completeLanguages: [],
+                  partialLanguages: [],
+                });
               } else {
                 const completeLangs: LanguageCode[] = [];
+                const partialLangs: LanguageCode[] = [];
                 let hasPartial = false;
 
                 for (const lang of Array.from(langCodes)) {
@@ -236,13 +257,15 @@ export default function QuestionsPage({
                   if (hasTitle && hasDescription) {
                     completeLangs.push(lang);
                   } else {
+                    partialLangs.push(lang);
                     hasPartial = true;
                   }
                 }
 
                 statusMap.set(question.id, {
                   status: hasPartial ? "partial" : "complete",
-                  languages: completeLangs,
+                  completeLanguages: completeLangs,
+                  partialLanguages: partialLangs,
                 });
               }
               continue;
@@ -261,10 +284,15 @@ export default function QuestionsPage({
             });
 
             if (langCodes.size === 0) {
-              statusMap.set(question.id, { status: "none", languages: [] });
+              statusMap.set(question.id, {
+                status: "none",
+                completeLanguages: [],
+                partialLanguages: [],
+              });
             } else {
               // Check if all languages are complete
               const completeLangs: LanguageCode[] = [];
+              const partialLangs: LanguageCode[] = [];
               let hasPartial = false;
 
               for (const lang of Array.from(langCodes)) {
@@ -279,13 +307,15 @@ export default function QuestionsPage({
                 if (hasQuestionText && translatedAnswerCount >= answerCount) {
                   completeLangs.push(lang);
                 } else {
+                  partialLangs.push(lang);
                   hasPartial = true;
                 }
               }
 
               statusMap.set(question.id, {
                 status: hasPartial ? "partial" : "complete",
-                languages: completeLangs,
+                completeLanguages: completeLangs,
+                partialLanguages: partialLangs,
               });
             }
           }
