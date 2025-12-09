@@ -233,12 +233,6 @@ export default function HostControlPage({
     startGame();
   }
 
-  useEffect(() => {
-    if (gameState?.status === "ACTIVE" || gameState?.status === "QUESTION" || gameState?.status === "SECTION") {
-      openMonitor();
-    }
-  }, [gameState?.status]);
-
   function handleRemovePlayer(playerId: string, playerName: string) {
     setPlayerToRemove({ id: playerId, name: playerName });
     setRemoveDialogOpen(true);
