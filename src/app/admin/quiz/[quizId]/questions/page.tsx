@@ -32,6 +32,9 @@ import {
   Languages,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { SupportedLanguages, type LanguageCode, type TranslationStatus } from "@/types";
 import { toast } from "sonner";
 
@@ -127,6 +130,11 @@ export default function QuestionsPage({
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(false);
+  const [editQuizDetailsOpen, setEditQuizDetailsOpen] = useState(false);
+  const [quizTitleInput, setQuizTitleInput] = useState("");
+  const [quizDescriptionInput, setQuizDescriptionInput] = useState("");
+  const [savingQuizDetails, setSavingQuizDetails] = useState(false);
+  const [quizDetailsError, setQuizDetailsError] = useState("");
 
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -192,6 +200,8 @@ export default function QuestionsPage({
       if (res.ok) {
         const data = await res.json();
         setQuiz(data);
+        setQuizTitleInput(data.title || "");
+        setQuizDescriptionInput(data.description || "");
 
         // Compute per-question/section translation status
         const statusMap = new Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>();
@@ -287,6 +297,58 @@ export default function QuestionsPage({
       console.error("Failed to fetch quiz:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function openEditQuizDetails() {
+    if (!quiz) return;
+    setQuizTitleInput(quiz.title || "");
+    setQuizDescriptionInput(quiz.description || "");
+    setQuizDetailsError("");
+    setEditQuizDetailsOpen(true);
+  }
+
+  async function saveQuizDetails() {
+    if (!quiz) return;
+
+    const trimmedTitle = quizTitleInput.trim();
+    const trimmedDescription = quizDescriptionInput.trim();
+
+    if (!trimmedTitle) {
+      setQuizDetailsError("Title is required");
+      return;
+    }
+
+    setSavingQuizDetails(true);
+    setQuizDetailsError("");
+
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          description: trimmedDescription,
+        }),
+      });
+
+      if (res.ok) {
+        setQuiz((prev) =>
+          prev ? { ...prev, title: trimmedTitle, description: trimmedDescription || null } : prev
+        );
+        setQuizTitleInput(trimmedTitle);
+        setQuizDescriptionInput(trimmedDescription);
+        setEditQuizDetailsOpen(false);
+        toast.success("Quiz details updated");
+      } else {
+        const data = await res.json().catch(() => null);
+        setQuizDetailsError(data?.error || "Failed to update quiz");
+      }
+    } catch (error) {
+      console.error("Failed to update quiz:", error);
+      setQuizDetailsError("Failed to update quiz");
+    } finally {
+      setSavingQuizDetails(false);
     }
   }
 
@@ -1049,6 +1111,7 @@ export default function QuestionsPage({
         onExportQuiz={handleExport}
         isExporting={exporting}
         settingsOpen={settingsSidebarOpen}
+        onEditQuizDetails={openEditQuizDetails}
       />
 
       {/* Questions List */}
@@ -1107,6 +1170,85 @@ export default function QuestionsPage({
         onUpdateAutoAdmit={updateAutoAdmit}
         onUpdatePowerUp={updatePowerUpCount}
       />
+
+      {/* Edit quiz details */}
+      <Dialog
+        open={editQuizDetailsOpen}
+        onOpenChange={(open) => {
+          setEditQuizDetailsOpen(open);
+          if (open && quiz) {
+            setQuizTitleInput(quiz.title || "");
+            setQuizDescriptionInput(quiz.description || "");
+          } else {
+            setQuizDetailsError("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit quiz details</DialogTitle>
+            <DialogDescription>
+              Update the title and description shown to hosts and players.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveQuizDetails();
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="quiz-title">Title</Label>
+              <Input
+                id="quiz-title"
+                value={quizTitleInput}
+                onChange={(e) => setQuizTitleInput(e.target.value)}
+                placeholder="Enter quiz title"
+                disabled={savingQuizDetails}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quiz-description">Description (optional)</Label>
+              <Textarea
+                id="quiz-description"
+                value={quizDescriptionInput}
+                onChange={(e) => setQuizDescriptionInput(e.target.value)}
+                placeholder="What is this quiz about?"
+                disabled={savingQuizDetails}
+                rows={3}
+              />
+            </div>
+
+            {quizDetailsError && (
+              <p className="text-sm text-destructive">{quizDetailsError}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditQuizDetailsOpen(false)}
+                disabled={savingQuizDetails}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={savingQuizDetails}>
+                {savingQuizDetails ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Question Editor Dialog */}
       <QuestionEditorDialog

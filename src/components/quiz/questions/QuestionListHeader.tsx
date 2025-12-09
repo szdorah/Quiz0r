@@ -12,6 +12,7 @@ import {
   Download,
   Loader2,
   Sparkles,
+  Pencil,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -51,6 +52,7 @@ interface QuestionListHeaderProps {
   onExportQuiz: () => void;
   isExporting?: boolean;
   settingsOpen: boolean;
+  onEditQuizDetails: () => void;
 }
 
 export function QuestionListHeader({
@@ -63,6 +65,7 @@ export function QuestionListHeader({
   onExportQuiz,
   isExporting = false,
   settingsOpen,
+  onEditQuizDetails,
 }: QuestionListHeaderProps) {
   const actualQuestionCount = quiz.questions.filter(
     (q) => q.questionType !== "SECTION"
@@ -70,7 +73,8 @@ export function QuestionListHeader({
   const canPlay = actualQuestionCount > 0;
 
   return (
-    <div className="space-y-4">
+    <TooltipProvider>
+      <div className="space-y-4">
       {/* Top Row: Navigation and Title */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div className="space-y-1">
@@ -83,6 +87,19 @@ export function QuestionListHeader({
           </Link>
           <div className="flex items-center gap-2">
             <h1 className="text-2xl sm:text-3xl font-bold">{quiz.title}</h1>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={onEditQuizDetails}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Edit title & description</TooltipContent>
+            </Tooltip>
             {quiz.aiGenerated && (
               <Badge
                 variant="outline"
@@ -96,92 +113,90 @@ export function QuestionListHeader({
         </div>
 
         {/* Action Buttons */}
-        <TooltipProvider>
-          <div className="flex flex-wrap items-center gap-2">
-            {/* Secondary Actions (Icon Buttons) */}
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Link href={`/admin/quiz/${quiz.id}/theme`}>
-                    <Button variant="ghost" size="icon" className="h-9 w-9">
-                      <Palette className="w-4 h-4" />
-                    </Button>
-                  </Link>
-                </TooltipTrigger>
-                <TooltipContent>Theme</TooltipContent>
-              </Tooltip>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onOpenTranslations}
-                  >
-                    <Languages className="w-4 h-4" />
+        <div className="flex flex-wrap items-center gap-2">
+          {/* Secondary Actions (Icon Buttons) */}
+          <div className="flex items-center gap-1">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Link href={`/admin/quiz/${quiz.id}/theme`}>
+                  <Button variant="ghost" size="icon" className="h-9 w-9">
+                    <Palette className="w-4 h-4" />
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent>Translations</TooltipContent>
-              </Tooltip>
+                </Link>
+              </TooltipTrigger>
+              <TooltipContent>Theme</TooltipContent>
+            </Tooltip>
 
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onExportQuiz}
-                    disabled={isExporting}
-                  >
-                    {isExporting ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <Download className="w-4 h-4" />
-                    )}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Export Quiz</TooltipContent>
-              </Tooltip>
-            </div>
-
-            <div className="w-px h-6 bg-border hidden sm:block" />
-
-            {/* Primary Actions */}
-            <div className="flex items-center gap-2">
-              <Link href={`/host?quizId=${quiz.id}`}>
-                <Button disabled={!canPlay} size="sm">
-                  <Play className="w-4 h-4 mr-1" />
-                  <span className="hidden sm:inline">Play</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onOpenTranslations}
+                >
+                  <Languages className="w-4 h-4" />
                 </Button>
-              </Link>
+              </TooltipTrigger>
+              <TooltipContent>Translations</TooltipContent>
+            </Tooltip>
 
-              <Button variant="outline" size="sm" onClick={onAddSection}>
-                <Layers className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">Section</span>
-              </Button>
-
-              <Button size="sm" onClick={onAddQuestion}>
-                <Plus className="w-4 h-4 sm:mr-1" />
-                <span className="hidden sm:inline">Question</span>
-              </Button>
-
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant={settingsOpen ? "secondary" : "ghost"}
-                    size="icon"
-                    className="h-9 w-9"
-                    onClick={onToggleSettings}
-                  >
-                    <Settings className="w-4 h-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Settings</TooltipContent>
-              </Tooltip>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onExportQuiz}
+                  disabled={isExporting}
+                >
+                  {isExporting ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Export Quiz</TooltipContent>
+            </Tooltip>
           </div>
-        </TooltipProvider>
+
+          <div className="w-px h-6 bg-border hidden sm:block" />
+
+          {/* Primary Actions */}
+          <div className="flex items-center gap-2">
+            <Link href={`/host?quizId=${quiz.id}`}>
+              <Button disabled={!canPlay} size="sm">
+                <Play className="w-4 h-4 mr-1" />
+                <span className="hidden sm:inline">Play</span>
+              </Button>
+            </Link>
+
+            <Button variant="outline" size="sm" onClick={onAddSection}>
+              <Layers className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Section</span>
+            </Button>
+
+            <Button size="sm" onClick={onAddQuestion}>
+              <Plus className="w-4 h-4 sm:mr-1" />
+              <span className="hidden sm:inline">Question</span>
+            </Button>
+
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={settingsOpen ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={onToggleSettings}
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Settings</TooltipContent>
+            </Tooltip>
+          </div>
+        </div>
       </div>
 
       {/* Stats Bar */}
@@ -190,6 +205,7 @@ export function QuestionListHeader({
         hintPowerUpEnabled={quiz.hintCount > 0}
         translationStatuses={translationStatuses}
       />
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
