@@ -9,7 +9,7 @@
 [![Vibe coded with OpenAI](https://img.shields.io/badge/Vibe%20coded-OpenAI-00A67E?logo=openai&logoColor=white)](https://openai.com)
 [![License](https://img.shields.io/badge/License-Custom-orange?logo=open-source-initiative&logoColor=white)](https://github.com/err0r-dev/.github/blob/main/profile/license.md)
 
-If you want a beginner-friendly walkthrough, start with [Non Techie Readme.md](Non Techie Readme.md). This README is for people who are comfortable running commands and want details on how the app works.
+If you want a beginner-friendly walkthrough, start with [Non Techie Readme.md](/Non%20Techie%20Readme.md). This README is for people who are comfortable running commands and want details on how the app works.
 
 ## Overview
 - Real-time multiplayer quiz game built with Next.js 14 (App Router), Socket.io, Prisma, and Tailwind.
