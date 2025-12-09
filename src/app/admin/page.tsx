@@ -59,6 +59,11 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { SupportedLanguages, type LanguageCode } from "@/types";
 
+const LanguageMap = SupportedLanguages as Record<
+  LanguageCode,
+  { code: string; name: string; flag: string; nativeName: string }
+>;
+
 interface Quiz {
   id: string;
   title: string;
@@ -662,14 +667,26 @@ export default function AdminDashboard() {
                     <Globe className="w-3 h-3" />
                     {quiz.translationLanguages?.length ? "Translated" : "English only"}
                   </Badge>
-                  {quiz.translationLanguages?.slice(0, 4).map((lang) => (
-                    <Badge key={lang} variant="outline" className="flex items-center gap-1">
-                      <span>{SupportedLanguages[lang]?.flag || lang.toUpperCase()}</span>
-                      <span className="hidden sm:inline text-xs">
-                        {SupportedLanguages[lang]?.nativeName || SupportedLanguages[lang]?.name || lang.toUpperCase()}
-                      </span>
-                    </Badge>
-                  ))}
+                  {quiz.translationLanguages?.slice(0, 4).map((langCode) => {
+                    const language = LanguageMap[langCode as LanguageCode];
+                    if (!language) {
+                      return (
+                        <Badge key={langCode} variant="outline" className="flex items-center gap-1">
+                          <span>{langCode.toUpperCase()}</span>
+                          <span className="hidden sm:inline text-xs">{langCode.toUpperCase()}</span>
+                        </Badge>
+                      );
+                    }
+
+                    const flag = language.flag;
+                    const label = language.nativeName ?? language.name;
+                    return (
+                      <Badge key={langCode} variant="outline" className="flex items-center gap-1">
+                        <span>{flag}</span>
+                        <span className="hidden sm:inline text-xs">{label}</span>
+                      </Badge>
+                    );
+                  })}
                   {quiz.translationLanguages && quiz.translationLanguages.length > 4 && (
                     <span className="text-xs text-muted-foreground">
                       +{quiz.translationLanguages.length - 4} more
