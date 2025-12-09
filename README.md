@@ -30,10 +30,13 @@ A real-time multiplayer quiz game application built with Next.js, Socket.io, and
    npm install
    ```
 
-2. Generate Prisma client and run migrations:
+2. Generate Prisma client and set up the local SQLite database (stored at `data/quiz.db` and ignored by git):
    ```bash
-   npx prisma generate
-   npx prisma migrate deploy
+   npm run db:push
+   ```
+   This repo intentionally omits Prisma migration history—`schema.prisma` is the source of truth. If you need SQL migrations for a deployment target, generate fresh ones with:
+   ```bash
+   npx prisma migrate dev --name init
    ```
 
 3. Start the development server:
