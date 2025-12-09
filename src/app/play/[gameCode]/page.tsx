@@ -28,8 +28,10 @@ import { PowerUpType, PlayerPowerUpState, SupportedLanguages, type LanguageCode,
 import { Check, X, Trophy, Medal, Award, Loader2, Upload, Layers, Bell, UserX, Zap, Lightbulb, Users, Sparkles, Languages as LanguagesIcon, AlarmClock, Globe, ChevronUp, Target } from "lucide-react";
 import { ThemeProvider, getAnswerColor, getSelectedAnswerStyle } from "@/components/theme/ThemeProvider";
 import { BackgroundEffects } from "@/components/theme/BackgroundEffects";
-import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
-import { CertificateStatusBanner } from "@/components/certificate/CertificateStatusBanner";
+import {
+  CertificateDownloadButton,
+  type CertificateButtonState,
+} from "@/components/certificate/CertificateDownloadButton";
 import { BORDER_RADIUS_MAP, SHADOW_MAP } from "@/types/theme";
 import { getContrastingTextColor } from "@/lib/color-utils";
 
@@ -71,6 +73,7 @@ export default function PlayerGamePage({
   const [copiedPlayerId, setCopiedPlayerId] = useState<string | null>(null);
   const [showCopyPlayerSelector, setShowCopyPlayerSelector] = useState(false);
   const [showHintModal, setShowHintModal] = useState(false);
+  const [certificateState, setCertificateState] = useState<CertificateButtonState>("checking");
 
   // Check if game exists and is joinable on mount
   useEffect(() => {
@@ -1861,6 +1864,8 @@ export default function PlayerGamePage({
       (s) => s.name.toLowerCase() === playerName.toLowerCase()
     );
     const myPosition = myScore?.position || 0;
+    const showGeneratingMessage =
+      certificateState === "checking" || certificateState === "generating";
 
     const theme = gameState.quizTheme;
     return (
@@ -1963,8 +1968,12 @@ export default function PlayerGamePage({
             <div className="mt-6 sm:mt-8 text-center space-y-3 sm:space-y-4 relative z-10">
               <p className="text-sm sm:text-base text-muted-foreground">Thanks for playing!</p>
 
-              {/* Certificate Status Banner */}
-              <CertificateStatusBanner gameCode={gameCode} />
+              {showGeneratingMessage && (
+                <div className="flex items-center justify-center gap-2 text-sm sm:text-base text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <span>Generating your certificate...</span>
+                </div>
+              )}
 
               <div className="flex flex-col sm:flex-row sm:justify-center sm:items-center gap-3 sm:gap-4">
                 {/* Download Button */}
@@ -1973,7 +1982,8 @@ export default function PlayerGamePage({
                   playerId={playerId}
                   playerName={playerName}
                   type="player"
-                  className="w-full sm:w-auto"
+                  className={`w-full sm:w-auto ${showGeneratingMessage ? "hidden" : ""}`}
+                  onStateChange={setCertificateState}
                 />
 
                 <Button

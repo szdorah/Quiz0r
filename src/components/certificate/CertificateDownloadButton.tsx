@@ -6,6 +6,14 @@ import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { getFilenameFromResponse } from "@/lib/certificate-utils";
 
+export type CertificateButtonState =
+  | "checking"
+  | "ready"
+  | "downloading"
+  | "success"
+  | "error"
+  | "generating";
+
 interface CertificateDownloadButtonProps {
   gameCode: string;
   playerId?: string; // Required for player certificates
@@ -14,6 +22,7 @@ interface CertificateDownloadButtonProps {
   disabled?: boolean;
   size?: "default" | "sm" | "lg"; // Button size
   className?: string;
+  onStateChange?: (state: CertificateButtonState) => void;
 }
 
 export function CertificateDownloadButton({
@@ -24,10 +33,9 @@ export function CertificateDownloadButton({
   disabled,
   size = "lg", // Default to lg for backwards compatibility
   className,
+  onStateChange,
 }: CertificateDownloadButtonProps) {
-  const [state, setState] = useState<
-    "checking" | "ready" | "downloading" | "success" | "error" | "generating"
-  >("checking");
+  const [state, setState] = useState<CertificateButtonState>("checking");
   const [certificateStatus, setCertificateStatus] = useState<string | null>(
     null
   );
@@ -79,6 +87,11 @@ export function CertificateDownloadButton({
   useEffect(() => {
     checkStatus();
   }, [checkStatus]);
+
+  // Notify parent about state changes (used for conditional UI)
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
 
   // Poll while generating or if we previously errored
   useEffect(() => {
