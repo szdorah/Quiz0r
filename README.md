@@ -86,6 +86,65 @@ docker compose logs -f   # wait for "Ready on http://localhost:3000"
 - `npm run lint` — Next lint.
 - `node scripts/cleanup-old-games.ts` — delete sessions older than 1 hour (manual/cron).
 
+## Project structure
+```
+.
+├─ src/
+│  ├─ app/                                  # Next.js App Router pages + API routes
+│  │  ├─ page.tsx                           # Landing page
+│  │  ├─ menu/                              # Menu selection screen
+│  │  ├─ play/[gameCode]/page.tsx           # Player join/answer view (public)
+│  │  ├─ host/[gameCode]/{display,control,playermonitor}/page.tsx # Host display + control panels
+│  │  ├─ admin/                             # Admin dashboard and tools
+│  │  │  ├─ page.tsx                        # Admin home
+│  │  │  ├─ games/page.tsx                  # Game history/controls
+│  │  │  ├─ quiz/new/page.tsx               # New quiz creation
+│  │  │  ├─ themes/[themeId]/page.tsx       # Theme editor
+│  │  │  └─ settings/page.tsx               # App settings (API keys, tunnel, etc.)
+│  │  ├─ api/                               # Route handlers for admin/host/player APIs
+│  │  │  ├─ quizzes/(route.ts, ai-generate, import, [quizId])     # CRUD + AI generation
+│  │  │  ├─ games/(route.ts, [gameCode])    # Game lifecycle endpoints
+│  │  │  ├─ themes/(route.ts, generate, [themeId]) # Theme CRUD + AI generate
+│  │  │  ├─ settings/(route.ts, tunnel)     # Settings and tunnel start/stop
+│  │  │  ├─ tunnel/route.ts                 # ngrok status
+│  │  │  ├─ shorten/route.ts                # URL shortener
+│  │  │  └─ upload/route.ts                 # Media upload
+│  │  └─ uploads/[...path]/route.ts         # Serves uploaded assets
+│  ├─ components/                           # UI primitives + domain components
+│  │  ├─ ui/                                # shadcn-based primitives (buttons, dialog, tabs, etc.)
+│  │  ├─ landing/                           # Marketing/landing sections
+│  │  ├─ quiz/                              # Quiz editing + player inputs
+│  │  │  ├─ editor/                         # Question/section modals
+│  │  │  ├─ questions/                      # Question list and stats
+│  │  │  └─ settings/                       # Admission/power-up controls
+│  │  ├─ admin/                             # Admin cards, pagination, side panels
+│  │  ├─ certificate/                       # Certificate status/download/regeneration
+│  │  ├─ theme/                             # Theme provider and background effects
+│  │  └─ display/AspectRatioHelper.tsx      # Host display scaling helper
+│  ├─ contexts/                             # React contexts (dark mode)
+│  ├─ hooks/                                # Client hooks (Socket.io connection, quiz preloading)
+│  ├─ lib/                                  # Services and utilities
+│  │  ├─ openai-*.ts                        # AI quiz/theme/translation helpers
+│  │  ├─ certificate-*                      # Certificate generation and helpers
+│  │  ├─ theme-*.ts                         # Theme presets, contrast, color utilities
+│  │  ├─ tunnel.ts                          # ngrok tunnel control
+│  │  ├─ scoring.ts                         # Game scoring logic
+│  │  ├─ db.ts                              # Prisma client helper
+│  │  └─ utils.ts                           # Shared client/server helpers
+│  ├─ middleware.ts                         # Blocks admin/host routes from ngrok/public traffic
+│  ├─ server/game-manager.ts                # Socket.io game state manager
+│  └─ types/                                # Shared TypeScript types (quizzes, settings, certificates, themes)
+├─ public/                                  # Static assets; upload root kept under version control via .gitkeep
+├─ prisma/schema.prisma                     # Database schema
+├─ data/                                    # SQLite database location (gitignored)
+├─ scripts/                                 # Setup/maintenance scripts (setup, cleanup-old-games, contrast checks)
+├─ server.ts                                # Custom Next.js + Socket.io entrypoint
+├─ list-players.ts                          # Utility to list currently connected players from the socket server
+├─ docker-compose.yml, Dockerfile           # Container build/run setup
+├─ components.json, tailwind.config.ts, postcss.config.mjs, next.config.mjs, tsconfig.json # Tooling/config
+└─ package.json, package-lock.json          # Dependencies and npm scripts
+```
+
 ## Data and storage
 - Default SQLite file: `data/quiz.db` (ignored by git).
 - Uploaded media lives under `public/uploads`; compose mounts `quiz-uploads` volume there.
