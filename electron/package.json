@@ -16,7 +16,10 @@
     "productName": "Quiz0r",
     "files": ["**/*"],
     "mac": {
-      "target": "dmg"
+      "target": "dmg",
+      "category": "public.app-category.productivity",
+      "hardenedRuntime": true,
+      "entitlements": null
     },
     "win": {
       "target": "nsis"
