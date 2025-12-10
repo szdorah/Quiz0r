@@ -24,10 +24,7 @@
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "notarize": {
-        "appBundleId": "dev.err0r.quiz0r",
-        "teamId": "H3F5W5M8VA",
-        "appleId": "${APPLE_ID}",
-        "appleIdPassword": "${APPLE_APP_SPECIFIC_PASSWORD}"
+        "appBundleId": "dev.err0r.quiz0r"
       }
     },
     "win": {
