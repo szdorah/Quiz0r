@@ -54,6 +54,7 @@ jobs:
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: H3F5W5M8VA
           APP_URL: https://your-hosted-app-url.com
         run: npm run build
 
