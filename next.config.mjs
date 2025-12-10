@@ -5,6 +5,18 @@ const nextConfig = {
     // Externalize @ngrok/ngrok to avoid webpack bundling native modules
     serverComponentsExternalPackages: ["@ngrok/ngrok"],
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "images.unsplash.com",
+      },
+      {
+        protocol: "https",
+        hostname: "source.unsplash.com",
+      },
+    ],
+  },
 };
 
 export default nextConfig;

@@ -13,6 +13,7 @@ import {
   ClientToServerEvents,
   PowerUpType,
   LanguageCode,
+  PlayerViewState,
 } from "@/types";
 
 interface NextQuestionPreview {
@@ -52,6 +53,7 @@ interface UseSocketReturn {
   removalReason: string | null;
   admissionRequests: Array<{playerId: string; playerName: string}>;
   admissionStatus: "admitted" | "refused" | null;
+  playerViews: Map<string, PlayerViewState>;
   // Actions
   startGame: () => void;
   nextQuestion: () => void;
@@ -65,6 +67,7 @@ interface UseSocketReturn {
   admitPlayer: (playerId: string) => void;
   refusePlayer: (playerId: string) => void;
   toggleAutoAdmit: (autoAdmit: boolean) => void;
+  requestPlayerViews: () => void;
 }
 
 export function useSocket({
@@ -109,6 +112,7 @@ export function useSocket({
   const [removalReason, setRemovalReason] = useState<string | null>(null);
   const [admissionRequests, setAdmissionRequests] = useState<Array<{playerId: string; playerName: string}>>([]);
   const [admissionStatus, setAdmissionStatus] = useState<"admitted" | "refused" | null>(null);
+  const [playerViews, setPlayerViews] = useState<Map<string, PlayerViewState>>(new Map());
 
   // Keep latest join data without recreating socket
   useEffect(() => {
@@ -357,6 +361,43 @@ export function useSocket({
       setAnswerResult(result);
     });
 
+    socket.on("monitor:playerViewUpdate", ({ playerId, viewState }) => {
+      setPlayerViews((prev) => {
+        const map = new Map(prev);
+        const previous = map.get(playerId);
+        map.set(playerId, {
+          ...previous,
+          ...viewState,
+          // Preserve the last screenshot when updates omit it to avoid flicker
+          screenshot: viewState.screenshot ?? previous?.screenshot ?? null,
+        });
+        return map;
+      });
+    });
+
+    socket.on("monitor:playerViewSnapshot", ({ views }) => {
+      setPlayerViews((prev) => {
+        const map = new Map<string, PlayerViewState>();
+        Object.entries(views || {}).forEach(([id, view]) => {
+          const previous = prev.get(id);
+          map.set(id, {
+            ...previous,
+            ...view,
+            screenshot: view.screenshot ?? previous?.screenshot ?? null,
+          });
+        });
+        return map;
+      });
+    });
+
+    socket.on("monitor:playerViewRemove", ({ playerId }) => {
+      setPlayerViews((prev) => {
+        const map = new Map(prev);
+        map.delete(playerId);
+        return map;
+      });
+    });
+
     socket.on("error", ({ message, code }) => {
       console.error("Socket error:", code, message);
       setError(message);
@@ -461,6 +502,12 @@ export function useSocket({
     });
   }, [gameCode]);
 
+  const requestPlayerViews = useCallback(() => {
+    socketRef.current?.emit("host:requestPlayerViews", {
+      gameCode: gameCode.toUpperCase(),
+    });
+  }, [gameCode]);
+
   const submitAnswer = useCallback(
     (questionId: string, answerIds: string[]) => {
       socketRef.current?.emit("player:answer", {
@@ -492,6 +539,7 @@ export function useSocket({
     removalReason,
     admissionRequests,
     admissionStatus,
+    playerViews,
     startGame,
     nextQuestion,
     showScoreboard,
@@ -504,5 +552,6 @@ export function useSocket({
     refusePlayer,
     toggleAutoAdmit,
     revealAnswers,
+    requestPlayerViews,
   };
 }

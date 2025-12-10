@@ -15,6 +15,7 @@ import {
   LanguageCode,
   SupportedLanguages,
   QuestionDataWithTranslations,
+  PlayerViewState,
 } from "@/types";
 import { QuizTheme } from "@/types/theme";
 import {
@@ -53,6 +54,7 @@ type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 export class GameManager {
   private io: TypedServer;
   private activeGames: Map<string, ActiveGame> = new Map();
+  private playerViewStates: Map<string, Map<string, PlayerViewState>> = new Map();
 
   constructor(io: TypedServer) {
     this.io = io;
@@ -74,6 +76,7 @@ export class GameManager {
     socket.on("host:admitPlayer", (data) => this.handleAdmitPlayer(socket, data));
     socket.on("host:refusePlayer", (data) => this.handleRefusePlayer(socket, data));
     socket.on("host:toggleAutoAdmit", (data) => this.handleToggleAutoAdmit(socket, data));
+    socket.on("host:requestPlayerViews", (data) => this.handleHostRequestPlayerViews(socket, data));
 
     // Player events
     socket.on("player:join", (data) => this.handlePlayerJoin(socket, data));
@@ -82,6 +85,7 @@ export class GameManager {
     socket.on("player:easterEggClick", (data) => this.handleEasterEggClick(socket, data));
     socket.on("player:usePowerUp", (data) => this.handlePowerUpUsage(socket, data));
     socket.on("player:updateLanguage", (data) => this.handlePlayerLanguageUpdate(socket, data));
+    socket.on("player:viewUpdate", (data) => this.handlePlayerViewUpdate(socket, data));
 
     socket.on("disconnect", () => this.handleDisconnect(socket));
   }
@@ -269,6 +273,15 @@ export class GameManager {
 
       // Send quiz data for preloading
       await this.sendQuizPreloadData(socket, upperCode, player.id);
+
+      // Seed monitor state for new player
+      this.storePlayerViewState(upperCode, player.id, {
+        stage: "waiting",
+        playerId: player.id,
+        playerName: player.name,
+        languageCode: player.languageCode as LanguageCode,
+        isActive: true,
+      });
     } catch (error) {
       console.error("Error joining game:", error);
       socket.emit("error", { message: "Failed to join game", code: "JOIN_FAILED" });
@@ -812,6 +825,7 @@ export class GameManager {
 
     // Clean up
     this.activeGames.delete(gameCode);
+    this.playerViewStates.delete(gameCode);
   }
 
   /**
@@ -885,6 +899,7 @@ export class GameManager {
 
       // Clean up any active game state
       this.activeGames.delete(upperCode);
+      this.playerViewStates.delete(upperCode);
 
       console.log(`Game ${upperCode} cancelled by host`);
     } catch (error) {
@@ -905,6 +920,7 @@ export class GameManager {
       });
 
       this.io.to(`game:${gameCode}`).emit("game:playerLeft", { playerId });
+      this.removePlayerViewState(gameCode, playerId);
     }
 
     console.log(`Client disconnected: ${socket.id}`);
@@ -964,6 +980,7 @@ export class GameManager {
 
       // Notify all clients
       this.io.to(`game:${upperCode}`).emit("game:playerRemoved", { playerId });
+      this.removePlayerViewState(upperCode, playerId);
 
       console.log(`[RemovePlayer] Player ${player.name} (${playerId}) removed from game ${upperCode}`);
     } catch (error) {
@@ -1405,8 +1422,73 @@ export class GameManager {
       // Notify host and players about the updated language
       this.io.to(`game:${upperCode}:host`).emit("game:playerJoined", { player: playerInfo });
       this.io.to(`game:${upperCode}`).emit("game:playerJoined", { player: playerInfo });
+
+      // Update monitor view with latest language
+      const existingView = this.playerViewStates.get(upperCode)?.get(playerId);
+      this.storePlayerViewState(upperCode, playerId, {
+        ...(existingView || { stage: "waiting", playerName: updated.name, playerId }),
+        languageCode,
+      });
     } catch (error) {
       console.error("Failed to update player language:", error);
+    }
+  }
+
+  private handlePlayerViewUpdate(
+    socket: TypedSocket,
+    data: { gameCode: string; playerId: string; viewState: PlayerViewState }
+  ) {
+    const { gameCode, playerId, viewState } = data;
+    const resolvedGameCode = (gameCode || (socket as any).gameCode || "").toUpperCase();
+    const resolvedPlayerId = playerId || (socket as any).playerId;
+
+    if (!resolvedGameCode || !resolvedPlayerId) {
+      console.warn("[PlayerView] Missing gameCode or playerId, skipping update");
+      return;
+    }
+
+    this.storePlayerViewState(resolvedGameCode, resolvedPlayerId, viewState);
+  }
+
+  private handleHostRequestPlayerViews(
+    socket: TypedSocket,
+    data: { gameCode: string }
+  ) {
+    const upperCode = data.gameCode.toUpperCase();
+    const views = this.playerViewStates.get(upperCode);
+    const payload: Record<string, PlayerViewState> = {};
+
+    if (views) {
+      views.forEach((view, playerId) => {
+        payload[playerId] = view;
+      });
+    }
+
+    socket.emit("monitor:playerViewSnapshot", { views: payload });
+  }
+
+  private storePlayerViewState(gameCode: string, playerId: string, viewState: PlayerViewState) {
+    const map = this.playerViewStates.get(gameCode) ?? new Map<string, PlayerViewState>();
+    const normalized: PlayerViewState = { ...viewState, playerId };
+    map.set(playerId, normalized);
+    this.playerViewStates.set(gameCode, map);
+
+    this.io.to(`game:${gameCode}:host`).emit("monitor:playerViewUpdate", {
+      playerId,
+      viewState: normalized,
+    });
+  }
+
+  private removePlayerViewState(gameCode: string, playerId: string) {
+    const map = this.playerViewStates.get(gameCode);
+    if (!map) return;
+
+    if (map.delete(playerId)) {
+      this.io.to(`game:${gameCode}:host`).emit("monitor:playerViewRemove", { playerId });
+    }
+
+    if (map.size === 0) {
+      this.playerViewStates.delete(gameCode);
     }
   }
 

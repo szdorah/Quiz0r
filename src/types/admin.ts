@@ -15,6 +15,7 @@ export interface GameListItem {
     avatarColor: string;
     avatarEmoji: string | null;
     totalScore: number;
+    isActive?: boolean;
   }>;
 }
 
@@ -39,6 +40,7 @@ export interface GameDetailPlayer {
   avatarEmoji: string | null;
   totalScore: number;
   position: number;
+   isActive: boolean;
 }
 
 export interface GameDetail extends GameListItem {

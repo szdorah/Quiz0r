@@ -11,7 +11,19 @@ export async function GET() {
           select: { questions: true },
         },
         questions: {
-          select: { questionType: true },
+          select: {
+            questionType: true,
+            translations: {
+              select: { languageCode: true },
+            },
+            answers: {
+              select: {
+                translations: {
+                  select: { languageCode: true },
+                },
+              },
+            },
+          },
         },
       },
       orderBy: { updatedAt: "desc" },
@@ -22,11 +34,25 @@ export async function GET() {
       const questionCount = quiz.questions.filter(
         (q) => q.questionType !== "SECTION"
       ).length;
+
+      const translationLanguages = new Set<string>();
+      for (const question of quiz.questions) {
+        question.translations.forEach((t) => {
+          if (t.languageCode !== "en") translationLanguages.add(t.languageCode);
+        });
+        question.answers.forEach((a) =>
+          a.translations.forEach((t) => {
+            if (t.languageCode !== "en") translationLanguages.add(t.languageCode);
+          })
+        );
+      }
+
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       const { questions, ...rest } = quiz;
       return {
         ...rest,
         questionCount,
+        translationLanguages: Array.from(translationLanguages).sort(),
       };
     });
 

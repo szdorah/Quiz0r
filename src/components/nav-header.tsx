@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Menu, X, FileQuestion, Gamepad2, Play, Settings, Home } from "lucide-react";
+import { Menu, X, FileQuestion, Gamepad2, Play, Settings, Home, Palette } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DarkModeToggle } from "@/components/ui/dark-mode-toggle";
 import { cn } from "@/lib/utils";
@@ -32,6 +32,14 @@ const navLinks = [
     color: "text-purple-500",
     bgColor: "bg-purple-500/10",
     description: "Start a game session",
+  },
+  {
+    href: "/admin/themes",
+    label: "Themes",
+    icon: Palette,
+    color: "text-pink-500",
+    bgColor: "bg-pink-500/10",
+    description: "Manage and edit themes",
   },
   {
     href: "/admin/settings",

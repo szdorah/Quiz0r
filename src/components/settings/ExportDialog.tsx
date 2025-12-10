@@ -27,12 +27,14 @@ interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   settings: Record<string, string>;
+  onExportSuccess?: () => void;
 }
 
 export function ExportDialog({
   open,
   onOpenChange,
   settings,
+  onExportSuccess,
 }: ExportDialogProps) {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
@@ -61,6 +63,8 @@ export function ExportDialog({
       toast.success("Settings exported successfully!", {
         description: `${exportFile.metadata.settingsCount} settings encrypted and downloaded`,
       });
+
+      onExportSuccess?.();
 
       // Reset and close
       setPassword("");

@@ -10,6 +10,7 @@ const PRIMARY_KEYS = [
   "shortio_api_key",
   "shortio_domain",
   "openai_api_key",
+  "unsplash_api_key",
 ];
 
 // Export settings to encrypted file

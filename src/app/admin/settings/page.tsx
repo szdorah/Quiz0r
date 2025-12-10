@@ -12,6 +12,16 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
@@ -36,20 +46,28 @@ import {
   Download,
   Upload,
   AlertTriangle,
+  Image,
+  Wand2,
 } from "lucide-react";
 import { ExportDialog } from "@/components/settings/ExportDialog";
 import { ImportDialog } from "@/components/settings/ImportDialog";
 
 interface SettingsData {
   ngrokToken: string | null;
+  ngrokTokenRaw: string | null;
   hasToken: boolean;
   tunnelRunning: boolean;
   tunnelUrl: string | null;
   shortioApiKey: string | null;
+  shortioApiKeyRaw: string | null;
   hasShortioApiKey: boolean;
   shortioDomain: string | null;
   openaiApiKey: string | null;
+  openaiApiKeyRaw: string | null;
   hasOpenaiApiKey: boolean;
+  unsplashApiKey: string | null;
+  unsplashApiKeyRaw: string | null;
+  hasUnsplashApiKey: boolean;
 }
 
 export default function SettingsPage() {
@@ -70,8 +88,14 @@ export default function SettingsPage() {
   const [showOpenai, setShowOpenai] = useState(false);
   const [savingOpenai, setSavingOpenai] = useState(false);
   const [showRemoveOpenaiDialog, setShowRemoveOpenaiDialog] = useState(false);
+  const [unsplashApiKeyInput, setUnsplashApiKeyInput] = useState("");
+  const [showUnsplash, setShowUnsplash] = useState(false);
+  const [savingUnsplash, setSavingUnsplash] = useState(false);
+  const [showRemoveUnsplashDialog, setShowRemoveUnsplashDialog] = useState(false);
   const [exportDialogOpen, setExportDialogOpen] = useState(false);
+  const [showExportNotice, setShowExportNotice] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [removeTokenDialogOpen, setRemoveTokenDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchSettings();
@@ -119,8 +143,6 @@ export default function SettingsPage() {
   }
 
   async function removeToken() {
-    if (!confirm("Are you sure you want to remove your ngrok token?")) return;
-
     setSaving(true);
     setMessage(null);
 
@@ -133,12 +155,14 @@ export default function SettingsPage() {
 
       if (res.ok) {
         setMessage({ type: "success", text: "Token removed" });
-        fetchSettings();
-      }
+    fetchSettings();
+  }
+
     } catch {
       setMessage({ type: "error", text: "Failed to remove token" });
     } finally {
       setSaving(false);
+      setRemoveTokenDialogOpen(false);
     }
   }
 
@@ -302,6 +326,58 @@ export default function SettingsPage() {
     }
   }
 
+  async function saveUnsplashSettings() {
+    setSavingUnsplash(true);
+    setMessage(null);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          unsplashApiKey: unsplashApiKeyInput,
+        }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Unsplash API key saved successfully!" });
+        setUnsplashApiKeyInput("");
+        setShowUnsplash(false);
+        fetchSettings();
+      } else {
+        const data = await res.json();
+        setMessage({ type: "error", text: data.error || "Failed to save Unsplash API key" });
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to save Unsplash API key" });
+    } finally {
+      setSavingUnsplash(false);
+    }
+  }
+
+  async function confirmRemoveUnsplashSettings() {
+    setSavingUnsplash(true);
+    setMessage(null);
+    setShowRemoveUnsplashDialog(false);
+
+    try {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ unsplashApiKey: "" }),
+      });
+
+      if (res.ok) {
+        setMessage({ type: "success", text: "Unsplash API key removed" });
+        fetchSettings();
+      }
+    } catch {
+      setMessage({ type: "error", text: "Failed to remove Unsplash API key" });
+    } finally {
+      setSavingUnsplash(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
@@ -366,13 +442,15 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
-            <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
-            <p className="text-amber-900 dark:text-amber-100">
-              Your export file is encrypted with a password. Keep your password
-              safe - it cannot be recovered.
-            </p>
-          </div>
+          {showExportNotice && (
+            <div className="flex gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-600 flex-shrink-0 mt-0.5" />
+              <p className="text-amber-900 dark:text-amber-100">
+                Your export file is encrypted with a password. Keep your password
+                safe - it cannot be recovered.
+              </p>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -404,12 +482,17 @@ export default function SettingsPage() {
               <Label>ngrok Auth Token</Label>
             </div>
 
-            {settings?.hasToken ? (
+              {settings?.hasToken ? (
               <div className="flex items-center gap-4">
                 <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
                   {settings.ngrokToken}
                 </code>
-                <Button variant="outline" size="sm" onClick={removeToken} disabled={saving}>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setRemoveTokenDialogOpen(true)}
+                  disabled={saving}
+                >
                   Remove
                 </Button>
               </div>
@@ -624,11 +707,11 @@ export default function SettingsPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Globe className="w-5 h-5" />
-            OpenAI Translation
+            <Wand2 className="w-5 h-5" />
+            OpenAI
           </CardTitle>
           <CardDescription>
-            Enable quiz translation to multiple languages using OpenAI GPT-4o.
+            Power AI-written quizzes, theme generation, translations, and certificate messages with OpenAI GPT-4o.
             Get an API key at{" "}
             <a
               href="https://platform.openai.com/api-keys"
@@ -704,14 +787,129 @@ export default function SettingsPage() {
           {settings?.hasOpenaiApiKey && (
             <div className="pt-4 border-t">
               <p className="text-sm text-muted-foreground">
-                With OpenAI translation enabled, you can translate quizzes to 10+ languages
-                including Spanish, French, German, Hebrew, Japanese, Chinese, Arabic, Portuguese,
-                Russian, and Italian. Players can select their preferred language when joining.
+                With OpenAI enabled, you can auto-write quizzes, generate themes from wizard answers,
+                translate quizzes to 10+ languages (Spanish, French, German, Hebrew, Japanese, Chinese,
+                Arabic, Portuguese, Russian, Italian), and craft AI congratulatory certificate messages.
+                Players can select their preferred language when joining.
               </p>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Unsplash Images Card */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Image className="w-5 h-5" />
+            Unsplash Images
+          </CardTitle>
+          <CardDescription>
+            Provide an Unsplash Access Key to let AI-created quizzes include real images.
+            Get a key at{" "}
+            <a
+              href="https://unsplash.com/developers"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:underline"
+            >
+              unsplash.com/developers
+            </a>
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Key className="w-4 h-4 text-muted-foreground" />
+              <Label>Unsplash Access Key</Label>
+            </div>
+
+            {settings?.hasUnsplashApiKey ? (
+              <div className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <code className="flex-1 px-3 py-2 bg-muted rounded-md text-sm">
+                    {settings.unsplashApiKey}
+                  </code>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRemoveUnsplashDialog(true)}
+                    disabled={savingUnsplash}
+                  >
+                    Remove
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  AI quiz creation will fetch topical images from Unsplash.
+                </p>
+              </div>
+            ) : showUnsplash ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Input
+                    type="password"
+                    placeholder="Paste your Unsplash access key..."
+                    value={unsplashApiKeyInput}
+                    onChange={(e) => setUnsplashApiKeyInput(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Stored securely and only used server-side for image lookup.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={saveUnsplashSettings}
+                    disabled={!unsplashApiKeyInput || savingUnsplash}
+                  >
+                    {savingUnsplash ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      "Save"
+                    )}
+                  </Button>
+                  <Button variant="outline" onClick={() => setShowUnsplash(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <Button variant="outline" onClick={() => setShowUnsplash(true)}>
+                <Key className="w-4 h-4 mr-2" />
+                Add Unsplash Access Key
+              </Button>
+            )}
+          </div>
+
+          {settings?.hasUnsplashApiKey && (
+            <div className="pt-4 border-t">
+              <p className="text-sm text-muted-foreground">
+                AI quiz creation will attach images to sections and many questions automatically.
+              </p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <AlertDialog open={removeTokenDialogOpen} onOpenChange={setRemoveTokenDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remove ngrok token?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will stop your external tunnel until you add a new token. Are you sure you want to continue?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={saving}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={removeToken}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={saving}
+            >
+              {saving ? "Removing..." : "Remove Token"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Remove Short.io Confirmation Dialog */}
       <Dialog open={showRemoveDialog} onOpenChange={setShowRemoveDialog}>
@@ -779,26 +977,61 @@ export default function SettingsPage() {
         </DialogContent>
       </Dialog>
 
+      {/* Remove Unsplash Confirmation Dialog */}
+      <Dialog open={showRemoveUnsplashDialog} onOpenChange={setShowRemoveUnsplashDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove Unsplash Access Key?</DialogTitle>
+            <DialogDescription>
+              AI quiz creation will stop attaching Unsplash images if you remove this key.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setShowRemoveUnsplashDialog(false)}
+              disabled={savingUnsplash}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={confirmRemoveUnsplashSettings}
+              disabled={savingUnsplash}
+            >
+              {savingUnsplash ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                "Remove API Key"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       {/* Export/Import Dialogs */}
       <ExportDialog
         open={exportDialogOpen}
         onOpenChange={setExportDialogOpen}
         settings={{
-          ngrok_token: settings?.ngrokToken || "",
-          shortio_api_key: settings?.shortioApiKey || "",
+          ngrok_token: settings?.ngrokTokenRaw || "",
+          shortio_api_key: settings?.shortioApiKeyRaw || "",
           shortio_domain: settings?.shortioDomain || "",
-          openai_api_key: settings?.openaiApiKey || "",
+          openai_api_key: settings?.openaiApiKeyRaw || "",
+          unsplash_api_key: settings?.unsplashApiKeyRaw || "",
         }}
+        onExportSuccess={() => setShowExportNotice(true)}
       />
 
       <ImportDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         currentSettings={{
-          ngrok_token: settings?.ngrokToken || "",
-          shortio_api_key: settings?.shortioApiKey || "",
+          ngrok_token: settings?.ngrokTokenRaw || "",
+          shortio_api_key: settings?.shortioApiKeyRaw || "",
           shortio_domain: settings?.shortioDomain || "",
-          openai_api_key: settings?.openaiApiKey || "",
+          openai_api_key: settings?.openaiApiKeyRaw || "",
+          unsplash_api_key: settings?.unsplashApiKeyRaw || "",
         }}
         onImportSuccess={() => {
           // Refresh settings after import

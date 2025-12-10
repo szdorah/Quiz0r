@@ -7,40 +7,36 @@ export function AspectRatioHelper() {
   const [isVisible, setIsVisible] = useState(false);
   const [isOptimalRatio, setIsOptimalRatio] = useState(true);
 
-  // Check if current window ratio is close to 16:9
+  // Check if current window is close to 16:9 and large enough to show content
   const checkAspectRatio = () => {
     if (typeof window === "undefined") return true;
 
     const currentRatio = window.innerWidth / window.innerHeight;
     const targetRatio = 16 / 9;
     const isOptimal = Math.abs(currentRatio - targetRatio) < 0.05; // 5% tolerance
+    // Also require the window to use most of the available screen so content isn't clipped
+    const fillEnough =
+      window.innerWidth >= window.screen.availWidth * 0.85 &&
+      window.innerHeight >= window.screen.availHeight * 0.85;
 
-    return isOptimal;
+    return isOptimal && fillEnough;
   };
 
-  // Calculate optimal 16:9 dimensions
+  // Calculate optimal 16:9 dimensions using ~90% of available screen
   const calculateOptimalDimensions = () => {
-    const currentArea = window.innerWidth * window.innerHeight;
     const targetRatio = 16 / 9;
 
-    let newHeight = Math.sqrt(currentArea / targetRatio);
-    let newWidth = newHeight * targetRatio;
-
-    // Ensure dimensions fit within screen
     const maxWidth = window.screen.availWidth;
     const maxHeight = window.screen.availHeight;
 
-    if (newWidth > maxWidth || newHeight > maxHeight) {
-      // Scale down to fit
-      if (maxWidth / maxHeight > targetRatio) {
-        // Height constrained
-        newHeight = maxHeight * 0.9; // 90% of screen height for padding
-        newWidth = newHeight * targetRatio;
-      } else {
-        // Width constrained
-        newWidth = maxWidth * 0.9; // 90% of screen width for padding
-        newHeight = newWidth / targetRatio;
-      }
+    // Start by using 90% of available width
+    let newWidth = maxWidth * 0.9;
+    let newHeight = newWidth / targetRatio;
+
+    // If height would exceed 90% of available height, clamp to height instead
+    if (newHeight > maxHeight * 0.9) {
+      newHeight = maxHeight * 0.9;
+      newWidth = newHeight * targetRatio;
     }
 
     return {
@@ -78,6 +74,21 @@ export function AspectRatioHelper() {
     return () => {
       window.removeEventListener("resize", updateRatio);
     };
+  }, []);
+
+  // Auto-adjust window to 16:9 on first load if needed
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    if (checkAspectRatio()) return;
+
+    // Small delay so the new window finishes opening before resize/move
+    const timeout = setTimeout(() => {
+      if (!checkAspectRatio()) {
+        handleResize();
+      }
+    }, 150);
+
+    return () => clearTimeout(timeout);
   }, []);
 
   // Track mouse position

@@ -58,7 +58,8 @@ interface QuestionCardProps {
   hintRequired: boolean;
   showHintWarning: boolean;
   translationStatus: "complete" | "partial" | "none";
-  translatedLanguages: LanguageCode[];
+  completeLanguages: LanguageCode[];
+  partialLanguages: LanguageCode[];
 }
 
 export function QuestionCard({
@@ -71,7 +72,8 @@ export function QuestionCard({
   hintRequired,
   showHintWarning,
   translationStatus,
-  translatedLanguages,
+  completeLanguages,
+  partialLanguages,
 }: QuestionCardProps) {
   const isSection = question.questionType === "SECTION";
 
@@ -169,6 +171,30 @@ export function QuestionCard({
                     </>
                   )}
                 </CardDescription>
+                {(completeLanguages.length > 0 || partialLanguages.length > 0) && (
+                  <div className="flex flex-wrap items-center gap-1 mt-1">
+                    {completeLanguages.map((lang) => (
+                      <span
+                        key={`complete-${lang}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-900/40 dark:text-emerald-200 px-2 py-0.5 text-[11px] font-medium"
+                        title={`${SupportedLanguages[lang]?.name || lang} translation complete`}
+                      >
+                        <span>{SupportedLanguages[lang]?.flag}</span>
+                        <span>Full</span>
+                      </span>
+                    ))}
+                    {partialLanguages.map((lang) => (
+                      <span
+                        key={`partial-${lang}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 px-2 py-0.5 text-[11px] font-medium"
+                        title={`${SupportedLanguages[lang]?.name || lang} translation incomplete`}
+                      >
+                        <span>{SupportedLanguages[lang]?.flag}</span>
+                        <span>Partial</span>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Warning Badges & Actions */}
@@ -197,10 +223,18 @@ export function QuestionCard({
                     </TooltipTrigger>
                     <TooltipContent>
                       <p>Some translations incomplete</p>
-                      {translatedLanguages.length > 0 && (
+                      {completeLanguages.length > 0 && (
                         <p className="text-xs text-muted-foreground">
                           Complete:{" "}
-                          {translatedLanguages
+                          {completeLanguages
+                            .map((l) => SupportedLanguages[l]?.flag)
+                            .join(" ")}
+                        </p>
+                      )}
+                      {partialLanguages.length > 0 && (
+                        <p className="text-xs text-muted-foreground">
+                          Needs work:{" "}
+                          {partialLanguages
                             .map((l) => SupportedLanguages[l]?.flag)
                             .join(" ")}
                         </p>
@@ -211,18 +245,18 @@ export function QuestionCard({
 
                 {/* Translation Complete Indicator */}
                 {translationStatus === "complete" &&
-                  translatedLanguages.length > 0 && (
+                  completeLanguages.length > 0 && (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="flex items-center gap-0.5 px-1">
-                          {translatedLanguages.slice(0, 3).map((lang) => (
+                          {completeLanguages.slice(0, 3).map((lang) => (
                             <span key={lang} className="text-xs leading-none">
                               {SupportedLanguages[lang]?.flag}
                             </span>
                           ))}
-                          {translatedLanguages.length > 3 && (
+                          {completeLanguages.length > 3 && (
                             <span className="text-xs text-muted-foreground">
-                              +{translatedLanguages.length - 3}
+                              +{completeLanguages.length - 3}
                             </span>
                           )}
                         </div>
@@ -230,7 +264,7 @@ export function QuestionCard({
                       <TooltipContent>
                         <p>Translations complete</p>
                         <p className="text-xs text-muted-foreground">
-                          {translatedLanguages
+                          {completeLanguages
                             .map((l) => SupportedLanguages[l]?.name)
                             .join(", ")}
                         </p>

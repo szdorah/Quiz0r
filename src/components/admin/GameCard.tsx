@@ -5,7 +5,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { GameListItem } from "@/types/admin";
 import { formatDistanceToNow } from "date-fns";
 
@@ -49,11 +49,13 @@ export function GameCard({ game, onClick }: GameCardProps) {
           <div className="flex items-center gap-2">
             {game.topPlayers.map((player, idx) => (
               <div key={player.id} className="flex items-center gap-1">
-                <Avatar
-                  style={{ backgroundColor: player.avatarColor }}
-                  className="w-6 h-6 text-xs"
-                >
-                  {player.avatarEmoji || player.name.charAt(0)}
+                <Avatar className="w-6 h-6">
+                  <AvatarFallback
+                    style={{ backgroundColor: player.avatarColor }}
+                    className="text-xs"
+                  >
+                    {player.avatarEmoji || player.name.charAt(0)}
+                  </AvatarFallback>
                 </Avatar>
                 <span className="text-xs">
                   {idx === 0 ? "🥇" : idx === 1 ? "🥈" : "🥉"}

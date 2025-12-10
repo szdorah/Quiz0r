@@ -19,6 +19,10 @@ dist
 .DS_Store
 *.pem
 
+# Local database
+data/*
+!data/.gitkeep
+
 # Debug
 npm-debug.log*
 yarn-debug.log*

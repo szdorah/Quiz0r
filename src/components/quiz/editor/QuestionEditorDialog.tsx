@@ -754,7 +754,21 @@ export function QuestionEditorDialog({
 
                   {/* Answer Translations */}
                   <div className="space-y-3">
-                    <Label>Answers</Label>
+                    <div className="flex items-center justify-between">
+                      <Label>Answers</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          answers.forEach((answer) =>
+                            onCopyAnswerToTranslation(answer, lang)
+                          )
+                        }
+                      >
+                        <Copy className="w-3 h-3 mr-1" />
+                        Copy English
+                      </Button>
+                    </div>
                     {answers.map((answer, index) => (
                       <div key={index} className="grid grid-cols-2 gap-2">
                         <Input

@@ -55,6 +55,19 @@ export default function GamesPage() {
     }
   }
 
+  function handleGameDeleted(gameId: string) {
+    setSelectedGameId(null);
+    setGames((prev) => prev.filter((g) => g.id !== gameId));
+
+    const isLastGameOnPage = games.length === 1 && pagination.page > 1;
+    if (isLastGameOnPage) {
+      setPagination((prev) => ({ ...prev, page: prev.page - 1 }));
+      return;
+    }
+
+    fetchGames();
+  }
+
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -127,6 +140,7 @@ export default function GamesPage() {
       <GameSidePanel
         gameId={selectedGameId}
         onClose={() => setSelectedGameId(null)}
+        onDeleted={handleGameDeleted}
       />
     </div>
   );

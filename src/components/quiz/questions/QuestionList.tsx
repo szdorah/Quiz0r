@@ -49,7 +49,14 @@ interface QuestionListProps {
   questions: Question[];
   hintRequired: boolean;
   translationStatuses: TranslationStatus[];
-  questionTranslationStatuses: Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>;
+  questionTranslationStatuses: Map<
+    string,
+    {
+      status: "complete" | "partial" | "none";
+      completeLanguages: LanguageCode[];
+      partialLanguages: LanguageCode[];
+    }
+  >;
   activeId: string | null;
   onDragStart: (event: DragStartEvent) => void;
   onDragEnd: (event: DragEndEvent) => void;
@@ -141,7 +148,12 @@ export function QuestionList({
     : 0;
 
   // Check if we have any translations at all
-  const hasTranslations = translationStatuses.some((t) => t.translatedFields > 0);
+  const hasTranslations =
+    translationStatuses.some((t) => t.translatedFields > 0) ||
+    Array.from(questionTranslationStatuses.values()).some(
+      (info) =>
+        info.completeLanguages.length > 0 || info.partialLanguages.length > 0
+    );
 
   if (questions.length === 0) {
     return <QuestionEmptyState onAddQuestion={onAddQuestion} />;
@@ -179,7 +191,8 @@ export function QuestionList({
                         ? sectionTranslationInfo?.status || "none"
                         : "none"
                     }
-                    translatedLanguages={sectionTranslationInfo?.languages || []}
+                    completeLanguages={sectionTranslationInfo?.completeLanguages || []}
+                    partialLanguages={sectionTranslationInfo?.partialLanguages || []}
                   />
                 );
               })()}
@@ -206,7 +219,8 @@ export function QuestionList({
                         ? translationInfo?.status || "none"
                         : "none"
                     }
-                    translatedLanguages={translationInfo?.languages || []}
+                    completeLanguages={translationInfo?.completeLanguages || []}
+                    partialLanguages={translationInfo?.partialLanguages || []}
                   />
                 );
               })}

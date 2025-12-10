@@ -12,6 +12,16 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
   AlertCircle,
@@ -22,6 +32,9 @@ import {
   Languages,
 } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
 import { SupportedLanguages, type LanguageCode, type TranslationStatus } from "@/types";
 import { toast } from "sonner";
 
@@ -61,6 +74,7 @@ interface Quiz {
   copyAnswerCount: number;
   doublePointsCount: number;
   questions: Question[];
+  aiGenerated?: boolean;
 }
 
 interface SectionGroup {
@@ -116,6 +130,11 @@ export default function QuestionsPage({
   const [editingQuestion, setEditingQuestion] = useState<Question | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [settingsSidebarOpen, setSettingsSidebarOpen] = useState(false);
+  const [editQuizDetailsOpen, setEditQuizDetailsOpen] = useState(false);
+  const [quizTitleInput, setQuizTitleInput] = useState("");
+  const [quizDescriptionInput, setQuizDescriptionInput] = useState("");
+  const [savingQuizDetails, setSavingQuizDetails] = useState(false);
+  const [quizDetailsError, setQuizDetailsError] = useState("");
 
   // Form state
   const [questionText, setQuestionText] = useState("");
@@ -166,7 +185,18 @@ export default function QuestionsPage({
   const [deleteResult, setDeleteResult] = useState<{ success: boolean; error?: string } | null>(null);
 
   // Question translation status for individual cards
-  const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>>(new Map());
+  const [questionTranslationStatuses, setQuestionTranslationStatuses] = useState<
+    Map<
+      string,
+      {
+        status: "complete" | "partial" | "none";
+        completeLanguages: LanguageCode[];
+        partialLanguages: LanguageCode[];
+      }
+    >
+  >(new Map());
+  const [questionToDelete, setQuestionToDelete] = useState<Question | null>(null);
+  const [deletingQuestion, setDeletingQuestion] = useState(false);
 
   useEffect(() => {
     fetchQuiz();
@@ -179,9 +209,18 @@ export default function QuestionsPage({
       if (res.ok) {
         const data = await res.json();
         setQuiz(data);
+        setQuizTitleInput(data.title || "");
+        setQuizDescriptionInput(data.description || "");
 
         // Compute per-question/section translation status
-        const statusMap = new Map<string, { status: "complete" | "partial" | "none"; languages: LanguageCode[] }>();
+        const statusMap = new Map<
+          string,
+          {
+            status: "complete" | "partial" | "none";
+            completeLanguages: LanguageCode[];
+            partialLanguages: LanguageCode[];
+          }
+        >();
 
         if (data.questions) {
           for (const question of data.questions) {
@@ -195,9 +234,14 @@ export default function QuestionsPage({
               });
 
               if (langCodes.size === 0) {
-                statusMap.set(question.id, { status: "none", languages: [] });
+                statusMap.set(question.id, {
+                  status: "none",
+                  completeLanguages: [],
+                  partialLanguages: [],
+                });
               } else {
                 const completeLangs: LanguageCode[] = [];
+                const partialLangs: LanguageCode[] = [];
                 let hasPartial = false;
 
                 for (const lang of Array.from(langCodes)) {
@@ -213,13 +257,15 @@ export default function QuestionsPage({
                   if (hasTitle && hasDescription) {
                     completeLangs.push(lang);
                   } else {
+                    partialLangs.push(lang);
                     hasPartial = true;
                   }
                 }
 
                 statusMap.set(question.id, {
                   status: hasPartial ? "partial" : "complete",
-                  languages: completeLangs,
+                  completeLanguages: completeLangs,
+                  partialLanguages: partialLangs,
                 });
               }
               continue;
@@ -238,10 +284,15 @@ export default function QuestionsPage({
             });
 
             if (langCodes.size === 0) {
-              statusMap.set(question.id, { status: "none", languages: [] });
+              statusMap.set(question.id, {
+                status: "none",
+                completeLanguages: [],
+                partialLanguages: [],
+              });
             } else {
               // Check if all languages are complete
               const completeLangs: LanguageCode[] = [];
+              const partialLangs: LanguageCode[] = [];
               let hasPartial = false;
 
               for (const lang of Array.from(langCodes)) {
@@ -256,13 +307,15 @@ export default function QuestionsPage({
                 if (hasQuestionText && translatedAnswerCount >= answerCount) {
                   completeLangs.push(lang);
                 } else {
+                  partialLangs.push(lang);
                   hasPartial = true;
                 }
               }
 
               statusMap.set(question.id, {
                 status: hasPartial ? "partial" : "complete",
-                languages: completeLangs,
+                completeLanguages: completeLangs,
+                partialLanguages: partialLangs,
               });
             }
           }
@@ -274,6 +327,58 @@ export default function QuestionsPage({
       console.error("Failed to fetch quiz:", error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  function openEditQuizDetails() {
+    if (!quiz) return;
+    setQuizTitleInput(quiz.title || "");
+    setQuizDescriptionInput(quiz.description || "");
+    setQuizDetailsError("");
+    setEditQuizDetailsOpen(true);
+  }
+
+  async function saveQuizDetails() {
+    if (!quiz) return;
+
+    const trimmedTitle = quizTitleInput.trim();
+    const trimmedDescription = quizDescriptionInput.trim();
+
+    if (!trimmedTitle) {
+      setQuizDetailsError("Title is required");
+      return;
+    }
+
+    setSavingQuizDetails(true);
+    setQuizDetailsError("");
+
+    try {
+      const res = await fetch(`/api/quizzes/${quiz.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          description: trimmedDescription,
+        }),
+      });
+
+      if (res.ok) {
+        setQuiz((prev) =>
+          prev ? { ...prev, title: trimmedTitle, description: trimmedDescription || null } : prev
+        );
+        setQuizTitleInput(trimmedTitle);
+        setQuizDescriptionInput(trimmedDescription);
+        setEditQuizDetailsOpen(false);
+        toast.success("Quiz details updated");
+      } else {
+        const data = await res.json().catch(() => null);
+        setQuizDetailsError(data?.error || "Failed to update quiz");
+      }
+    } catch (error) {
+      console.error("Failed to update quiz:", error);
+      setQuizDetailsError("Failed to update quiz");
+    } finally {
+      setSavingQuizDetails(false);
     }
   }
 
@@ -442,7 +547,7 @@ export default function QuestionsPage({
 
   async function saveTranslationForLanguage(lang: LanguageCode) {
     if (!editingQuestion?.id) {
-      alert("Save the question before editing translations.");
+      toast.error("Save the question before editing translations.");
       return;
     }
 
@@ -477,15 +582,15 @@ export default function QuestionsPage({
       );
 
       if (res.ok) {
-        alert(`Saved ${SupportedLanguages[lang].name} translation`);
+        toast.success(`Saved ${SupportedLanguages[lang].name} translation`);
         await loadQuestionTranslations(editingQuestion.id);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save translation");
+        toast.error(data.error || "Failed to save translation");
       }
     } catch (error) {
       console.error("Failed to save translation:", error);
-      alert("Failed to save translation");
+      toast.error("Failed to save translation");
     } finally {
       setSavingTranslation((current) => (current === lang ? null : current));
     }
@@ -599,11 +704,11 @@ export default function QuestionsPage({
         setActiveTranslationTab(lang);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to auto-translate question");
+        toast.error(data.error || "Failed to auto-translate question");
       }
     } catch (error) {
       console.error("Failed to auto-translate:", error);
-      alert("Failed to auto-translate question");
+      toast.error("Failed to auto-translate question");
     } finally {
       setAutoTranslatingQuestion(null);
     }
@@ -655,7 +760,7 @@ export default function QuestionsPage({
 
   async function saveSection() {
     if (!questionText.trim()) {
-      alert("Section title is required");
+      toast.error("Section title is required");
       return;
     }
 
@@ -691,11 +796,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save section");
+        toast.error(data.error || "Failed to save section");
       }
     } catch (error) {
       console.error("Failed to save section:", error);
-      alert("Failed to save section");
+      toast.error("Failed to save section");
     }
   }
 
@@ -718,11 +823,11 @@ export default function QuestionsPage({
         setImageUrl(data.url);
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to upload image");
+        toast.error(data.error || "Failed to upload image");
       }
     } catch (error) {
       console.error("Upload error:", error);
-      alert("Failed to upload image");
+      toast.error("Failed to upload image");
     } finally {
       setUploading(false);
     }
@@ -734,35 +839,35 @@ export default function QuestionsPage({
 
   async function saveQuestion() {
     if (!questionText.trim()) {
-      alert("Question text is required");
+      toast.error("Question text is required");
       return;
     }
 
     const validAnswers = answers.filter((a) => a.answerText.trim());
 
     if (validAnswers.length < 2) {
-      alert("At least 2 answers are required");
+      toast.error("At least 2 answers are required");
       return;
     }
 
     if (!validAnswers.some((a) => a.isCorrect)) {
-      alert("At least one answer must be marked as correct");
+      toast.error("At least one answer must be marked as correct");
       return;
     }
 
     if (easterEggEnabled) {
       if (!easterEggButtonText.trim()) {
-        alert("Easter egg button text is required");
+        toast.error("Easter egg button text is required");
         return;
       }
       if (!easterEggUrl.trim() || !easterEggUrl.match(/^https?:\/\/.+/)) {
-        alert("Easter egg URL must be a valid HTTP/HTTPS URL");
+        toast.error("Easter egg URL must be a valid HTTP/HTTPS URL");
         return;
       }
     }
 
     if (quiz && quiz.hintCount > 0 && !hint.trim()) {
-      alert("Hint is required when Hint power-up is enabled");
+      toast.error("Hint is required when Hint power-up is enabled");
       return;
     }
 
@@ -803,11 +908,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to save question");
+        toast.error(data.error || "Failed to save question");
       }
     } catch (error) {
       console.error("Failed to save question:", error);
-      alert("Failed to save question");
+      toast.error("Failed to save question");
     }
   }
 
@@ -843,18 +948,33 @@ export default function QuestionsPage({
     }
   }
 
-  async function deleteQuestion(questionId: string) {
-    if (!confirm("Are you sure you want to delete this question?")) return;
+  function requestDeleteQuestion(questionId: string) {
+    if (!quiz) return;
+    const question = quiz.questions.find((q) => q.id === questionId) || null;
+    setQuestionToDelete(question);
+  }
+
+  async function deleteQuestion() {
+    if (!questionToDelete) return;
+    setDeletingQuestion(true);
 
     try {
-      const res = await fetch(`/api/quizzes/${quizId}/questions/${questionId}`, {
+      const res = await fetch(`/api/quizzes/${quizId}/questions/${questionToDelete.id}`, {
         method: "DELETE",
       });
       if (res.ok) {
+        toast.success("Question deleted");
         fetchQuiz();
+      } else {
+        const data = await res.json().catch(() => null);
+        toast.error(data?.error || "Failed to delete question");
       }
     } catch (error) {
       console.error("Failed to delete question:", error);
+      toast.error("Failed to delete question");
+    } finally {
+      setDeletingQuestion(false);
+      setQuestionToDelete(null);
     }
   }
 
@@ -889,11 +1009,11 @@ export default function QuestionsPage({
         fetchQuiz();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to duplicate question");
+        toast.error(data.error || "Failed to duplicate question");
       }
     } catch (error) {
       console.error("Failed to duplicate question:", error);
-      alert("Failed to duplicate question");
+      toast.error("Failed to duplicate question");
     }
   }
 
@@ -1021,6 +1141,7 @@ export default function QuestionsPage({
         onExportQuiz={handleExport}
         isExporting={exporting}
         settingsOpen={settingsSidebarOpen}
+        onEditQuizDetails={openEditQuizDetails}
       />
 
       {/* Questions List */}
@@ -1033,13 +1154,43 @@ export default function QuestionsPage({
         onDragStart={handleDragStart}
         onDragEnd={handleDragEnd}
         onEdit={openEditDialog}
-        onDelete={deleteQuestion}
+        onDelete={requestDeleteQuestion}
         onDuplicate={duplicateQuestion}
         onAddQuestion={() => {
           resetForm();
           setDialogOpen(true);
         }}
       />
+
+      <AlertDialog open={!!questionToDelete} onOpenChange={(open) => !open && setQuestionToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this question?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove{" "}
+              <strong>{questionToDelete?.questionText || "this question"}</strong>{" "}
+              from the quiz.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deletingQuestion}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={deleteQuestion}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deletingQuestion}
+            >
+              {deletingQuestion ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Question"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Settings Sidebar */}
       <QuizSettingsSidebar
@@ -1049,6 +1200,85 @@ export default function QuestionsPage({
         onUpdateAutoAdmit={updateAutoAdmit}
         onUpdatePowerUp={updatePowerUpCount}
       />
+
+      {/* Edit quiz details */}
+      <Dialog
+        open={editQuizDetailsOpen}
+        onOpenChange={(open) => {
+          setEditQuizDetailsOpen(open);
+          if (open && quiz) {
+            setQuizTitleInput(quiz.title || "");
+            setQuizDescriptionInput(quiz.description || "");
+          } else {
+            setQuizDetailsError("");
+          }
+        }}
+      >
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Edit quiz details</DialogTitle>
+            <DialogDescription>
+              Update the title and description shown to hosts and players.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form
+            className="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              saveQuizDetails();
+            }}
+          >
+            <div className="space-y-2">
+              <Label htmlFor="quiz-title">Title</Label>
+              <Input
+                id="quiz-title"
+                value={quizTitleInput}
+                onChange={(e) => setQuizTitleInput(e.target.value)}
+                placeholder="Enter quiz title"
+                disabled={savingQuizDetails}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="quiz-description">Description (optional)</Label>
+              <Textarea
+                id="quiz-description"
+                value={quizDescriptionInput}
+                onChange={(e) => setQuizDescriptionInput(e.target.value)}
+                placeholder="What is this quiz about?"
+                disabled={savingQuizDetails}
+                rows={3}
+              />
+            </div>
+
+            {quizDetailsError && (
+              <p className="text-sm text-destructive">{quizDetailsError}</p>
+            )}
+
+            <div className="flex justify-end gap-2 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditQuizDetailsOpen(false)}
+                disabled={savingQuizDetails}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={savingQuizDetails}>
+                {savingQuizDetails ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  "Save changes"
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Question Editor Dialog */}
       <QuestionEditorDialog

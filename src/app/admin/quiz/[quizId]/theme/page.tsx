@@ -1,124 +1,151 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { ThemePreview, ThemePreviewMini } from "@/components/admin/ThemePreview";
-import { QuizTheme, DEFAULT_THEME } from "@/types/theme";
-import { parseTheme, validateThemeJson, stringifyTheme } from "@/lib/theme";
-import { THEME_PRESETS, PRESET_LIST } from "@/lib/theme-presets";
-import { generateAIPrompt, ThemeWizardAnswers } from "@/lib/theme-template";
 import {
-  ArrowLeft,
-  Palette,
-  Sparkles,
-  Copy,
-  Check,
-  Loader2,
-  Trash2,
-  Wand2,
-} from "lucide-react";
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import { ThemePreview, ThemePreviewMini } from "@/components/admin/ThemePreview";
+import { DEFAULT_THEME, QuizTheme } from "@/types/theme";
+import { parseTheme, stringifyTheme } from "@/lib/theme";
+import { PRESET_LIST, THEME_PRESETS } from "@/lib/theme-presets";
+import { ArrowLeft, Check, Loader2, Palette, Plus } from "lucide-react";
 
 interface Props {
   params: { quizId: string };
 }
 
-type TabType = "presets" | "wizard" | "json";
+interface ThemeRecord {
+  id: string;
+  name: string;
+  description: string | null;
+  theme: string;
+}
 
-export default function ThemeEditorPage({ params }: Props) {
+type ThemeOption = {
+  id: string;
+  name: string;
+  description: string;
+  source: "none" | "builtin" | "custom";
+  themeJson: string | null;
+  preview: QuizTheme;
+};
+
+export default function QuizThemeApplyPage({ params }: Props) {
   const { quizId } = params;
   const router = useRouter();
 
   const [quizTitle, setQuizTitle] = useState("");
-  const [currentTheme, setCurrentTheme] = useState<QuizTheme | null>(null);
-  const [themeJson, setThemeJson] = useState("");
-  const [previewTheme, setPreviewTheme] = useState<QuizTheme | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [currentThemeJson, setCurrentThemeJson] = useState<string | null>(null);
+  const [customThemes, setCustomThemes] = useState<ThemeRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<TabType>("presets");
+  const [error, setError] = useState<string | null>(null);
+  const [selectedId, setSelectedId] = useState<string>("none");
 
-  // Wizard form state
-  const [wizardAnswers, setWizardAnswers] = useState<ThemeWizardAnswers>({
-    topic: "",
-    mood: "",
-    colors: "",
-    backgroundAnimation: "",
-    celebration: "",
-  });
-
-  // Load current theme
   useEffect(() => {
-    async function loadTheme() {
+    async function loadData() {
       try {
-        const res = await fetch(`/api/quizzes/${quizId}/theme`);
-        if (res.ok) {
-          const data = await res.json();
+        const [quizRes, themeRes] = await Promise.all([
+          fetch(`/api/quizzes/${quizId}/theme`),
+          fetch("/api/themes"),
+        ]);
+
+        if (quizRes.ok) {
+          const data = await quizRes.json();
           setQuizTitle(data.title);
-          if (data.theme) {
-            const parsed = parseTheme(data.theme);
-            setCurrentTheme(parsed);
-            setPreviewTheme(parsed);
-            setThemeJson(data.theme);
-          }
+          setCurrentThemeJson(data.theme);
+        }
+
+        if (themeRes.ok) {
+          const data = await themeRes.json();
+          setCustomThemes(data.themes || []);
         }
       } catch (err) {
-        console.error("Failed to load theme:", err);
+        console.error("Failed to load theme data:", err);
       } finally {
         setLoading(false);
       }
     }
 
-    loadTheme();
+    loadData();
   }, [quizId]);
 
-  // Handle JSON input change
-  const handleJsonChange = (value: string) => {
-    setThemeJson(value);
-    setError(null);
+  const options: ThemeOption[] = useMemo(() => {
+    const base: ThemeOption[] = [
+      {
+        id: "none",
+        name: "Use default",
+        description: "Fallback styling of the app",
+        source: "none",
+        themeJson: null,
+        preview: DEFAULT_THEME,
+      },
+      {
+        id: "default",
+        name: "Default theme",
+        description: "App base styling",
+        source: "builtin",
+        themeJson: stringifyTheme(DEFAULT_THEME),
+        preview: DEFAULT_THEME,
+      },
+      ...PRESET_LIST.map((preset) => ({
+        id: `builtin-${preset.id}`,
+        name: preset.name,
+        description: preset.description,
+        source: "builtin" as const,
+        themeJson: stringifyTheme(THEME_PRESETS[preset.id]),
+        preview: THEME_PRESETS[preset.id],
+      })),
+      ...customThemes.map((theme) => ({
+        id: theme.id,
+        name: theme.name,
+        description: theme.description || "Custom theme",
+        source: "custom" as const,
+        themeJson: theme.theme,
+        preview: parseTheme(theme.theme) || DEFAULT_THEME,
+      })),
+    ];
 
-    if (!value.trim()) {
-      setPreviewTheme(null);
+    if (currentThemeJson) {
+      const match = base.find((opt) => opt.themeJson === currentThemeJson);
+      if (!match) {
+        const parsed = parseTheme(currentThemeJson);
+        base.push({
+          id: "custom-current",
+          name: parsed?.name || "Current theme",
+          description: "Currently applied to this quiz",
+          source: "custom",
+          themeJson: currentThemeJson,
+          preview: parsed || DEFAULT_THEME,
+        });
+      }
+    }
+
+    return base;
+  }, [customThemes, currentThemeJson]);
+
+  useEffect(() => {
+    if (!currentThemeJson) {
+      setSelectedId("none");
       return;
     }
 
-    const validationError = validateThemeJson(value);
-    if (validationError) {
-      setError(validationError);
-      setPreviewTheme(currentTheme);
-    } else {
-      const parsed = parseTheme(value);
-      setPreviewTheme(parsed);
-    }
-  };
+    const matching = options.find((opt) => opt.themeJson === currentThemeJson);
+    setSelectedId(matching ? matching.id : "custom-current");
+  }, [currentThemeJson, options]);
 
-  // Select preset
-  const selectPreset = (presetId: string) => {
-    const preset = THEME_PRESETS[presetId];
-    if (preset) {
-      const json = stringifyTheme(preset);
-      setThemeJson(json);
-      setPreviewTheme(preset);
-      setError(null);
-    }
-  };
+  const selectedOption = options.find((opt) => opt.id === selectedId) || options[0];
 
-  // Copy AI prompt to clipboard
-  const copyAIPrompt = async () => {
-    const prompt = generateAIPrompt(wizardAnswers);
-    await navigator.clipboard.writeText(prompt);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const applyTheme = async () => {
+    if (!selectedOption) return;
 
-  // Save theme
-  const saveTheme = async () => {
     setSaving(true);
     setError(null);
 
@@ -126,42 +153,18 @@ export default function ThemeEditorPage({ params }: Props) {
       const res = await fetch(`/api/quizzes/${quizId}/theme`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ theme: themeJson || null }),
+        body: JSON.stringify({ theme: selectedOption.themeJson }),
       });
 
       if (res.ok) {
-        const data = await res.json();
-        const parsed = parseTheme(data.theme);
-        setCurrentTheme(parsed);
         router.push(`/admin/quiz/${quizId}/questions`);
       } else {
         const data = await res.json();
-        setError(data.error || "Failed to save theme");
+        setError(data.error || "Failed to apply theme");
       }
     } catch (err) {
-      console.error("Failed to save theme:", err);
-      setError("Failed to save theme");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // Clear theme
-  const clearTheme = async () => {
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/quizzes/${quizId}/theme`, {
-        method: "DELETE",
-      });
-
-      if (res.ok) {
-        setCurrentTheme(null);
-        setPreviewTheme(null);
-        setThemeJson("");
-        setError(null);
-      }
-    } catch (err) {
-      console.error("Failed to clear theme:", err);
+      console.error("Failed to apply theme:", err);
+      setError("Failed to apply theme");
     } finally {
       setSaving(false);
     }
@@ -189,245 +192,72 @@ export default function ThemeEditorPage({ params }: Props) {
             <div>
               <h1 className="text-xl font-bold flex items-center gap-2">
                 <Palette className="w-5 h-5" />
-                Theme Editor
+                Apply Theme
               </h1>
               <p className="text-sm text-muted-foreground">{quizTitle}</p>
             </div>
           </div>
           <div className="flex gap-2">
-            {currentTheme && (
-              <Button variant="outline" onClick={clearTheme} disabled={saving}>
-                <Trash2 className="w-4 h-4 mr-2" />
-                Clear Theme
+            <Link href="/admin/themes">
+              <Button variant="outline">
+                <Plus className="w-4 h-4 mr-2" />
+                Manage Themes
               </Button>
-            )}
-            <Button onClick={saveTheme} disabled={saving || !!error}>
+            </Link>
+            <Button onClick={applyTheme} disabled={saving}>
               {saving ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Check className="w-4 h-4 mr-2" />
               )}
-              Save Theme
+              Apply Theme
             </Button>
           </div>
         </div>
       </header>
 
       <main className="container mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Left: Theme Configuration */}
-          <div className="space-y-6">
-            {/* Tab Buttons */}
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === "presets" ? "default" : "outline"}
-                onClick={() => setActiveTab("presets")}
-                size="sm"
-              >
-                <Sparkles className="w-4 h-4 mr-2" />
-                Presets
-              </Button>
-              <Button
-                variant={activeTab === "wizard" ? "default" : "outline"}
-                onClick={() => setActiveTab("wizard")}
-                size="sm"
-              >
-                <Wand2 className="w-4 h-4 mr-2" />
-                AI Wizard
-              </Button>
-              <Button
-                variant={activeTab === "json" ? "default" : "outline"}
-                onClick={() => setActiveTab("json")}
-                size="sm"
-              >
-                JSON
-              </Button>
-            </div>
-
-            {/* Presets Tab */}
-            {activeTab === "presets" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Theme Presets</CardTitle>
-                  <CardDescription>
-                    Choose a pre-made theme to get started quickly
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-2 gap-4">
-                    {/* Default Theme */}
-                    <button
-                      onClick={() => {
-                        setThemeJson(stringifyTheme(DEFAULT_THEME));
-                        setPreviewTheme(DEFAULT_THEME);
-                        setError(null);
-                      }}
-                      className="text-left p-3 rounded-lg border hover:border-primary transition-colors"
-                    >
-                      <ThemePreviewMini theme={DEFAULT_THEME} />
-                      <p className="font-medium mt-2">Default</p>
-                      <p className="text-xs text-muted-foreground">
-                        Purple theme (current)
-                      </p>
-                    </button>
-
-                    {/* Other Presets */}
-                    {PRESET_LIST.map((preset) => (
-                      <button
-                        key={preset.id}
-                        onClick={() => selectPreset(preset.id)}
-                        className="text-left p-3 rounded-lg border hover:border-primary transition-colors"
-                      >
-                        <ThemePreviewMini theme={THEME_PRESETS[preset.id]} />
-                        <p className="font-medium mt-2">{preset.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {preset.description}
-                        </p>
-                      </button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* AI Wizard Tab */}
-            {activeTab === "wizard" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>AI Theme Wizard</CardTitle>
-                  <CardDescription>
-                    Answer a few questions, then copy the prompt to ChatGPT or Claude
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="topic">What is your quiz about?</Label>
-                    <Input
-                      id="topic"
-                      placeholder="e.g., Christmas Trivia, Science Quiz, Movie Night"
-                      value={wizardAnswers.topic}
-                      onChange={(e) =>
-                        setWizardAnswers({ ...wizardAnswers, topic: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="mood">What mood do you want?</Label>
-                    <Input
-                      id="mood"
-                      placeholder="e.g., fun and playful, professional, spooky, festive"
-                      value={wizardAnswers.mood}
-                      onChange={(e) =>
-                        setWizardAnswers({ ...wizardAnswers, mood: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="colors">Preferred colors (optional)</Label>
-                    <Input
-                      id="colors"
-                      placeholder="e.g., blues and greens, warm sunset colors, neon"
-                      value={wizardAnswers.colors}
-                      onChange={(e) =>
-                        setWizardAnswers({ ...wizardAnswers, colors: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="background">Background animation</Label>
-                    <Input
-                      id="background"
-                      placeholder="e.g., falling snow, twinkling stars, bubbles, none"
-                      value={wizardAnswers.backgroundAnimation}
-                      onChange={(e) =>
-                        setWizardAnswers({
-                          ...wizardAnswers,
-                          backgroundAnimation: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="celebration">Celebration effect</Label>
-                    <Input
-                      id="celebration"
-                      placeholder="e.g., confetti, sparkles, fireworks, simple glow"
-                      value={wizardAnswers.celebration}
-                      onChange={(e) =>
-                        setWizardAnswers({
-                          ...wizardAnswers,
-                          celebration: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <Button
-                    onClick={copyAIPrompt}
-                    disabled={!wizardAnswers.topic || !wizardAnswers.mood}
-                    className="w-full"
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="lg:col-span-2 space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle>Select a Theme</CardTitle>
+                <CardDescription>
+                  Choose from built-in presets or your saved custom themes
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                {options.map((option) => (
+                  <button
+                    key={option.id}
+                    onClick={() => setSelectedId(option.id)}
+                    className={`text-left rounded-lg border p-3 transition-colors ${
+                      selectedId === option.id ? "border-primary shadow-sm" : "hover:border-primary"
+                    }`}
                   >
-                    {copied ? (
-                      <>
-                        <Check className="w-4 h-4 mr-2" />
-                        Copied!
-                      </>
-                    ) : (
-                      <>
-                        <Copy className="w-4 h-4 mr-2" />
-                        Copy Prompt for AI
-                      </>
-                    )}
-                  </Button>
-
-                  <div className="text-sm text-muted-foreground space-y-2 pt-2 border-t">
-                    <p className="font-medium">Next steps:</p>
-                    <ol className="list-decimal list-inside space-y-1">
-                      <li>Click &quot;Copy Prompt for AI&quot; above</li>
-                      <li>Paste into ChatGPT, Claude, or your preferred AI</li>
-                      <li>Copy the JSON response from the AI</li>
-                      <li>Go to the JSON tab and paste it there</li>
-                    </ol>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* JSON Tab */}
-            {activeTab === "json" && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Theme JSON</CardTitle>
-                  <CardDescription>
-                    Paste your theme JSON here (from AI or manual editing)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Textarea
-                    value={themeJson}
-                    onChange={(e) => handleJsonChange(e.target.value)}
-                    placeholder="Paste your theme JSON here..."
-                    className="font-mono text-sm min-h-[400px]"
-                  />
-                  {error && (
-                    <p className="text-sm text-destructive">{error}</p>
-                  )}
-                </CardContent>
-              </Card>
+                    <ThemePreviewMini theme={option.preview} />
+                    <p className="font-medium mt-2">{option.name}</p>
+                    <p className="text-xs text-muted-foreground line-clamp-2">
+                      {option.description}
+                    </p>
+                    <p className="text-[11px] uppercase tracking-wide text-muted-foreground mt-1">
+                      {option.source === "builtin" ? "Built-in" : option.source === "custom" ? "Custom" : "Default"}
+                    </p>
+                  </button>
+                ))}
+              </CardContent>
+            </Card>
+            {error && (
+              <p className="text-sm text-destructive px-2">{error}</p>
             )}
           </div>
 
-          {/* Right: Preview */}
           <div className="space-y-4">
             <h2 className="text-lg font-semibold">Preview</h2>
-            <ThemePreview theme={previewTheme} />
+            <ThemePreview theme={selectedOption?.preview || DEFAULT_THEME} />
             <p className="text-sm text-muted-foreground">
-              {previewTheme
-                ? `Previewing: ${previewTheme.name}`
+              {selectedOption?.preview
+                ? `Previewing: ${selectedOption.preview.name}`
                 : "Using default theme"}
             </p>
           </div>

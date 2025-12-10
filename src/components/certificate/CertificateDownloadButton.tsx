@@ -2,9 +2,17 @@
 
 import { Button } from "@/components/ui/button";
 import { Download, Loader2, Check, X, Clock } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { toast } from "sonner";
 import { getFilenameFromResponse } from "@/lib/certificate-utils";
+
+export type CertificateButtonState =
+  | "checking"
+  | "ready"
+  | "downloading"
+  | "success"
+  | "error"
+  | "generating";
 
 interface CertificateDownloadButtonProps {
   gameCode: string;
@@ -13,6 +21,8 @@ interface CertificateDownloadButtonProps {
   type: "host" | "player";
   disabled?: boolean;
   size?: "default" | "sm" | "lg"; // Button size
+  className?: string;
+  onStateChange?: (state: CertificateButtonState) => void;
 }
 
 export function CertificateDownloadButton({
@@ -22,67 +32,92 @@ export function CertificateDownloadButton({
   type,
   disabled,
   size = "lg", // Default to lg for backwards compatibility
+  className,
+  onStateChange,
 }: CertificateDownloadButtonProps) {
-  const [state, setState] = useState<
-    "checking" | "ready" | "downloading" | "success" | "error" | "generating"
-  >("checking");
+  const [state, setState] = useState<CertificateButtonState>("checking");
   const [certificateStatus, setCertificateStatus] = useState<string | null>(
     null
   );
 
-  // Check certificate status
-  useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const response = await fetch(
-          `/api/games/${gameCode}/certificates/status`
-        );
-        const data = await response.json();
-
-        // Find this certificate
-        const cert = data.certificates.find(
-          (c: any) =>
-            c.type === type && (type === "host" || c.playerId === playerId)
-        );
-
-        if (cert) {
-          setCertificateStatus(cert.status);
-          if (cert.status === "completed") {
-            setState("ready");
-          } else if (
-            cert.status === "pending" ||
-            cert.status === "generating"
-          ) {
-            setState("generating");
-          } else if (cert.status === "failed") {
-            setState("error");
-          }
-        } else {
-          // No certificate record yet, might be old game
-          setState("checking");
+  const checkStatus = useCallback(async () => {
+    try {
+      const response = await fetch(
+        `/api/games/${gameCode}/certificates/status`,
+        {
+          headers: { "ngrok-skip-browser-warning": "true" },
         }
-      } catch (error) {
-        console.error("Failed to check certificate status:", error);
-        setState("error");
-      }
-    };
+      );
 
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error || `Failed to check certificate status (${response.status})`
+        );
+      }
+
+      const data = await response.json();
+
+      // Find this certificate
+      const cert = data.certificates.find(
+        (c: any) =>
+          c.type === type && (type === "host" || c.playerId === playerId)
+      );
+
+      if (cert) {
+        setCertificateStatus(cert.status);
+        if (cert.status === "completed") {
+          setState("ready");
+        } else if (cert.status === "pending" || cert.status === "generating") {
+          setState("generating");
+        } else if (cert.status === "failed") {
+          setState("error");
+        }
+      } else {
+        // No certificate record yet, might be old game
+        setState("checking");
+      }
+    } catch (error) {
+      console.error("Failed to check certificate status:", error);
+      setState("error");
+    }
+  }, [gameCode, type, playerId]);
+
+  // Check certificate status on mount
+  useEffect(() => {
     checkStatus();
+  }, [checkStatus]);
 
-    // Poll while generating
+  // Notify parent about state changes (used for conditional UI)
+  useEffect(() => {
+    onStateChange?.(state);
+  }, [state, onStateChange]);
+
+  // Poll while generating or if we previously errored
+  useEffect(() => {
+    const shouldPoll =
+      state === "checking" ||
+      state === "error" ||
+      certificateStatus === "pending" ||
+      certificateStatus === "generating";
+
+    if (!shouldPoll) return;
+
     const interval = setInterval(() => {
-      if (
-        certificateStatus === "pending" ||
-        certificateStatus === "generating"
-      ) {
-        checkStatus();
-      }
+      checkStatus();
     }, 2000);
 
     return () => clearInterval(interval);
-  }, [gameCode, type, playerId, certificateStatus]);
+  }, [checkStatus, certificateStatus, state]);
 
   const handleDownload = async () => {
+    if (state === "error") {
+      // Retry fetching status when previously errored
+      setState("checking");
+      await checkStatus();
+      return;
+    }
+
     if (state !== "ready") return;
 
     setState("downloading");
@@ -92,13 +127,31 @@ export function CertificateDownloadButton({
         `/api/games/${gameCode}/certificates/download`,
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
           body: JSON.stringify({ type, playerId }),
         }
       );
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        // If certificate is still generating, update state instead of showing error
+        if (
+          errorData.status === "pending" ||
+          errorData.status === "generating"
+        ) {
+          setCertificateStatus(errorData.status);
+          setState("generating");
+          return;
+        }
+
+        if (errorData.status === "failed") {
+          setCertificateStatus(errorData.status);
+          setState("error");
+        }
+
         throw new Error(errorData.error || "Failed to download certificate");
       }
 
@@ -138,7 +191,7 @@ export function CertificateDownloadButton({
     ready:
       type === "host"
         ? "Download Leaderboard Certificate"
-        : "Download My Certificate",
+        : "Download Certificate",
     downloading: "Downloading...",
     success: "Downloaded!",
     error: "Error - Try Again",
@@ -157,6 +210,7 @@ export function CertificateDownloadButton({
       disabled={isDisabled}
       variant={state === "success" ? "default" : "outline"}
       size={size}
+      className={className}
     >
       {state === "checking" && (
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />

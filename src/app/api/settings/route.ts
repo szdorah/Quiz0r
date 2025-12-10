@@ -32,33 +32,52 @@ export async function GET() {
       where: { key: "openai_api_key" },
     });
 
+    // Get Unsplash settings
+    const unsplashApiKeySetting = await prisma.setting.findUnique({
+      where: { key: "unsplash_api_key" },
+    });
+
     const hasToken = !!tokenSetting?.value;
     const maskedToken = tokenSetting?.value
       ? `${tokenSetting.value.slice(0, 8)}...${tokenSetting.value.slice(-4)}`
       : null;
+    const rawToken = tokenSetting?.value || null;
     const tunnelUrl = tunnelSetting?.value || null;
 
     const hasShortioApiKey = !!shortioApiKeySetting?.value;
     const maskedShortioApiKey = shortioApiKeySetting?.value
       ? `${shortioApiKeySetting.value.slice(0, 8)}...${shortioApiKeySetting.value.slice(-4)}`
       : null;
+    const rawShortioApiKey = shortioApiKeySetting?.value || null;
     const shortioDomain = shortioDomainSetting?.value || null;
 
     const hasOpenaiApiKey = !!openaiApiKeySetting?.value;
     const maskedOpenaiApiKey = openaiApiKeySetting?.value
       ? `${openaiApiKeySetting.value.slice(0, 8)}...${openaiApiKeySetting.value.slice(-4)}`
       : null;
+    const rawOpenaiApiKey = openaiApiKeySetting?.value || null;
+    const hasUnsplashApiKey = !!unsplashApiKeySetting?.value;
+    const maskedUnsplashApiKey = unsplashApiKeySetting?.value
+      ? `${unsplashApiKeySetting.value.slice(0, 8)}...${unsplashApiKeySetting.value.slice(-4)}`
+      : null;
+    const rawUnsplashApiKey = unsplashApiKeySetting?.value || null;
 
     return NextResponse.json({
       ngrokToken: maskedToken,
+      ngrokTokenRaw: rawToken,
       hasToken,
       tunnelRunning: !!tunnelUrl,
       tunnelUrl,
       shortioApiKey: maskedShortioApiKey,
+      shortioApiKeyRaw: rawShortioApiKey,
       hasShortioApiKey,
       shortioDomain,
       openaiApiKey: maskedOpenaiApiKey,
+      openaiApiKeyRaw: rawOpenaiApiKey,
       hasOpenaiApiKey,
+      unsplashApiKey: maskedUnsplashApiKey,
+      unsplashApiKeyRaw: rawUnsplashApiKey,
+      hasUnsplashApiKey,
     });
   } catch (error) {
     console.error("Failed to get settings:", error);
@@ -73,7 +92,15 @@ export async function GET() {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { ngrokToken, shortioApiKey, shortioDomain, openaiApiKey } = body;
+    // Normalize incoming values to avoid persisting accidental whitespace/newlines
+    const normalize = (value: unknown) =>
+      typeof value === "string" ? value.trim() : value;
+
+    const ngrokToken = normalize(body.ngrokToken) as string | undefined;
+    const shortioApiKey = normalize(body.shortioApiKey) as string | undefined;
+    const shortioDomain = normalize(body.shortioDomain) as string | undefined;
+    const openaiApiKey = normalize(body.openaiApiKey) as string | undefined;
+    const unsplashApiKey = normalize(body.unsplashApiKey) as string | undefined;
 
     if (ngrokToken !== undefined) {
       if (ngrokToken) {
@@ -143,6 +170,20 @@ export async function POST(request: Request) {
         // Remove OpenAI API key
         await prisma.setting.deleteMany({
           where: { key: "openai_api_key" },
+        });
+      }
+    }
+
+    if (unsplashApiKey !== undefined) {
+      if (unsplashApiKey) {
+        await prisma.setting.upsert({
+          where: { key: "unsplash_api_key" },
+          update: { value: unsplashApiKey },
+          create: { key: "unsplash_api_key", value: unsplashApiKey },
+        });
+      } else {
+        await prisma.setting.deleteMany({
+          where: { key: "unsplash_api_key" },
         });
       }
     }

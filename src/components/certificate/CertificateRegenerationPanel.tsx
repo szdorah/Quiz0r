@@ -4,8 +4,16 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { RefreshCw, CheckCircle, XCircle, Loader2, Clock } from "lucide-react";
+import {
+  RefreshCw,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Clock,
+  Download,
+} from "lucide-react";
 import { toast } from "sonner";
+import { getFilenameFromResponse } from "@/lib/certificate-utils";
 
 interface CertificateRegenerationPanelProps {
   gameCode: string;
@@ -27,6 +35,9 @@ export function CertificateRegenerationPanel({
   const [certificates, setCertificates] = useState<CertificateInfo[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [regenerating, setRegenerating] = useState(false);
+  const [downloadingIds, setDownloadingIds] = useState<Set<string>>(
+    new Set()
+  );
 
   const fetchCertificates = async () => {
     try {
@@ -47,6 +58,69 @@ export function CertificateRegenerationPanel({
       );
     } catch (error) {
       console.error("Failed to fetch certificates:", error);
+    }
+  };
+
+  const handleDownload = async (cert: CertificateInfo) => {
+    if (cert.status !== "completed") {
+      toast.error("Certificate is not ready to download yet");
+      return;
+    }
+
+    setDownloadingIds((prev) => new Set(prev).add(cert.id));
+
+    try {
+      const response = await fetch(
+        `/api/games/${gameCode}/certificates/download`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "ngrok-skip-browser-warning": "true",
+          },
+          body: JSON.stringify({
+            type: cert.type,
+            playerId: cert.playerId,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error ||
+            `Failed to download certificate (${response.status})`
+        );
+      }
+
+      const blob = await response.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = getFilenameFromResponse(response);
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast.success(
+        cert.type === "host"
+          ? "Host certificate downloaded"
+          : `${cert.playerName || "Player"}'s certificate downloaded`
+      );
+    } catch (error) {
+      console.error("Certificate download error:", error);
+      toast.error(
+        error instanceof Error
+          ? error.message
+          : "Failed to download certificate"
+      );
+    } finally {
+      setDownloadingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(cert.id);
+        return next;
+      });
     }
   };
 
@@ -172,27 +246,46 @@ export function CertificateRegenerationPanel({
                 key={cert.id}
                 className="flex items-center gap-3 p-2 rounded-lg hover:bg-accent/50 transition-colors"
               >
-                <Checkbox
-                  id={cert.id}
-                  checked={selectedIds.has(cert.id)}
-                  onCheckedChange={() => toggleSelection(cert.id)}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    {getStatusIcon(cert.status)}
-                    <label
-                      htmlFor={cert.id}
-                      className="text-sm font-medium cursor-pointer truncate"
-                    >
-                      {getStatusText(cert)}
-                    </label>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <Checkbox
+                    id={cert.id}
+                    checked={selectedIds.has(cert.id)}
+                    onCheckedChange={() => toggleSelection(cert.id)}
+                  />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      {getStatusIcon(cert.status)}
+                      <label
+                        htmlFor={cert.id}
+                        className="text-sm font-medium cursor-pointer truncate"
+                      >
+                        {getStatusText(cert)}
+                      </label>
+                    </div>
+                    {cert.errorMessage && (
+                      <p className="text-xs text-muted-foreground truncate mt-0.5">
+                        {cert.errorMessage}
+                      </p>
+                    )}
                   </div>
-                  {cert.errorMessage && (
-                    <p className="text-xs text-muted-foreground truncate mt-0.5">
-                      {cert.errorMessage}
-                    </p>
-                  )}
                 </div>
+                <Button
+                  onClick={() => handleDownload(cert)}
+                  size="sm"
+                  variant="outline"
+                  disabled={
+                    cert.status !== "completed" ||
+                    downloadingIds.has(cert.id)
+                  }
+                  className="flex-shrink-0"
+                >
+                  {downloadingIds.has(cert.id) ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4 mr-2" />
+                  )}
+                  Download
+                </Button>
               </div>
             ))}
           </div>

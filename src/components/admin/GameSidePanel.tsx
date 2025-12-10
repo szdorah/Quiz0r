@@ -7,23 +7,41 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Avatar } from "@/components/ui/avatar";
-import { X, ExternalLink } from "lucide-react";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { ExternalLink, Loader2, Trash2 } from "lucide-react";
 import { useSocket } from "@/hooks/useSocket";
 import { CertificateDownloadButton } from "@/components/certificate/CertificateDownloadButton";
 import { GameDetail } from "@/types/admin";
 import { format } from "date-fns";
+import { toast } from "sonner";
 
 interface GameSidePanelProps {
   gameId: string | null;
   onClose: () => void;
+  onDeleted: (gameId: string) => void;
 }
 
-export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
+export function GameSidePanel({ gameId, onClose, onDeleted }: GameSidePanelProps) {
   const [game, setGame] = useState<GameDetail | null>(null);
   const [loading, setLoading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [certStatus, setCertStatus] = useState<{
+    host?: { status: string; errorMessage?: string };
+    players: Record<string, { status: string; errorMessage?: string }>;
+  }>({ players: {} });
 
   // WebSocket for live updates (only for running games)
   const isRunning = game?.status !== "FINISHED";
@@ -59,6 +77,44 @@ export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
     fetchGameDetails();
   }, [gameId]);
 
+  // Fetch certificate status for finished games
+  useEffect(() => {
+    async function fetchCertificates() {
+      if (!game || game.status !== "FINISHED") return;
+      try {
+        const res = await fetch(
+          `/api/games/${game.gameCode}/certificates/status`,
+          { headers: { "ngrok-skip-browser-warning": "true" } }
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const hostCert = data.certificates.find((c: any) => c.type === "host");
+        const players: Record<string, { status: string; errorMessage?: string }> =
+          {};
+        data.certificates
+          .filter((c: any) => c.type === "player")
+          .forEach((c: any) => {
+            if (c.playerId) {
+              players[c.playerId] = {
+                status: c.status,
+                errorMessage: c.errorMessage || undefined,
+              };
+            }
+          });
+        setCertStatus({
+          host: hostCert
+            ? { status: hostCert.status, errorMessage: hostCert.errorMessage }
+            : undefined,
+          players,
+        });
+      } catch (error) {
+        console.error("Failed to fetch certificate status:", error);
+      }
+    }
+
+    fetchCertificates();
+  }, [game]);
+
   // Update scores from WebSocket
   useEffect(() => {
     if (scores.length > 0 && game) {
@@ -66,132 +122,227 @@ export function GameSidePanel({ gameId, onClose }: GameSidePanelProps) {
         prev
           ? {
               ...prev,
-              allPlayers: scores.map((s, idx) => ({
-                id: s.playerId,
-                name: s.name,
-                avatarColor: s.avatarColor,
-                avatarEmoji: s.avatarEmoji || null,
-                totalScore: s.score,
-                position: idx + 1,
-              })),
+              allPlayers: scores.map((s, idx) => {
+                const existing = prev.allPlayers.find((p) => p.id === s.playerId);
+                return {
+                  id: s.playerId,
+                  name: s.name,
+                  avatarColor: s.avatarColor,
+                  avatarEmoji: s.avatarEmoji || null,
+                  totalScore: s.score,
+                  position: idx + 1,
+                  isActive: existing?.isActive ?? true,
+                };
+              }),
             }
           : null
       );
     }
   }, [scores, game]);
 
+  async function handleDelete() {
+    if (!game) return;
+
+    setDeleting(true);
+    try {
+      const res = await fetch(`/api/admin/games/${game.id}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success("Game deleted from history");
+        onDeleted(game.id);
+        return;
+      }
+
+      const data = await res.json().catch(() => null);
+      const errorMessage = data?.error || "Failed to delete game";
+      toast.error(errorMessage);
+    } catch (error) {
+      console.error("Failed to delete game:", error);
+      toast.error("Failed to delete game");
+    } finally {
+      setDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  }
+
   if (!gameId) return null;
 
   return (
-    <Dialog open={!!gameId} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Game: {game?.gameCode}</DialogTitle>
-        </DialogHeader>
+    <>
+      <Dialog open={!!gameId} onOpenChange={onClose}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Game: {game?.gameCode}</DialogTitle>
+          </DialogHeader>
 
-        {loading ? (
-          <div className="py-8 text-center text-muted-foreground">
-            Loading...
-          </div>
-        ) : game ? (
-          <div className="space-y-6">
-            {/* Game Info */}
-            <div>
-              <h3 className="font-bold text-lg">{game.quiz.title}</h3>
-              <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-                <Badge variant={isRunning ? "default" : "secondary"}>
-                  {isRunning ? "Running" : "Finished"}
-                </Badge>
-                <span>•</span>
-                <span>{game.playerCount} players</span>
-              </div>
-              <p className="text-sm text-muted-foreground mt-1">
-                {game.endedAt
-                  ? `Ended ${format(
-                      new Date(game.endedAt),
-                      "MMM d, yyyy 'at' h:mm a"
-                    )}`
-                  : `Started ${format(
-                      new Date(game.createdAt),
-                      "MMM d, yyyy 'at' h:mm a"
-                    )}`}
-              </p>
+          {loading ? (
+            <div className="py-8 text-center text-muted-foreground">
+              Loading...
             </div>
-
-            {/* Actions */}
-            <div className="space-y-2">
-              {!isRunning && (
-                <CertificateDownloadButton
-                  gameCode={game.gameCode}
-                  type="host"
-                />
-              )}
-
-              {isRunning && (
-                <Button
-                  variant="outline"
-                  className="w-full"
-                  onClick={() =>
-                    window.open(`/host/${game.gameCode}/control`, "_blank")
-                  }
-                >
-                  <ExternalLink className="w-4 h-4 mr-2" />
-                  Resume Host Control
-                </Button>
-              )}
-            </div>
-
-            {/* Leaderboard */}
-            <div>
-              <h4 className="font-semibold mb-3 flex items-center gap-2">
-                Leaderboard
-                {isRunning && connected && (
-                  <Badge variant="outline" className="text-xs">
-                    Live
+          ) : game ? (
+            <div className="space-y-6">
+              {/* Game Info */}
+              <div>
+                <h3 className="font-bold text-lg">{game.quiz.title}</h3>
+                <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+                  <Badge variant={isRunning ? "default" : "secondary"}>
+                    {isRunning ? "Running" : "Finished"}
                   </Badge>
-                )}
-              </h4>
+                  <span>•</span>
+                  <span>{game.playerCount} players</span>
+                </div>
+                <p className="text-sm text-muted-foreground mt-1">
+                  {game.endedAt
+                    ? `Ended ${format(
+                        new Date(game.endedAt),
+                        "MMM d, yyyy 'at' h:mm a"
+                      )}`
+                    : `Started ${format(
+                        new Date(game.createdAt),
+                        "MMM d, yyyy 'at' h:mm a"
+                      )}`}
+                </p>
+              </div>
 
+              {/* Actions */}
               <div className="space-y-2">
-                {game.allPlayers.map((player) => (
-                  <div
-                    key={player.id}
-                    className="flex items-center gap-3 p-3 rounded-lg bg-card border"
-                  >
-                    <span className="font-bold text-sm w-8">
-                      {player.position}.
-                    </span>
-
-                    <Avatar
-                      style={{ backgroundColor: player.avatarColor }}
-                      className="w-10 h-10"
-                    >
-                      {player.avatarEmoji || player.name.charAt(0)}
-                    </Avatar>
-
-                    <div className="flex-1">
-                      <p className="font-medium">{player.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {player.totalScore} points
-                      </p>
+                {!isRunning &&
+                  (certStatus.host?.status === "completed" ? (
+                    <CertificateDownloadButton
+                      gameCode={game.gameCode}
+                      type="host"
+                    />
+                  ) : (
+                    <div className="text-sm text-muted-foreground">
+                      Host certificate {certStatus.host ? "not ready" : "unavailable"}
                     </div>
+                  ))}
 
-                    {!isRunning && (
-                      <CertificateDownloadButton
-                        gameCode={game.gameCode}
-                        playerId={player.id}
-                        playerName={player.name}
-                        type="player"
-                        size="sm"
-                      />
+                {!isRunning && (
+                  <Button
+                    variant="destructive"
+                    className="w-full"
+                    onClick={() => setDeleteDialogOpen(true)}
+                    disabled={deleting}
+                  >
+                    {deleting ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Trash2 className="w-4 h-4 mr-2" />
                     )}
-                  </div>
-                ))}
+                    Delete Game
+                  </Button>
+                )}
+
+                {isRunning && (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    onClick={() =>
+                      window.open(`/host/${game.gameCode}/control`, "_blank")
+                    }
+                  >
+                    <ExternalLink className="w-4 h-4 mr-2" />
+                    Resume Host Control
+                  </Button>
+                )}
+              </div>
+
+              {/* Leaderboard */}
+              <div>
+                <h4 className="font-semibold mb-3 flex items-center gap-2">
+                  Leaderboard
+                  {isRunning && connected && (
+                    <Badge variant="outline" className="text-xs">
+                      Live
+                    </Badge>
+                  )}
+                </h4>
+
+                <div className="space-y-2">
+                  {game.allPlayers.map((player) => (
+                    <div
+                      key={player.id}
+                      className="flex items-center gap-3 p-3 rounded-lg bg-card border"
+                    >
+                      <span className="font-bold text-sm w-8">
+                        {player.position}.
+                      </span>
+
+                      <Avatar className="w-10 h-10">
+                        <AvatarFallback
+                          style={{ backgroundColor: player.avatarColor }}
+                          className="text-lg flex items-center justify-center"
+                        >
+                          {player.avatarEmoji || player.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+
+                      <div className="flex-1">
+                        <p className="font-medium">{player.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {player.totalScore} points
+                        </p>
+                      </div>
+
+                      {!isRunning &&
+                        (certStatus.players[player.id]?.status === "completed" ? (
+                          <CertificateDownloadButton
+                            gameCode={game.gameCode}
+                            playerId={player.id}
+                            playerName={player.name}
+                            type="player"
+                            size="sm"
+                          />
+                        ) : (
+                          <div className="text-xs text-muted-foreground text-right leading-snug">
+                            Certificate unavailable
+                            <div className="text-[11px]">
+                              {certStatus.players[player.id]?.status
+                                ? `Status: ${certStatus.players[player.id]?.status}`
+                                : "Player not eligible or left early"}
+                            </div>
+                          </div>
+                        ))}
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
-        ) : null}
-      </DialogContent>
-    </Dialog>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete this game?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove all player data and certificates for game{" "}
+              <strong>{game?.gameCode}</strong>. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleting}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              disabled={deleting}
+            >
+              {deleting ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Deleting...
+                </>
+              ) : (
+                "Delete Game"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }
