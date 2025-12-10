@@ -40,14 +40,14 @@ export default defineConfig({
       process.env.HEADED === "true"
     ),
 
-    // Collect trace on first retry
-    trace: "on-first-retry",
+    // Collect trace on first retry (or always if TRACE=on)
+    trace: process.env.TRACE === "on" ? "on" : "on-first-retry",
 
-    // Screenshot on failure
-    screenshot: "only-on-failure",
+    // Screenshot on failure (or always if SCREENSHOT=on)
+    screenshot: process.env.SCREENSHOT === "on" ? "on" : "only-on-failure",
 
-    // Video on failure
-    video: "retain-on-failure",
+    // Video on failure (or always if VIDEO=on)
+    video: process.env.VIDEO === "on" ? "on" : "retain-on-failure",
 
     // Action timeout
     actionTimeout: 15000,

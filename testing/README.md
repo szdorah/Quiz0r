@@ -57,14 +57,31 @@ Simulates realistic behavior with random answers, powerup usage (Hint, Copy, 2x)
 npx playwright test testing/e2e/15-simulation.spec.ts -c testing/playwright.config.ts
 ```
 
-### 4. Run with NPM Scripts (Easiest)
+### 4. Stress Test (Multi-Language, High Load)
+Stress test with configurable player count, multiple languages, and random powerups.
+
+```bash
+# Basic stress test (20 players, 5 questions, headless)
+PARTICIPANT_COUNT=20 QUESTION_COUNT=5 npx playwright test testing/e2e/stress-test.spec.ts -c testing/playwright.config.ts
+
+# With all features enabled
+PARTICIPANT_COUNT=20 QUESTION_COUNT=5 USE_POWERUPS=true USE_MULTI_LANG=true npx playwright test testing/e2e/stress-test.spec.ts -c testing/playwright.config.ts
+
+# Extreme stress test (50 players)
+PARTICIPANT_COUNT=50 QUESTION_COUNT=10 npx playwright test testing/e2e/stress-test.spec.ts -c testing/playwright.config.ts
+
+# With video and screenshot capture
+VIDEO=on SCREENSHOT=on PARTICIPANT_COUNT=20 QUESTION_COUNT=5 npx playwright test testing/e2e/stress-test.spec.ts -c testing/playwright.config.ts
+```
+
+### 5. Run with NPM Scripts (Easiest)
 We have added a script to `package.json` that handles the config path for you:
 
 ```bash
 npm run test:e2e
 ```
 
-### 4. Run All Tests
+### 6. Run All Tests
 Use the helper script to run the entire suite.
 ```bash
 ./testing/e2e/run-all-tests.sh
@@ -81,7 +98,13 @@ You can configure the tests using environment variables:
 | `PARTICIPANT_COUNT` | `5` | Number of players to simulate in the game |
 | `QUESTION_COUNT` | `3` | Number of questions in the generated quiz |
 | `HEADLESS` | `true` | Set to `false` to see the browser UI |
+| `HEADED` | `false` | Set to `true` to see the browser UI (alternative to HEADLESS) |
 | `BASE_URL` | `http://localhost:3000` | Target URL for the application |
+| `USE_POWERUPS` | `true` | Enable random powerup usage in stress tests |
+| `USE_MULTI_LANG` | `true` | Enable multiple languages in stress tests |
+| `VIDEO` | `retain-on-failure` | Set to `on` to always record videos |
+| `SCREENSHOT` | `only-on-failure` | Set to `on` to always capture screenshots |
+| `TRACE` | `on-first-retry` | Set to `on` to always collect traces |
 
 **Example:**
 ```bash
