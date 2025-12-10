@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "electron": "^30.0.0",
-    "electron-builder": "^24.0.0"
+    "electron-builder": "^24.13.3"
   },
   "build": {
     "appId": "dev.err0r.quiz0r",
@@ -24,7 +24,10 @@
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "notarize": {
-        "appBundleId": "dev.err0r.quiz0r"
+        "appBundleId": "dev.err0r.quiz0r",
+        "teamId": "H3F5W5M8VA",
+        "appleId": "${APPLE_ID}",
+        "appleIdPassword": "${APPLE_APP_SPECIFIC_PASSWORD}"
       }
     },
     "win": {
