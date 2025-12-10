@@ -5,15 +5,15 @@ export default defineConfig({
   test: {
     environment: "node",
     globals: true,
-    include: ["tests/**/*.test.ts"],
-    setupFiles: ["./tests/setup.ts"],
+    include: ["testing/**/*.test.ts"],
+    setupFiles: ["./testing/setup.ts"],
     coverage: {
       provider: "v8",
-      reports: ["text", "lcov"],
+      reporter: ["text", "lcov"],
       exclude: [
         "node_modules",
-        "tests/mocks/**",
-        "tests/**",
+        "testing/unit/mocks/**",
+        "testing/**",
         ".next/**",
         "public/**",
         "scripts/**",

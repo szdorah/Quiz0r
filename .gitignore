@@ -5,7 +5,7 @@ node_modules
 
 # Testing
 coverage
-test-results*
+**/.playwright/
 
 # Next.js
 .next/
@@ -51,6 +51,13 @@ prisma/*.db-journal
 .idea
 .vscode
 
-# Uploads
+# User-uploaded files - ignore all contents but keep directory structure
+# This prevents large/binary files from being committed while ensuring
+# the uploads directory exists for the application (see src/app/api/upload/route.ts)
 public/uploads/*
 !public/uploads/.gitkeep
+
+# Safety: Explicitly ignore sensitive files that might be uploaded accidentally
+!public/uploads/*.key
+!public/uploads/*.pem
+!public/uploads/*secret*
