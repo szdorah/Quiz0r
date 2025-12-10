@@ -21,10 +21,11 @@
       "target": "dmg",
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
-      "entitlements": null
+      "notarize": {
+        "appBundleId": "dev.err0r.quiz0r"
+      }
     },
     "win": {
       "target": "nsis"
     }
   }
-}
