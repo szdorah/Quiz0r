@@ -11,7 +11,7 @@
   },
   "devDependencies": {
     "electron": "^30.5.1",
-    "electron-builder": "^24.13.3"
+    "electron-builder": "24.12.0"
   },
   "build": {
     "appId": "dev.err0r.quiz0r",
@@ -22,11 +22,7 @@
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity",
-      "hardenedRuntime": true,
-      "notarize": {
-        "appBundleId": "dev.err0r.quiz0r",
-        "ascProvider": "H3F5W5M8VA"
-      }
+      "hardenedRuntime": true
     },
     "win": {
       "target": "nsis"
