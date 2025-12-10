@@ -23,6 +23,12 @@ echo ">> Creating data directory"
 mkdir -p "${ROOT_DIR}/data"
 
 echo ">> Applying database migrations"
-npx prisma migrate deploy
+if [ -d "${ROOT_DIR}/prisma/migrations" ] && [ "$(ls -A ${ROOT_DIR}/prisma/migrations)" ]; then
+  echo "Migrations found, deploying..."
+  npx prisma migrate deploy
+else
+  echo "No migrations found, creating initial migration..."
+  npx prisma migrate dev --name init
+fi
 
 echo ">> Setup complete. Run: npm run dev"
