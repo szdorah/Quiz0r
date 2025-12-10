@@ -10,7 +10,7 @@
     "build": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^30.0.0",
+    "electron": "^30.5.1",
     "electron-builder": "^24.13.3"
   },
   "build": {
@@ -24,7 +24,8 @@
       "category": "public.app-category.productivity",
       "hardenedRuntime": true,
       "notarize": {
-        "appBundleId": "dev.err0r.quiz0r"
+        "appBundleId": "dev.err0r.quiz0r",
+        "ascProvider": "H3F5W5M8VA"
       }
     },
     "win": {
