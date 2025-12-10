@@ -2,7 +2,7 @@
   "name": "quiz0r",
   "version": "0.1.0",
   "description": "Quiz0r desktop app",
-    "author": "Jonathan Isaacs",
+  "author": "Jonathan Isaacs",
   "main": "main.js",
   "private": true,
   "scripts": {
@@ -16,7 +16,9 @@
   "build": {
     "appId": "dev.err0r.quiz0r",
     "productName": "Quiz0r",
-    "files": ["**/*"],
+    "files": [
+      "**/*"
+    ],
     "mac": {
       "target": "dmg",
       "category": "public.app-category.productivity",
@@ -29,3 +31,4 @@
       "target": "nsis"
     }
   }
+}
