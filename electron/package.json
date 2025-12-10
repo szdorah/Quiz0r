@@ -1,6 +1,8 @@
 {
   "name": "quiz0r",
   "version": "0.1.0",
+  "description": "Quiz0r desktop app",
+    "author": "Jonathan Isaacs",
   "main": "main.js",
   "private": true,
   "scripts": {
