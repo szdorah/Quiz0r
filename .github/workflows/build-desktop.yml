@@ -28,8 +28,12 @@ jobs:
       - name: Build Electron app
         working-directory: electron
         env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
           APP_URL: https://your-hosted-app-url.com
         run: npm run build
+
 
       - name: Upload artefacts
         uses: actions/upload-artifact@v4
