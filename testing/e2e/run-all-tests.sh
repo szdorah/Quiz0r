@@ -67,6 +67,10 @@ echo "📋 Test Suite 8: Host Controls"
 npx playwright test testing/e2e/13-host-controls.spec.ts --reporter=list -c testing/playwright.config.ts
 
 echo ""
+echo "📋 Test Suite 9: Full Gameplay Simulation (Powerups, Random Answers)"
+PARTICIPANT_COUNT=$PLAYER_COUNT QUESTION_COUNT=$QUESTION_COUNT npx playwright test testing/e2e/15-simulation.spec.ts --reporter=list -c testing/playwright.config.ts
+
+echo ""
 echo "=========================================="
 echo "🎯 MASTER COMPREHENSIVE TEST"
 echo "=========================================="

@@ -3,6 +3,7 @@ import {
     createTestQuiz,
     createGameSession,
     joinAsPlayer,
+    submitRandomAnswer,
 } from "./helpers/test-helpers";
 
 /**
@@ -112,20 +113,21 @@ test.describe("Ultra Simple Test", () => {
         const buttonCount = await allButtons.count();
         console.log(`   Found ${buttonCount} total buttons`);
 
-        for (let i = 0; i < Math.min(buttonCount, 10); i++) {
-            const button = allButtons.nth(i);
-            const text = await button.textContent();
-            const isVisible = await button.isVisible();
-            const isEnabled = await button.isEnabled();
-            console.log(`   Button ${i}: "${text?.trim()}" (visible: ${isVisible}, enabled: ${isEnabled})`);
+        // Try to submit a random answer
+        try {
+            console.log("\n👆 Attempting to submit random answer...");
+            const answer = await submitRandomAnswer(playerPage);
+            console.log(`   ✓ Answer selected: ${answer.letter}`);
+        } catch (error) {
+            console.log("   ❌ Failed to submit answer:", error);
 
-            // If this looks like an answer button, click it
-            if (text && /^[A-D]\s/.test(text.trim()) && isVisible && isEnabled) {
-                console.log(`\n👆 Clicking answer button: "${text.trim()}"`);
-                await button.click();
-                await playerPage.waitForTimeout(1000);
-                console.log("   ✓ Answer clicked!");
-                break;
+            // Fallback: show button details for debugging
+            for (let i = 0; i < Math.min(buttonCount, 10); i++) {
+                const button = allButtons.nth(i);
+                const text = await button.textContent();
+                const isVisible = await button.isVisible();
+                const isEnabled = await button.isEnabled();
+                console.log(`   Button ${i}: "${text?.trim()}" (visible: ${isVisible}, enabled: ${isEnabled})`);
             }
         }
 

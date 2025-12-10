@@ -4,6 +4,12 @@ import {
     createGameSession,
     joinAsPlayer,
     waitForPlayerCount,
+    submitRandomAnswer,
+    waitForTimerExpiry,
+    showQuestionResults,
+    useRandomPowerUps,
+    checkCertificateAvailability,
+    simulateCertificateDownloads,
 } from "./helpers/test-helpers";
 import { SAMPLE_PLAYERS } from "./helpers/test-fixtures";
 
@@ -100,38 +106,34 @@ test.describe("Simple E2E Test - Proven to Work", () => {
             // Wait for players to see question
             await playerPages[0].waitForTimeout(1000);
 
-            // Players answer
+            // Players use powerups and answer randomly
             for (let i = 0; i < playerPages.length; i++) {
                 const playerPage = playerPages[i];
                 await playerPage.waitForTimeout(100 * i);
 
-                // Find and click first answer
-                // Answer buttons start with letters A, B, C, D
-                const allButtons = playerPage.locator("button");
-                const buttonCount = await allButtons.count();
+                try {
+                    // Randomly use powerups (30% chance for each)
+                    const powerUps = await useRandomPowerUps(playerPage, 0.3);
+                    const powerUpLog = [];
+                    if (powerUps.hint) powerUpLog.push('💡Hint');
+                    if (powerUps.copy) powerUpLog.push(`📋Copy(${powerUps.copiedFrom})`);
+                    if (powerUps.double) powerUpLog.push('✨2x');
 
-                for (let j = 0; j < buttonCount; j++) {
-                    const button = allButtons.nth(j);
-                    const text = await button.textContent();
-
-                    // Look for buttons starting with A, B, C, or D
-                    if (text && /^[A-D]\s/.test(text.trim())) {
-                        await button.click();
-                        break;
-                    }
+                    // Submit answer
+                    const answer = await submitRandomAnswer(playerPage);
+                    const log = `      Player ${i + 1} selected: ${answer.letter}`;
+                    console.log(powerUpLog.length > 0 ? `${log} [${powerUpLog.join(', ')}]` : log);
+                } catch (error) {
+                    console.log(`      ⚠ Player ${i + 1} couldn't answer:`, error);
                 }
             }
             console.log(`    ✓ All ${playerCount} players answered`);
 
-            await page.waitForTimeout(2000);
+            // Wait for timer to expire
+            await waitForTimerExpiry(page, 30);
 
-            // Reveal answers
-            const revealButton = page.getByRole("button", { name: /reveal/i });
-            if (await revealButton.count()) {
-                await revealButton.click();
-                await page.waitForTimeout(1000);
-                console.log("    ✓ Answers revealed");
-            }
+            // Show results for this question
+            await showQuestionResults(page);
         }
 
         // Show final results
@@ -145,6 +147,15 @@ test.describe("Simple E2E Test - Proven to Work", () => {
 
         await page.waitForTimeout(2000);
         console.log("✓ Final results shown");
+
+        // Check certificate availability
+        console.log("\n📜 Checking certificates...");
+        const certAvailable = await checkCertificateAvailability(playerPages);
+        console.log(`✓ ${certAvailable}/${playerCount} players have certificates`);
+
+        // Simulate certificate downloads
+        const downloadCount = await simulateCertificateDownloads(playerPages, 0.5);
+        console.log(`✓ ${downloadCount} certificates downloaded`);
 
         // Cleanup
         await playerContext.close();

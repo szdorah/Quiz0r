@@ -34,14 +34,21 @@ npx playwright test testing/e2e/final-working.spec.ts --headed -c testing/playwr
 PARTICIPANT_COUNT=10 QUESTION_COUNT=5 npx playwright test testing/e2e/final-working.spec.ts -c testing/playwright.config.ts
 ```
 
-### 2. Run with NPM Scripts (Easiest)
+### 2. Full Gameplay Simulation
+Simulates realistic behavior with random answers, powerup usage (Hint, Copy, 2x), and certificate downloads.
+
+```bash
+npx playwright test testing/e2e/15-simulation.spec.ts -c testing/playwright.config.ts
+```
+
+### 3. Run with NPM Scripts (Easiest)
 We have added a script to `package.json` that handles the config path for you:
 
 ```bash
 npm run test:e2e
 ```
 
-### 3. Run All Tests
+### 4. Run All Tests
 Use the helper script to run the entire suite.
 ```bash
 ./testing/e2e/run-all-tests.sh

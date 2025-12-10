@@ -12,6 +12,10 @@ export interface TestQuizConfig {
     questionType?: "SINGLE_SELECT" | "MULTI_SELECT" | "MIXED";
     timeLimit?: number;
     points?: number;
+    hintCount?: number;
+    copyAnswerCount?: number;
+    doublePointsCount?: number;
+    randomizeCorrectAnswers?: boolean;
 }
 
 export interface PlayerJoinConfig {
@@ -37,6 +41,10 @@ export async function createTestQuiz(
         questionType = "SINGLE_SELECT",
         timeLimit = 30,
         points = 100,
+        hintCount = 2,
+        copyAnswerCount = 2,
+        doublePointsCount = 2,
+        randomizeCorrectAnswers = true,
     } = config;
 
     // Create quiz
@@ -46,6 +54,19 @@ export async function createTestQuiz(
     expect(quizRes.ok()).toBeTruthy();
     const quiz = await quizRes.json();
 
+    // Update quiz with powerup configuration using PATCH
+    const updateRes = await page.request.patch(`${baseURL}/api/quizzes/${quiz.id}`, {
+        data: {
+            hintCount,
+            copyAnswerCount,
+            doublePointsCount,
+        },
+    });
+    expect(updateRes.ok()).toBeTruthy();
+    const updatedQuiz = await updateRes.json();
+
+    console.log(`   💡 Powerups configured: ${updatedQuiz.hintCount || 0} hints, 📋 ${updatedQuiz.copyAnswerCount || 0} copies, ✨ ${updatedQuiz.doublePointsCount || 0} 2x`);
+
     // Add questions
     const questionIds: string[] = [];
     for (let i = 0; i < questionCount; i++) {
@@ -53,17 +74,27 @@ export async function createTestQuiz(
             questionType === "SINGLE_SELECT" ||
             (questionType === "MIXED" && i % 2 === 0);
 
+        // Randomize which answer is correct
+        let correctAnswerIndex = 0; // Default to A
+        if (randomizeCorrectAnswers) {
+            correctAnswerIndex = Math.floor(Math.random() * 4); // 0-3 for A-D
+        }
+
+        // Create answers array with randomized correct answer
+        const answers = [
+            { answerText: "Answer A", isCorrect: correctAnswerIndex === 0 },
+            { answerText: "Answer B", isCorrect: isSingleSelect ? (correctAnswerIndex === 1) : (correctAnswerIndex === 1 || correctAnswerIndex === 0) },
+            { answerText: "Answer C", isCorrect: correctAnswerIndex === 2 },
+            { answerText: "Answer D", isCorrect: correctAnswerIndex === 3 },
+        ];
+
         const questionData = {
             questionText: `Test Question ${i + 1}`,
             questionType: isSingleSelect ? "SINGLE_SELECT" : "MULTI_SELECT",
             timeLimit,
             points,
-            answers: [
-                { answerText: "Answer A", isCorrect: true },
-                { answerText: "Answer B", isCorrect: isSingleSelect ? false : true },
-                { answerText: "Answer C", isCorrect: false },
-                { answerText: "Answer D", isCorrect: false },
-            ],
+            answers,
+            hint: hintCount > 0 ? `Hint for question ${i + 1}: Look for clues in the wording!` : null,
         };
 
         const questionRes = await page.request.post(
@@ -260,6 +291,266 @@ export async function submitAnswer(
 }
 
 /**
+ * Uses the hint powerup if available
+ */
+export async function useHintPowerUp(playerPage: Page): Promise<boolean> {
+    try {
+        // Look for the Hint button
+        const hintButton = playerPage.getByRole('button', { name: /hint/i }).filter({ hasText: /left/ });
+
+        if (await hintButton.count() > 0) {
+            const isEnabled = await hintButton.first().isEnabled();
+            if (isEnabled) {
+                await hintButton.first().click();
+                await playerPage.waitForTimeout(800);
+
+                // Try multiple strategies to close the hint modal
+                // Strategy 1: Look for Close button by role and text
+                let closeButton = playerPage.getByRole('button', { name: /close/i });
+                if (await closeButton.isVisible({ timeout: 1000 }).catch(() => false)) {
+                    await closeButton.click();
+                    await playerPage.waitForTimeout(300);
+                    return true;
+                }
+
+                // Strategy 2: Look for any button with "Close" text in the dialog
+                closeButton = playerPage.locator('button:has-text("Close")').last();
+                if (await closeButton.isVisible({ timeout: 500 }).catch(() => false)) {
+                    await closeButton.click();
+                    await playerPage.waitForTimeout(300);
+                    return true;
+                }
+
+                // Strategy 3: Press Escape key to close dialog
+                await playerPage.keyboard.press('Escape');
+                await playerPage.waitForTimeout(300);
+
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Uses the double points powerup if available
+ */
+export async function useDoublePointsPowerUp(playerPage: Page): Promise<boolean> {
+    try {
+        // Look for the 2x button
+        const doubleButton = playerPage.getByRole('button', { name: /2x/i }).filter({ hasText: /left/ });
+
+        if (await doubleButton.count() > 0) {
+            const isEnabled = await doubleButton.first().isEnabled();
+            if (isEnabled) {
+                await doubleButton.first().click();
+                await playerPage.waitForTimeout(500);
+                return true;
+            }
+        }
+        return false;
+    } catch (error) {
+        return false;
+    }
+}
+
+/**
+ * Uses the copy answer powerup if available
+ * Randomly selects a player to copy from
+ */
+export async function useCopyAnswerPowerUp(playerPage: Page): Promise<{ used: boolean; copiedFrom?: string }> {
+    try {
+        // Look for the Copy button
+        const copyButton = playerPage.getByRole('button', { name: /copy/i }).filter({ hasText: /left/ });
+
+        if (await copyButton.count() > 0) {
+            const isEnabled = await copyButton.first().isEnabled();
+            if (isEnabled) {
+                await copyButton.first().click();
+                await playerPage.waitForTimeout(1000);
+
+                // Wait for the "Copy Answer" dialog to appear
+                const dialogTitle = playerPage.locator('text="Copy Answer"');
+                const dialogVisible = await dialogTitle.isVisible({ timeout: 2000 }).catch(() => false);
+
+                if (!dialogVisible) {
+                    return { used: false };
+                }
+
+                // Find player selection buttons within the dialog
+                // These are buttons with w-full and justify-start classes
+                // Filter to only include buttons that have a span (player name) to avoid matching other buttons
+                const playerButtons = playerPage.locator('button.w-full.justify-start').filter({
+                    has: playerPage.locator('span')
+                });
+
+                // Wait a moment for player list to fully load
+                await playerPage.waitForTimeout(500);
+
+                const count = await playerButtons.count();
+
+                if (count === 0) {
+                    // No other players available to copy from (shouldn't happen with 5 players)
+                    await playerPage.keyboard.press('Escape');
+                    await playerPage.waitForTimeout(300);
+                    return { used: false };
+                }
+
+                if (count > 0) {
+                    // Randomly select a player
+                    const randomPlayerIndex = Math.floor(Math.random() * count);
+                    const selectedButton = playerButtons.nth(randomPlayerIndex);
+
+                    // Verify button is visible and enabled before clicking
+                    const isButtonVisible = await selectedButton.isVisible().catch(() => false);
+                    const isButtonEnabled = await selectedButton.isEnabled().catch(() => false);
+
+                    if (!isButtonVisible || !isButtonEnabled) {
+                        await playerPage.keyboard.press('Escape');
+                        await playerPage.waitForTimeout(300);
+                        return { used: false };
+                    }
+
+                    const playerName = await selectedButton.textContent();
+
+                    // Click the player button
+                    try {
+                        await selectedButton.click({ timeout: 3000 });
+                    } catch (clickError) {
+                        await playerPage.keyboard.press('Escape');
+                        await playerPage.waitForTimeout(300);
+                        return { used: false };
+                    }
+
+                    // Wait for the dialog to close
+                    await playerPage.waitForTimeout(1000);
+
+                    // Verify the dialog actually closed
+                    const dialogStillVisible = await dialogTitle.isVisible({ timeout: 500 }).catch(() => false);
+                    if (dialogStillVisible) {
+                        // Dialog didn't close, force it with Escape
+                        await playerPage.keyboard.press('Escape');
+                        await playerPage.waitForTimeout(300);
+                    }
+
+                    return { used: true, copiedFrom: playerName?.trim() };
+                } else {
+                    // No players available to copy from
+                    await playerPage.keyboard.press('Escape');
+                    await playerPage.waitForTimeout(300);
+                    return { used: false };
+                }
+            }
+        }
+        return { used: false };
+    } catch (error) {
+        // Ensure dialog is closed on error
+        await playerPage.keyboard.press('Escape').catch(() => {});
+        await playerPage.waitForTimeout(300);
+        return { used: false };
+    }
+}
+
+/**
+ * Randomly decides whether to use powerups and which ones
+ * @param playerPage - The player's page
+ * @param usageChance - Probability (0-1) of using each powerup (default: 0.3 = 30% chance)
+ */
+export async function useRandomPowerUps(
+    playerPage: Page,
+    usageChance: number = 0.3
+): Promise<{ hint: boolean; copy: boolean; double: boolean; copiedFrom?: string }> {
+    const result = {
+        hint: false,
+        copy: false,
+        double: false,
+        copiedFrom: undefined as string | undefined,
+    };
+
+    // Randomly decide to use hint (30% chance by default)
+    if (Math.random() < usageChance) {
+        result.hint = await useHintPowerUp(playerPage);
+    }
+
+    // Randomly decide to use copy (30% chance by default)
+    if (Math.random() < usageChance) {
+        const copyResult = await useCopyAnswerPowerUp(playerPage);
+        result.copy = copyResult.used;
+        result.copiedFrom = copyResult.copiedFrom;
+    }
+
+    // Randomly decide to use double points (30% chance by default)
+    if (Math.random() < usageChance) {
+        result.double = await useDoublePointsPowerUp(playerPage);
+    }
+
+    return result;
+}
+
+/**
+ * Submits a random answer as a player
+ * This function finds all available answer buttons and randomly selects one
+ */
+export async function submitRandomAnswer(playerPage: Page): Promise<{ letter: string; index: number }> {
+    // Wait for the question to be displayed
+    await playerPage.waitForTimeout(1500);
+
+    // Find all buttons on the page
+    const allButtons = playerPage.locator('button');
+    const buttonCount = await allButtons.count();
+
+    // Collect all answer buttons (those starting with A, B, C, or D)
+    const answerButtons: { button: any; letter: string; index: number }[] = [];
+    const letters = ['A', 'B', 'C', 'D'];
+
+    for (let i = 0; i < buttonCount; i++) {
+        const button = allButtons.nth(i);
+        const text = await button.textContent();
+
+        if (text) {
+            const trimmedText = text.trim();
+            for (const letter of letters) {
+                // Check if button starts with letter followed by space or just the letter
+                if (trimmedText.startsWith(letter + ' ') || trimmedText.startsWith(letter)) {
+                    // Verify button is visible and enabled
+                    const isVisible = await button.isVisible().catch(() => false);
+                    const isEnabled = await button.isEnabled().catch(() => false);
+
+                    if (isVisible && isEnabled) {
+                        answerButtons.push({
+                            button,
+                            letter,
+                            index: letters.indexOf(letter)
+                        });
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    if (answerButtons.length === 0) {
+        throw new Error('No answer buttons found on the page');
+    }
+
+    // Randomly select one of the available answer buttons
+    const randomIndex = Math.floor(Math.random() * answerButtons.length);
+    const selectedAnswer = answerButtons[randomIndex];
+
+    // Click the button with retry logic
+    try {
+        await selectedAnswer.button.click({ timeout: 5000 });
+        await playerPage.waitForTimeout(500);
+    } catch (error) {
+        throw new Error(`Failed to click answer button ${selectedAnswer.letter}: ${error}`);
+    }
+
+    return { letter: selectedAnswer.letter, index: selectedAnswer.index };
+}
+
+/**
  * Waits for the host to see a specific number of players
  */
 export async function waitForPlayerCount(
@@ -270,6 +561,74 @@ export async function waitForPlayerCount(
     await expect(
         hostPage.getByText(new RegExp(`${expectedCount}.*player`, "i"))
     ).toBeVisible({ timeout });
+}
+
+/**
+ * Waits for the question timer to expire
+ * @param hostPage - The host control page
+ * @param timeLimit - The time limit for the question in seconds (default: 30)
+ */
+export async function waitForTimerExpiry(
+    hostPage: Page,
+    timeLimit: number = 30
+): Promise<void> {
+    // Add a buffer to ensure timer has fully expired
+    const waitTime = (timeLimit + 2) * 1000;
+    console.log(`    ⏳ Waiting ${timeLimit}s for timer to expire...`);
+    await hostPage.waitForTimeout(waitTime);
+    console.log(`    ✓ Timer expired`);
+}
+
+/**
+ * Verifies how many players have submitted answers on the host control panel
+ * @param hostPage - The host control page
+ * @returns Object with answered count and total count
+ */
+export async function checkPlayerAnswers(hostPage: Page): Promise<{ answered: number; total: number }> {
+    // Use more specific selectors to find the answer count
+    // First try to find the "X of Y players answered" text
+    const playersAnsweredText = await hostPage.locator('text=/\\d+ of \\d+ players answered/i').textContent().catch(() => null);
+
+    if (playersAnsweredText) {
+        const match = playersAnsweredText.match(/(\d+)\s+of\s+(\d+)/i);
+        if (match) {
+            return {
+                answered: parseInt(match[1]),
+                total: parseInt(match[2])
+            };
+        }
+    }
+
+    // Fallback: Look for the "Answered" section with the count
+    const bodyText = await hostPage.textContent('body');
+    const answeredMatch = bodyText?.match(/Answered\s*(\d+)\s*\/\s*(\d+)/i);
+    if (answeredMatch) {
+        return {
+            answered: parseInt(answeredMatch[1]),
+            total: parseInt(answeredMatch[2])
+        };
+    }
+
+    return { answered: 0, total: 0 };
+}
+
+/**
+ * Shows the results for the current question
+ * Clicks the "Show Results" or "Reveal" button on the host control
+ */
+export async function showQuestionResults(hostPage: Page): Promise<void> {
+    // Look for reveal/show results button
+    const revealButton = hostPage.getByRole("button", {
+        name: /reveal|show results/i
+    });
+
+    if (await revealButton.count() > 0) {
+        await revealButton.first().click();
+        await hostPage.waitForTimeout(2000);
+        console.log("    ✓ Results displayed");
+    } else {
+        console.log("    ℹ No reveal button found (may be auto-revealed)");
+    }
 }
 
 /**
@@ -344,4 +703,111 @@ export async function getPlayerScore(
         return match ? parseInt(match[1]) : null;
     }
     return null;
+}
+
+/**
+ * Checks if certificate download button is visible for players
+ * @param playerPages - Array of player pages to check
+ * @returns Number of players who can see the certificate download button
+ */
+export async function checkCertificateAvailability(
+    playerPages: Page[]
+): Promise<number> {
+    let availableCount = 0;
+
+    for (let i = 0; i < playerPages.length; i++) {
+        const playerPage = playerPages[i];
+
+        // Wait a bit for the final results screen to load
+        await playerPage.waitForTimeout(1000);
+
+        // Look for certificate download button
+        const certButton = playerPage.locator('button').filter({
+            hasText: /download certificate|certificate/i
+        }).first();
+
+        const isVisible = await certButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (isVisible) {
+            availableCount++;
+            console.log(`      Player ${i + 1}: Certificate available ✓`);
+        } else {
+            console.log(`      Player ${i + 1}: No certificate button`);
+        }
+    }
+
+    return availableCount;
+}
+
+/**
+ * Simulates certificate download for a random subset of players
+ * Note: Actual file download is not verified, only button click
+ * @param playerPages - Array of player pages
+ * @param downloadChance - Probability (0-1) that each player will download (default: 0.5)
+ */
+export async function simulateCertificateDownloads(
+    playerPages: Page[],
+    downloadChance: number = 0.5
+): Promise<number> {
+    let downloadCount = 0;
+
+    for (let i = 0; i < playerPages.length; i++) {
+        const playerPage = playerPages[i];
+
+        // Randomly decide if this player downloads their certificate
+        if (Math.random() < downloadChance) {
+            const certButton = playerPage.locator('button').filter({
+                hasText: /download certificate|certificate/i
+            }).first();
+
+            const isVisible = await certButton.isVisible({ timeout: 2000 }).catch(() => false);
+
+            if (isVisible) {
+                try {
+                    // Click the download button
+                    // Note: This triggers a download but we don't verify the file
+                    await certButton.click({ timeout: 3000 });
+                    downloadCount++;
+                    console.log(`      Player ${i + 1}: Downloaded certificate 📄`);
+
+                    // Small delay to allow download to initiate
+                    await playerPage.waitForTimeout(500);
+                } catch (error) {
+                    console.log(`      Player ${i + 1}: Failed to download certificate`);
+                }
+            }
+        }
+    }
+
+    return downloadCount;
+}
+
+/**
+ * Deletes a quiz from the database
+ * @param page - Browser page instance
+ * @param quizId - The ID of the quiz to delete
+ */
+export async function deleteQuiz(page: Page, quizId: string): Promise<void> {
+    try {
+        const baseURL = process.env.BASE_URL || "http://localhost:3000";
+
+        // Call the DELETE API endpoint
+        const response = await page.evaluate(async ({ url, id }) => {
+            const res = await fetch(`${url}/api/quizzes/${id}`, {
+                method: 'DELETE',
+            });
+            return {
+                status: res.status,
+                ok: res.ok,
+            };
+        }, { url: baseURL, id: quizId });
+
+        if (response.ok) {
+            console.log(`   ✓ Quiz ${quizId} deleted successfully`);
+        } else {
+            console.log(`   ⚠️  Failed to delete quiz ${quizId}: Status ${response.status}`);
+        }
+    } catch (error) {
+        console.log(`   ⚠️  Error deleting quiz ${quizId}:`, error);
+    }
 }

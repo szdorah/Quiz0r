@@ -3,6 +3,14 @@ import {
     createTestQuiz,
     createGameSession,
     joinAsPlayer,
+    submitRandomAnswer,
+    waitForTimerExpiry,
+    showQuestionResults,
+    useRandomPowerUps,
+    checkCertificateAvailability,
+    simulateCertificateDownloads,
+    checkPlayerAnswers,
+    deleteQuiz,
 } from "./helpers/test-helpers";
 
 /**
@@ -126,38 +134,28 @@ test.describe("Final Working E2E Test", () => {
 
             console.log("   ✓ Question visible on player screens");
 
-            // Players answer
+            // Players use powerups and answer randomly
             console.log("   👆 Players submitting answers...");
             let answeredCount = 0;
 
             for (let i = 0; i < playerPages.length; i++) {
                 const playerPage = playerPages[i];
 
-                // Find all buttons
-                const allButtons = playerPage.locator("button");
-                const buttonCount = await allButtons.count();
+                try {
+                    // Randomly use powerups (30% chance for each)
+                    const powerUps = await useRandomPowerUps(playerPage, 0.3);
+                    const powerUpLog = [];
+                    if (powerUps.hint) powerUpLog.push('💡Hint');
+                    if (powerUps.copy) powerUpLog.push(`📋Copy(${powerUps.copiedFrom})`);
+                    if (powerUps.double) powerUpLog.push('✨2x');
 
-                // Look for answer button starting with "A"
-                let clicked = false;
-                for (let j = 0; j < buttonCount; j++) {
-                    const button = allButtons.nth(j);
-                    const text = await button.textContent();
-
-                    // Match buttons starting with A, B, C, or D (no space required)
-                    if (text && /^[A-D]/.test(text.trim())) {
-                        try {
-                            // Check if button is enabled
-                            const isEnabled = await button.isEnabled();
-                            if (isEnabled) {
-                                await button.click({ timeout: 1000 });
-                                answeredCount++;
-                                clicked = true;
-                            }
-                            break;
-                        } catch (e) {
-                            // Button might be disabled or not clickable
-                        }
-                    }
+                    // Submit answer
+                    const answer = await submitRandomAnswer(playerPage);
+                    const log = `      Player ${i + 1} selected: ${answer.letter}`;
+                    console.log(powerUpLog.length > 0 ? `${log} [${powerUpLog.join(', ')}]` : log);
+                    answeredCount++;
+                } catch (e) {
+                    console.log(`      ⚠️  Player ${i + 1} couldn't answer`);
                 }
 
                 // Small delay between players
@@ -166,46 +164,51 @@ test.describe("Final Working E2E Test", () => {
 
             console.log(`   ✓ ${answeredCount}/${playerCount} players answered`);
 
-            // Wait for answers to register
-            await page.waitForTimeout(1500);
-
-            // Check on host how many players answered
-            const answeredText = await page.textContent('body');
-            if (answeredText && answeredText.includes(`${answeredCount}`)) {
-                console.log(`   ✅ Host confirmed ${answeredCount} answers received`);
-            }
-
-            // Reveal answers if button exists
+            // Verify host sees the answers
             await page.waitForTimeout(1000);
-            const revealButton = page.locator('button').filter({
-                hasText: /reveal/i
-            }).first();
+            const hostAnswers = await checkPlayerAnswers(page);
+            console.log(`   📊 Host panel shows: ${hostAnswers.answered}/${hostAnswers.total} answered`);
 
-            if (await revealButton.isVisible({ timeout: 2000 }).catch(() => false)) {
-                await revealButton.click();
-                await page.waitForTimeout(1500);
-                console.log("   ✓ Answers revealed");
-            }
+            // Wait for timer to expire
+            await waitForTimerExpiry(page, 30);
 
-            await page.waitForTimeout(500);
+            // Show results for this question
+            await showQuestionResults(page);
         }
 
-        // Show final results
+        // End the game to show final results
         console.log(`\n${"─".repeat(70)}`);
-        console.log("🏆 Showing final results...");
+        console.log("🏆 Ending game to show final results...");
 
-        const resultsButton = page.locator('button').filter({
-            hasText: /show results|final|finish/i
+        // Look for "End Game" button on the host control
+        const endGameButton = page.locator('button').filter({
+            hasText: /end game/i
         }).first();
 
-        if (await resultsButton.isVisible({ timeout: 3000 }).catch(() => false)) {
-            await resultsButton.click();
+        if (await endGameButton.isVisible({ timeout: 3000 }).catch(() => false)) {
+            await endGameButton.click();
             await page.waitForTimeout(2000);
-            console.log("   ✓ Final results displayed");
+            console.log("   ✓ Game ended, final results displayed");
+        } else {
+            console.log("   ⚠️  End Game button not found, game may have already ended");
         }
+
+        // Check certificate availability
+        console.log("\n📜 Checking certificate availability...");
+        const certAvailable = await checkCertificateAvailability(playerPages);
+        console.log(`   ✓ ${certAvailable}/${playerCount} players can download certificates`);
+
+        // Simulate some players downloading certificates (50% chance)
+        console.log("\n📄 Simulating certificate downloads...");
+        const downloadCount = await simulateCertificateDownloads(playerPages, 0.5);
+        console.log(`   ✓ ${downloadCount} players downloaded certificates`);
 
         // Cleanup
         await playerContext.close();
+
+        // Delete the quiz
+        console.log("\n🗑️  Cleaning up test data...");
+        await deleteQuiz(page, quizId);
 
         console.log(`\n${"=".repeat(70)}`);
         console.log("✅ TEST COMPLETED SUCCESSFULLY");
