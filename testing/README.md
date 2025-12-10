@@ -34,14 +34,30 @@ npx playwright test testing/e2e/final-working.spec.ts --headed -c testing/playwr
 PARTICIPANT_COUNT=10 QUESTION_COUNT=5 npx playwright test testing/e2e/final-working.spec.ts -c testing/playwright.config.ts
 ```
 
-### 2. Full Gameplay Simulation
+### 2. Translation Testing
+Tests the multi-language translation system with players selecting different languages.
+
+```bash
+# Run all translation tests (3 scenarios)
+npx playwright test testing/e2e/translation.spec.ts --headed -c testing/playwright.config.ts
+
+# Run specific translation test
+npx playwright test testing/e2e/translation.spec.ts -g "players see content in their selected language" -c testing/playwright.config.ts
+```
+
+**Translation Test Scenarios:**
+- **Mixed Languages**: 2 Spanish, 2 French, 1 English player
+- **Language Switching**: Players switching languages mid-game
+- **No Translations**: Verifies selector doesn't appear for English-only quizzes
+
+### 3. Full Gameplay Simulation
 Simulates realistic behavior with random answers, powerup usage (Hint, Copy, 2x), and certificate downloads.
 
 ```bash
 npx playwright test testing/e2e/15-simulation.spec.ts -c testing/playwright.config.ts
 ```
 
-### 3. Run with NPM Scripts (Easiest)
+### 4. Run with NPM Scripts (Easiest)
 We have added a script to `package.json` that handles the config path for you:
 
 ```bash

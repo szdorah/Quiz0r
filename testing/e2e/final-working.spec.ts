@@ -11,6 +11,7 @@ import {
     simulateCertificateDownloads,
     checkPlayerAnswers,
     deleteQuiz,
+    verifyTranslatedContent,
 } from "./helpers/test-helpers";
 
 /**
@@ -26,18 +27,26 @@ test.describe("Final Working E2E Test", () => {
         const playerCount = parseInt(process.env.PARTICIPANT_COUNT || "5", 10);
         const questionCount = parseInt(process.env.QUESTION_COUNT || "3", 10);
 
+        // Optional translation testing
+        const enableTranslations = process.env.ENABLE_TRANSLATIONS === "true";
+        const translationLanguages = process.env.TRANSLATION_LANGUAGES?.split(',') || ['es', 'fr'];
+
         console.log(`\n${"=".repeat(70)}`);
         console.log(`FINAL WORKING E2E TEST - WITH PLAYER ANSWERS`);
         console.log(`Players: ${playerCount} | Questions: ${questionCount}`);
+        if (enableTranslations) {
+            console.log(`Translations: Enabled (${translationLanguages.join(', ')})`);
+        }
         console.log(`${"=".repeat(70)}\n`);
 
-        // Create quiz
+        // Create quiz (with optional translations)
         console.log("📝 Creating quiz...");
         const { quizId } = await createTestQuiz(page, {
             title: `Final Test - ${playerCount}P ${questionCount}Q`,
             questionCount,
             timeLimit: 30,
             points: 100,
+            languages: enableTranslations ? translationLanguages : undefined,
         });
         console.log(`   ✓ Quiz ID: ${quizId}`);
 
@@ -52,20 +61,53 @@ test.describe("Final Working E2E Test", () => {
         await page.waitForLoadState("networkidle");
         console.log("   ✓ Control panel loaded");
 
-        // Join players
+        // Join players (with optional language selection)
         console.log(`\n👥 Joining ${playerCount} players...`);
         const playerContext = await browser.newContext();
-        const playerPages = [];
+        const playerPages: any[] = [];
 
         for (let i = 0; i < playerCount; i++) {
+            // Randomly assign languages if translations are enabled
+            // 30% first language, 30% second language, 40% English
+            let languageCode: string | undefined;
+            let languageDisplay = "English 🇬🇧";
+
+            if (enableTranslations && translationLanguages.length > 0) {
+                const rand = Math.random();
+                if (rand < 0.3 && translationLanguages[0]) {
+                    languageCode = translationLanguages[0];
+                    languageDisplay = `${translationLanguages[0].toUpperCase()} ${getLanguageFlag(translationLanguages[0])}`;
+                } else if (rand < 0.6 && translationLanguages[1]) {
+                    languageCode = translationLanguages[1];
+                    languageDisplay = `${translationLanguages[1].toUpperCase()} ${getLanguageFlag(translationLanguages[1])}`;
+                }
+                // else: English (default)
+            }
+
             const playerPage = await joinAsPlayer(playerContext, {
                 gameCode,
                 playerName: `Player${i + 1}`,
+                languageCode,
             });
-            playerPages.push(playerPage);
+            playerPages.push({ page: playerPage, language: languageCode, name: `Player${i + 1}` });
+
             if ((i + 1) % 5 === 0 || i === playerCount - 1) {
                 console.log(`   ✓ ${i + 1}/${playerCount} players joined`);
             }
+            if (enableTranslations && (i < 3)) {
+                // Show language selection for first 3 players only (avoid log spam)
+                console.log(`      Player${i + 1}: ${languageDisplay}`);
+            }
+        }
+
+        // Helper function for language flags
+        function getLanguageFlag(code: string): string {
+            const flags: Record<string, string> = {
+                'es': '🇪🇸', 'fr': '🇫🇷', 'de': '🇩🇪', 'he': '🇮🇱',
+                'ja': '🇯🇵', 'zh-CN': '🇨🇳', 'ar': '🇸🇦', 'pt': '🇵🇹',
+                'ru': '🇷🇺', 'it': '🇮🇹'
+            };
+            return flags[code] || '🌐';
         }
 
         await page.waitForTimeout(2000);
@@ -106,7 +148,7 @@ test.describe("Final Working E2E Test", () => {
             console.log("   ⏳ Waiting for question to appear on player screens...");
 
             // Wait for answer buttons to appear on first player's screen
-            const firstPlayerPage = playerPages[0];
+            const firstPlayerPage = playerPages[0].page;
 
             // Wait for answer buttons to appear on first player's screen
             let questionVisible = false;
@@ -138,8 +180,24 @@ test.describe("Final Working E2E Test", () => {
             console.log("   👆 Players submitting answers...");
             let answeredCount = 0;
 
+            // Optional translation verification (sample 2 players to avoid slowing test)
+            if (enableTranslations && q === 0) {
+                console.log("   🔍 Verifying translations (sample check)...");
+                for (let i = 0; i < Math.min(2, playerPages.length); i++) {
+                    const player = playerPages[i];
+                    if (player.language) {
+                        const prefix = `[${player.language.toUpperCase()}]`;
+                        const verified = await verifyTranslatedContent(player.page, prefix);
+                        if (verified) {
+                            console.log(`      ✓ ${player.name}: Seeing ${player.language.toUpperCase()} content`);
+                        }
+                    }
+                }
+            }
+
             for (let i = 0; i < playerPages.length; i++) {
-                const playerPage = playerPages[i];
+                const player = playerPages[i];
+                const playerPage = player.page;
 
                 try {
                     // Randomly use powerups (30% chance for each)
@@ -195,12 +253,13 @@ test.describe("Final Working E2E Test", () => {
 
         // Check certificate availability
         console.log("\n📜 Checking certificate availability...");
-        const certAvailable = await checkCertificateAvailability(playerPages);
+        const playerPagesOnly = playerPages.map(p => p.page);
+        const certAvailable = await checkCertificateAvailability(playerPagesOnly);
         console.log(`   ✓ ${certAvailable}/${playerCount} players can download certificates`);
 
         // Simulate some players downloading certificates (50% chance)
         console.log("\n📄 Simulating certificate downloads...");
-        const downloadCount = await simulateCertificateDownloads(playerPages, 0.5);
+        const downloadCount = await simulateCertificateDownloads(playerPagesOnly, 0.5);
         console.log(`   ✓ ${downloadCount} players downloaded certificates`);
 
         // Cleanup

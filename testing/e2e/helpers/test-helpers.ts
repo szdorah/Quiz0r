@@ -16,6 +16,7 @@ export interface TestQuizConfig {
     copyAnswerCount?: number;
     doublePointsCount?: number;
     randomizeCorrectAnswers?: boolean;
+    languages?: string[];  // Array of language codes to add translations for (e.g., ['es', 'fr'])
 }
 
 export interface PlayerJoinConfig {
@@ -45,6 +46,7 @@ export async function createTestQuiz(
         copyAnswerCount = 2,
         doublePointsCount = 2,
         randomizeCorrectAnswers = true,
+        languages,
     } = config;
 
     // Create quiz
@@ -106,6 +108,17 @@ export async function createTestQuiz(
         questionIds.push(question.id);
     }
 
+    // Add translations if languages are specified
+    if (languages && languages.length > 0) {
+        console.log(`   🌐 Adding translations for: ${languages.join(', ')}`);
+        const translationsAdded = await addTranslationsToQuiz(page, quiz.id, languages);
+        if (translationsAdded) {
+            console.log(`   ✓ Translations added successfully`);
+        } else {
+            console.log(`   ⚠️  Failed to add translations`);
+        }
+    }
+
     return { quizId: quiz.id, questionIds };
 }
 
@@ -162,12 +175,10 @@ export async function joinAsPlayer(
         }
     }
 
-    // Select language if specified
+    // Select language if specified (before clicking Join)
     if (languageCode) {
-        const languageSelector = playerPage.locator('select[name="language"]');
-        if (await languageSelector.count()) {
-            await languageSelector.selectOption(languageCode);
-        }
+        await selectLanguageOnJoin(playerPage, languageCode);
+        await playerPage.waitForTimeout(100); // Brief wait to ensure selection persists
     }
 
     // Join the game
@@ -783,7 +794,8 @@ export async function simulateCertificateDownloads(
 }
 
 /**
- * Deletes a quiz from the database
+ * Permanently deletes a quiz from the database (hard delete)
+ * This removes the quiz, all questions, answers, translations, game sessions, and related data
  * @param page - Browser page instance
  * @param quizId - The ID of the quiz to delete
  */
@@ -791,23 +803,265 @@ export async function deleteQuiz(page: Page, quizId: string): Promise<void> {
     try {
         const baseURL = process.env.BASE_URL || "http://localhost:3000";
 
-        // Call the DELETE API endpoint
-        const response = await page.evaluate(async ({ url, id }) => {
-            const res = await fetch(`${url}/api/quizzes/${id}`, {
-                method: 'DELETE',
-            });
-            return {
-                status: res.status,
-                ok: res.ok,
-            };
-        }, { url: baseURL, id: quizId });
+        // Call the hard-delete API endpoint (permanent deletion)
+        // Use page.request instead of page.evaluate to avoid browser context issues
+        const response = await page.request.post(`${baseURL}/api/quizzes/${quizId}/hard-delete`);
 
-        if (response.ok) {
-            console.log(`   ✓ Quiz ${quizId} deleted successfully`);
+        if (response.ok()) {
+            console.log(`   ✓ Quiz and all related data permanently deleted`);
         } else {
-            console.log(`   ⚠️  Failed to delete quiz ${quizId}: Status ${response.status}`);
+            const errorText = await response.text().catch(() => 'Unknown error');
+            console.log(`   ⚠️  Failed to delete quiz ${quizId}: ${response.status()} - ${errorText}`);
         }
     } catch (error) {
         console.log(`   ⚠️  Error deleting quiz ${quizId}:`, error);
+    }
+}
+
+/**
+ * Adds translations to a quiz for testing
+ * Creates mock translations with language prefixes for easy verification
+ * @param page - Browser page instance
+ * @param quizId - The ID of the quiz to add translations to
+ * @param languages - Array of language codes (e.g., ['es', 'fr'])
+ * @returns Success status
+ */
+export async function addTranslationsToQuiz(
+    page: Page,
+    quizId: string,
+    languages: string[]
+): Promise<boolean> {
+    try {
+        const baseURL = process.env.BASE_URL || "http://localhost:3000";
+
+        // Fetch the quiz with all questions and answers
+        const quizRes = await page.request.get(`${baseURL}/api/quizzes/${quizId}`);
+        if (!quizRes.ok()) {
+            console.log(`   ⚠️  Failed to fetch quiz for translations`);
+            return false;
+        }
+
+        const quiz = await quizRes.json();
+
+        // For each language, create translations for all questions and answers
+        for (const languageCode of languages) {
+            const langPrefix = `[${languageCode.toUpperCase()}]`;
+
+            for (const question of quiz.questions) {
+                // Prepare answer translations
+                const answerTranslations = question.answers.map((answer: any) => ({
+                    id: answer.id,
+                    answerText: `${langPrefix} ${answer.answerText}`,
+                }));
+
+                // Create question and answer translations in one request
+                const translationData = {
+                    questionText: `${langPrefix} ${question.questionText}`,
+                    hostNotes: question.hostNotes ? `${langPrefix} ${question.hostNotes}` : null,
+                    hint: question.hint ? `${langPrefix} ${question.hint}` : null,
+                    easterEggButtonText: question.easterEggButtonText ? `${langPrefix} ${question.easterEggButtonText}` : null,
+                    answers: answerTranslations,
+                };
+
+                const translationRes = await page.request.put(
+                    `${baseURL}/api/quizzes/${quizId}/questions/${question.id}/translations/${languageCode}`,
+                    { data: translationData }
+                );
+
+                if (!translationRes.ok()) {
+                    console.log(`   ⚠️  Failed to add ${languageCode} translation for question ${question.id}`);
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    } catch (error) {
+        console.log(`   ⚠️  Error adding translations:`, error);
+        return false;
+    }
+}
+
+/**
+ * Selects a language on the join screen
+ * Handles shadcn Select component interaction
+ * @param playerPage - The player's page
+ * @param languageCode - Language code to select (e.g., 'es', 'fr')
+ * @returns Success status
+ */
+export async function selectLanguageOnJoin(
+    playerPage: Page,
+    languageCode: string
+): Promise<boolean> {
+    try {
+        // Wait a bit for the page to fully load and API calls to complete
+        await playerPage.waitForTimeout(1500);
+
+        // Look for the label text to confirm selector is present
+        const labelVisible = await playerPage.locator('text=Select Quiz Questions/Answer Language')
+            .isVisible({ timeout: 3000 })
+            .catch(() => false);
+
+        if (!labelVisible) {
+            console.log(`   ⚠️  Language selector not found (quiz may not have translations)`);
+            return false;
+        }
+
+        // Find the SelectTrigger button - it should be visible next to the label
+        const selectTrigger = playerPage.locator('button[role="combobox"]').first();
+
+        // Check if language selector exists
+        const selectorExists = await selectTrigger.isVisible({ timeout: 2000 }).catch(() => false);
+
+        if (!selectorExists) {
+            console.log(`   ⚠️  Language selector trigger not found`);
+            return false;
+        }
+
+        // Click the select trigger to open dropdown
+        await selectTrigger.click();
+        await playerPage.waitForTimeout(1200);
+
+        // Wait for the dropdown content to be visible
+        await playerPage.locator('[role="listbox"]').waitFor({ state: 'visible', timeout: 3000 }).catch(() => {});
+
+        // Map language codes to native names (same approach as mid-game switching)
+        const languageMap: Record<string, string> = {
+            'es': 'Español',
+            'fr': 'Français',
+            'de': 'Deutsch',
+            'he': 'עברית',
+            'ja': '日本語',
+            'zh-CN': '简体中文',
+            'ar': 'العربية',
+            'pt': 'Português',
+            'ru': 'Русский',
+            'it': 'Italiano',
+            'en': 'English'
+        };
+        const nativeName = languageMap[languageCode] || languageCode;
+
+        // Find the option by its text content (native name)
+        const languageOption = playerPage.locator(`[role="option"]:has-text("${nativeName}")`).first();
+
+        // Wait for the specific option to be visible
+        const optionVisible = await languageOption.isVisible({ timeout: 4000 }).catch(() => false);
+
+        if (!optionVisible) {
+            // Debug: log all available options
+            const allOptions = await playerPage.locator('[role="option"]').count();
+            console.log(`   ⚠️  Language option ${languageCode} (${nativeName}) not found (${allOptions} options available)`);
+
+            // Close the dropdown
+            await playerPage.keyboard.press('Escape');
+            return false;
+        }
+
+        await languageOption.click();
+        await playerPage.waitForTimeout(500);
+
+        return true;
+    } catch (error) {
+        console.log(`   ⚠️  Error selecting language:`, error);
+        return false;
+    }
+}
+
+/**
+ * Verifies that translated content is displayed on the player's screen
+ * @param playerPage - The player's page
+ * @param expectedPrefix - Expected language prefix (e.g., '[ES]', '[FR]')
+ * @returns True if translations are displayed correctly
+ */
+export async function verifyTranslatedContent(
+    playerPage: Page,
+    expectedPrefix: string
+): Promise<boolean> {
+    try {
+        // Wait a moment for content to render
+        await playerPage.waitForTimeout(1000);
+
+        // Check if question text contains the prefix
+        const pageText = await playerPage.textContent('body');
+
+        if (!pageText) {
+            console.log(`   ⚠️  Page content is empty`);
+            return false;
+        }
+
+        // Verify the prefix appears in the content
+        if (pageText.includes(expectedPrefix)) {
+            return true;
+        }
+
+        console.log(`   ⚠️  Expected prefix ${expectedPrefix} not found in content`);
+        return false;
+    } catch (error) {
+        console.log(`   ⚠️  Error verifying translated content:`, error);
+        return false;
+    }
+}
+
+/**
+ * Switches language during gameplay using the bottom-right selector
+ * @param playerPage - The player's page
+ * @param languageCode - Language code to switch to (e.g., 'es', 'fr')
+ * @returns Success status
+ */
+export async function switchLanguageDuringGame(
+    playerPage: Page,
+    languageCode: string
+): Promise<boolean> {
+    try {
+        // Wait for game to be fully loaded
+        await playerPage.waitForTimeout(1000);
+
+        // Find the collapsible language selector at bottom-right (fixed position)
+        const collapsibleTrigger = playerPage.locator('.fixed.bottom-4.right-4 button').first();
+
+        // Check if collapsed language selector exists
+        const triggerExists = await collapsibleTrigger.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (!triggerExists) {
+            console.log(`   ⚠️  Language switcher not found during game`);
+            return false;
+        }
+
+        // Click to expand the language selector
+        await collapsibleTrigger.click();
+        await playerPage.waitForTimeout(800);
+
+        // Find and click the language button by looking for the native language name
+        const languageMap: Record<string, string> = {
+            'es': 'Español',
+            'fr': 'Français',
+            'de': 'Deutsch',
+            'he': 'עברית',
+            'ja': '日本語',
+            'zh-CN': '简体中文',
+            'ar': 'العربية',
+            'pt': 'Português',
+            'ru': 'Русский',
+            'it': 'Italiano',
+            'en': 'English'
+        };
+        const nativeName = languageMap[languageCode] || languageCode;
+
+        const languageButton = playerPage.locator(`button:has-text("${nativeName}")`).first();
+
+        const buttonVisible = await languageButton.isVisible({ timeout: 3000 }).catch(() => false);
+
+        if (!buttonVisible) {
+            console.log(`   ⚠️  Language button for ${languageCode} (${nativeName}) not found`);
+            return false;
+        }
+
+        await languageButton.click();
+        await playerPage.waitForTimeout(800);
+
+        return true;
+    } catch (error) {
+        console.log(`   ⚠️  Error switching language during game:`, error);
+        return false;
     }
 }
