@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 20
 
-      # ✅ macOS only: import Apple Developer certificate
+      # macOS only: import Apple Developer certificate
       - name: Import Apple Developer certificate
         if: runner.os == 'macOS'
         env:
@@ -45,7 +45,7 @@ jobs:
             -s \
             -k "" build.keychain
 
-      - name: Install Electron deps
+      - name: Install Electron dependencies
         working-directory: electron
         run: npm install
 
@@ -54,7 +54,6 @@ jobs:
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: "H3F5W5M8VA"
           APP_URL: https://your-hosted-app-url.com
         run: npm run build
 
