@@ -13,40 +13,40 @@ const navLinks = [
     href: "/admin",
     label: "Quizzes",
     icon: FileQuestion,
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
     description: "Create and manage quizzes",
   },
   {
     href: "/admin/games",
     label: "Games",
     icon: Gamepad2,
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
+    color: "text-orange-500",
+    bgColor: "bg-orange-500/10",
     description: "View game sessions",
   },
   {
     href: "/host",
     label: "Host",
     icon: Play,
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
     description: "Start a game session",
   },
   {
     href: "/admin/themes",
     label: "Themes",
     icon: Palette,
-    color: "text-pink-500",
-    bgColor: "bg-pink-500/10",
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
     description: "Manage and edit themes",
   },
   {
     href: "/admin/settings",
     label: "Settings",
     icon: Settings,
-    color: "text-amber-500",
-    bgColor: "bg-amber-500/10",
+    color: "text-orange-600",
+    bgColor: "bg-orange-600/10",
     description: "App configuration",
   },
 ];
@@ -73,7 +73,7 @@ export function NavHeader() {
           <div className="w-8 h-8 rounded-lg bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
             <Home className="w-4 h-4 text-primary" />
           </div>
-          <span className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent group-hover:opacity-80 transition-opacity">
+          <span className="text-xl font-bold gradient-text group-hover:opacity-80 transition-opacity">
             Quiz0r
           </span>
         </Link>

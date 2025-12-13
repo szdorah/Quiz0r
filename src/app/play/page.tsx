@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { ArrowLeft } from "lucide-react";
 
 export default function JoinPage() {
@@ -40,10 +40,13 @@ export default function JoinPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/20 to-background flex flex-col">
+    <div className="min-h-screen relative overflow-hidden flex flex-col">
+      {/* Gradient background - warm colors */}
+      <div className="gradient-bg" />
+
       {/* Header - only show back link for local users */}
       {!isExternal && (
-        <header className="p-4">
+        <header className="relative z-10 p-4">
           <Link
             href="/"
             className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground transition-colors"
@@ -55,12 +58,12 @@ export default function JoinPage() {
       )}
 
       {/* Main content */}
-      <main className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm">
+      <main className="relative z-10 flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm border-border/50 fade-in-up">
           <CardHeader className="text-center">
-            <CardTitle className="text-3xl font-bold text-primary">
+            <h1 className="text-3xl font-bold gradient-text title-glow">
               Quiz0r
-            </CardTitle>
+            </h1>
           </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-6">

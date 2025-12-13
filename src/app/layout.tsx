@@ -9,11 +9,6 @@ const inter = Inter({ subsets: ["latin"] });
 export const metadata: Metadata = {
   title: "Quiz0r",
   description: "Real-time multiplayer quiz application",
-  icons: {
-    icon: "/quiz0r-logo.png",
-    shortcut: "/quiz0r-logo.png",
-    apple: "/quiz0r-logo.png",
-  },
 };
 
 // Inline script to set dark mode before React hydrates (prevents FOUC)

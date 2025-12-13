@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 180">
+  <defs>
+    <linearGradient id="warmGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#f59e0b"/>
+      <stop offset="50%" style="stop-color:#ef4444"/>
+      <stop offset="100%" style="stop-color:#f97316"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="180" height="180" rx="40" fill="#0a0a0a"/>
+
+  <!-- Gradient ring -->
+  <circle cx="90" cy="90" r="70" fill="none" stroke="url(#warmGradient)" stroke-width="6"/>
+
+  <!-- Question mark -->
+  <text x="90" y="118" text-anchor="middle" font-family="Arial, sans-serif" font-size="100" font-weight="bold" fill="url(#warmGradient)">?</text>
+</svg>

@@ -11,32 +11,32 @@ const menuItems = [
     description: "Create and manage your quizzes",
     icon: FileQuestion,
     href: "/admin",
-    color: "text-blue-500",
-    bgColor: "bg-blue-500/10",
+    color: "text-amber-500",
+    bgColor: "bg-amber-500/10",
   },
   {
     title: "Games",
     description: "View in-progress and previous games",
     icon: Gamepad2,
     href: "/admin/games",
-    color: "text-green-500",
-    bgColor: "bg-green-500/10",
+    color: "text-orange-500",
+    bgColor: "bg-orange-500/10",
   },
   {
     title: "Host Game",
     description: "Start a new game session",
     icon: Play,
     href: "/host",
-    color: "text-purple-500",
-    bgColor: "bg-purple-500/10",
+    color: "text-red-500",
+    bgColor: "bg-red-500/10",
   },
   {
     title: "Settings",
     description: "Configure app settings and API keys",
     icon: Settings,
     href: "/admin/settings",
-    color: "text-amber-500",
-    bgColor: "bg-amber-500/10",
+    color: "text-yellow-500",
+    bgColor: "bg-yellow-500/10",
   },
 ];
 
@@ -57,23 +57,23 @@ export default function MenuPage() {
         Back
       </Link>
 
-      {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-primary/10 via-background to-purple-500/5" />
+      {/* Gradient background - warm colors */}
+      <div className="gradient-bg" />
 
       {/* Content */}
       <div className="relative z-10 min-h-screen flex flex-col items-center justify-center px-4 py-16">
         <div className="w-full max-w-2xl">
-          <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2">
+          <h1 className="text-3xl sm:text-4xl font-bold text-center mb-2 gradient-text title-glow fade-in-up">
             Quiz0r
           </h1>
-          <p className="text-muted-foreground text-center mb-10">
+          <p className="text-muted-foreground text-center mb-10 fade-in-up-delay-1">
             What would you like to do?
           </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 fade-in-up-delay-2">
             {menuItems.map((item) => (
               <Link key={item.href} href={item.href}>
-                <Card className="h-full hover:shadow-lg hover:border-primary/50 transition-all duration-200 cursor-pointer group">
+                <Card className="h-full feature-card cursor-pointer group border-border/50 hover:border-primary/30">
                   <CardContent className="p-6 flex items-start gap-4">
                     <div className={`p-3 rounded-xl ${item.bgColor} group-hover:scale-110 transition-transform`}>
                       <item.icon className={`w-6 h-6 ${item.color}`} />
