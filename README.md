@@ -37,7 +37,15 @@ If you want a beginner-friendly walkthrough, start with [Non Techie Readme.md](/
 - SQLite (bundled via Prisma; no external DB needed)
 - Docker (optional) for containerized runs
 
-## Project setup (local)
+## Quick Start
+```bash
+npm run setup   # installs deps, creates .env, sets up database
+npm run dev     # starts the app at http://localhost:3000
+```
+
+<details>
+<summary>Manual setup steps (if you prefer)</summary>
+
 ```bash
 # 1) Install dependencies
 npm install
@@ -52,8 +60,7 @@ npx prisma db push
 npm run dev
 # App: http://localhost:3000
 ```
-
-`npm run setup` runs the above steps (install, ensure .env, db push) for convenience.
+</details>
 
 ## Running with Docker
 ```bash
