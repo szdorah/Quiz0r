@@ -318,8 +318,12 @@ export class GameManager {
         id: q.id,
         questionText: q.questionText,
         imageUrl: q.imageUrl,
+        targetX: q.targetX,
+        targetY: q.targetY,
+        targetWidth: q.targetWidth,
+        targetHeight: q.targetHeight,
         hostNotes: q.hostNotes,
-        questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT",
+        questionType: q.questionType as "SINGLE_SELECT" | "MULTI_SELECT" | "IMAGE_TARGET" | "SECTION",
         timeLimit: q.timeLimit,
         points: q.points,
         answers: q.answers.map((a) => ({
@@ -474,9 +478,9 @@ export class GameManager {
 
   private async handlePlayerAnswer(
     socket: TypedSocket,
-    data: { gameCode: string; questionId: string; answerIds: string[] }
+    data: { gameCode: string; questionId: string; answerIds: string[]; selectedRect?: { x: number; y: number; width: number; height: number } }
   ) {
-    let { gameCode, questionId, answerIds } = data;
+    let { gameCode, questionId, answerIds, selectedRect } = data;
     const upperCode = gameCode.toUpperCase();
     const game = this.activeGames.get(upperCode);
 
@@ -558,6 +562,21 @@ export class GameManager {
         timeTaken,
         isCorrect
       );
+    } else if (question.questionType === "IMAGE_TARGET") {
+      const tx = question.targetX ?? 0;
+      const ty = question.targetY ?? 0;
+      const tw = question.targetWidth ?? 0;
+      const th = question.targetHeight ?? 0;
+      const hasRect = !!selectedRect;
+      const intersects = hasRect && selectedRect!.x < tx + tw && selectedRect!.x + selectedRect!.width > tx && selectedRect!.y < ty + th && selectedRect!.y + selectedRect!.height > ty;
+      isCorrect = Boolean(intersects);
+      points = calculateSingleSelectScore(
+        question.points,
+        question.timeLimit * 1000,
+        timeTaken,
+        isCorrect
+      );
+      answerIds = [];
     } else {
       isCorrect = isFullyCorrect(answerIds, correctIds);
       points = calculateMultiSelectScore(

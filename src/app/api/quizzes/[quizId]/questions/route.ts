@@ -42,6 +42,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       questionType = "SINGLE_SELECT",
       timeLimit = 30,
       points = 100,
+      targetX = null,
+      targetY = null,
+      targetWidth = null,
+      targetHeight = null,
       answers = [],
       hint,
       easterEggEnabled = false,
@@ -81,11 +85,19 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Sections don't require answers, but regular questions do
     const isSection = questionType === "SECTION";
+    const isImageTarget = questionType === "IMAGE_TARGET";
     if (!isSection && (!Array.isArray(answers) || answers.length < 2)) {
       return NextResponse.json(
         { error: "At least 2 answers are required" },
         { status: 400 }
       );
+    }
+
+    if (isImageTarget) {
+      const hasRect = [targetX, targetY, targetWidth, targetHeight].every((v) => typeof v === "number");
+      if (!imageUrl || !hasRect) {
+        return NextResponse.json({ error: "Image target requires an image and target rectangle" }, { status: 400 });
+      }
     }
 
     // Get the next order index
@@ -105,6 +117,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
         questionType,
         timeLimit,
         points,
+        targetX: isImageTarget ? targetX : null,
+        targetY: isImageTarget ? targetY : null,
+        targetWidth: isImageTarget ? targetWidth : null,
+        targetHeight: isImageTarget ? targetHeight : null,
         orderIndex: nextOrderIndex,
         hint: hint?.trim() || null,
         easterEggEnabled,

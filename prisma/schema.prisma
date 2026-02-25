@@ -40,7 +40,7 @@ model Quiz {
 }
 
 // Individual question within a quiz
-// questionType: "SINGLE_SELECT" | "MULTI_SELECT"
+// questionType: "SINGLE_SELECT" | "MULTI_SELECT" | "IMAGE_TARGET"
 model Question {
   id           String   @id @default(cuid())
   quizId       String
@@ -53,6 +53,12 @@ model Question {
   timeLimit    Int      @default(30)
   points       Int      @default(100)
   orderIndex   Int
+
+  // IMAGE_TARGET question configuration (normalized 0..1 image coordinates)
+  targetX      Float?
+  targetY      Float?
+  targetWidth  Float?
+  targetHeight Float?
 
   // Easter Egg Configuration
   easterEggEnabled          Boolean  @default(false)

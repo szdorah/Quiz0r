@@ -17,6 +17,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
       questionType,
       timeLimit,
       points,
+      targetX,
+      targetY,
+      targetWidth,
+      targetHeight,
       orderIndex,
       answers,
       hint,
@@ -35,6 +39,10 @@ export async function PUT(request: NextRequest, { params }: RouteParams) {
     if (questionType !== undefined) updateData.questionType = questionType;
     if (timeLimit !== undefined) updateData.timeLimit = timeLimit;
     if (points !== undefined) updateData.points = points;
+    if (targetX !== undefined) updateData.targetX = targetX;
+    if (targetY !== undefined) updateData.targetY = targetY;
+    if (targetWidth !== undefined) updateData.targetWidth = targetWidth;
+    if (targetHeight !== undefined) updateData.targetHeight = targetHeight;
     if (orderIndex !== undefined) updateData.orderIndex = orderIndex;
     if (hint !== undefined) updateData.hint = hint?.trim() || null;
 

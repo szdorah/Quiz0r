@@ -62,7 +62,7 @@ interface UseSocketReturn {
   skipTimer: () => void;
   revealAnswers: () => void;
   cancelGame: () => void;
-  submitAnswer: (questionId: string, answerIds: string[]) => void;
+  submitAnswer: (questionId: string, answerIds: string[], selectedRect?: { x: number; y: number; width: number; height: number }) => void;
   removePlayer: (playerId: string) => void;
   admitPlayer: (playerId: string) => void;
   refusePlayer: (playerId: string) => void;
@@ -509,11 +509,12 @@ export function useSocket({
   }, [gameCode]);
 
   const submitAnswer = useCallback(
-    (questionId: string, answerIds: string[]) => {
+    (questionId: string, answerIds: string[], selectedRect?: { x: number; y: number; width: number; height: number }) => {
       socketRef.current?.emit("player:answer", {
         gameCode: gameCode.toUpperCase(),
         questionId,
         answerIds,
+        selectedRect,
       });
     },
     [gameCode]
