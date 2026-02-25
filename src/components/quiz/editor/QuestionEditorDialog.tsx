@@ -58,6 +58,10 @@ interface Question {
   id: string;
   questionText: string;
   imageUrl?: string | null;
+  targetX?: number | null;
+  targetY?: number | null;
+  targetWidth?: number | null;
+  targetHeight?: number | null;
   hostNotes?: string | null;
   hint?: string | null;
   questionType: string;
@@ -77,6 +81,8 @@ interface QuestionEditorDialogProps {
   setQuestionText: (value: string) => void;
   imageUrl: string;
   setImageUrl: (value: string) => void;
+  targetRect: { x: number; y: number; width: number; height: number } | null;
+  setTargetRect: (value: { x: number; y: number; width: number; height: number } | null) => void;
   hostNotes: string;
   setHostNotes: (value: string) => void;
   hint: string;
@@ -143,6 +149,8 @@ export function QuestionEditorDialog({
   setQuestionText,
   imageUrl,
   setImageUrl,
+  targetRect,
+  setTargetRect,
   hostNotes,
   setHostNotes,
   hint,
@@ -189,6 +197,9 @@ export function QuestionEditorDialog({
 }: QuestionEditorDialogProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [advancedOpen, setAdvancedOpen] = useState(easterEggEnabled);
+  const imageTargetRef = useRef<HTMLDivElement>(null);
+  const [draftRect, setDraftRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [dragStart, setDragStart] = useState<{ x: number; y: number } | null>(null);
 
   const addAnswer = () => {
     if (answers.length < 6) {
@@ -224,14 +235,50 @@ export function QuestionEditorDialog({
     setAnswers(newAnswers);
   };
 
+
+  const startRectSelection = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (questionType !== "IMAGE_TARGET") return;
+    const container = imageTargetRef.current;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const x = Math.min(Math.max((event.clientX - bounds.left) / bounds.width, 0), 1);
+    const y = Math.min(Math.max((event.clientY - bounds.top) / bounds.height, 0), 1);
+    setDragStart({ x, y });
+    setDraftRect({ x, y, width: 0, height: 0 });
+  };
+
+  const updateRectSelection = (event: React.MouseEvent<HTMLDivElement>) => {
+    if (!dragStart) return;
+    const container = imageTargetRef.current;
+    if (!container) return;
+    const bounds = container.getBoundingClientRect();
+    const currentX = Math.min(Math.max((event.clientX - bounds.left) / bounds.width, 0), 1);
+    const currentY = Math.min(Math.max((event.clientY - bounds.top) / bounds.height, 0), 1);
+    const nextRect = {
+      x: Math.min(dragStart.x, currentX),
+      y: Math.min(dragStart.y, currentY),
+      width: Math.abs(currentX - dragStart.x),
+      height: Math.abs(currentY - dragStart.y),
+    };
+    setDraftRect(nextRect);
+  };
+
+  const endRectSelection = () => {
+    if (draftRect && draftRect.width > 0.01 && draftRect.height > 0.01) {
+      setTargetRect(draftRect);
+    }
+    setDragStart(null);
+  };
+
   // Validation
   const validAnswers = answers.filter((a) => a.answerText.trim());
   const hasValidQuestion = questionText.trim().length > 0;
   const hasEnoughAnswers = validAnswers.length >= 2;
   const hasCorrectAnswer = validAnswers.some((a) => a.isCorrect);
   const hasRequiredHint = !hintRequired || hint.trim().length > 0;
+  const hasImageTarget = questionType !== "IMAGE_TARGET" || (!!imageUrl && !!targetRect);
   const canSave =
-    hasValidQuestion && hasEnoughAnswers && hasCorrectAnswer && hasRequiredHint;
+    hasValidQuestion && hasEnoughAnswers && hasCorrectAnswer && hasRequiredHint && hasImageTarget;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -406,6 +453,38 @@ export function QuestionEditorDialog({
                   </div>
                 )}
               </div>
+
+              {questionType === "IMAGE_TARGET" && imageUrl && (
+                <div className="space-y-2">
+                  <Label>Correct Area <span className="text-destructive">*</span></Label>
+                  <div
+                    ref={imageTargetRef}
+                    className="relative inline-block max-w-full cursor-crosshair border rounded-lg overflow-hidden"
+                    onMouseDown={startRectSelection}
+                    onMouseMove={updateRectSelection}
+                    onMouseUp={endRectSelection}
+                    onMouseLeave={endRectSelection}
+                  >
+                    <img src={imageUrl} alt="Target selection" className="max-h-64 w-auto select-none" draggable={false} />
+                    {(draftRect || targetRect) && (() => {
+                      const rect = draftRect || targetRect;
+                      if (!rect) return null;
+                      return (
+                        <div
+                          className="absolute border-2 border-green-500 bg-green-500/20"
+                          style={{
+                            left: `${rect.x * 100}%`,
+                            top: `${rect.y * 100}%`,
+                            width: `${rect.width * 100}%`,
+                            height: `${rect.height * 100}%`,
+                          }}
+                        />
+                      );
+                    })()}
+                  </div>
+                  <p className="text-xs text-muted-foreground">Click and drag on the image to mark the correct rectangle.</p>
+                </div>
+              )}
             </div>
 
             {/* Section 2: Type + Time/Points */}
@@ -434,6 +513,15 @@ export function QuestionEditorDialog({
                     onClick={() => setQuestionType("MULTI_SELECT")}
                   >
                     Multi
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={questionType === "IMAGE_TARGET" ? "default" : "outline"}
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => setQuestionType("IMAGE_TARGET")}
+                  >
+                    Image
                   </Button>
                 </div>
               </div>

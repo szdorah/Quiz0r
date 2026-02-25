@@ -4,6 +4,7 @@ import { QuizTheme } from "./theme";
 export const QuestionType = {
   SINGLE_SELECT: "SINGLE_SELECT",
   MULTI_SELECT: "MULTI_SELECT",
+  IMAGE_TARGET: "IMAGE_TARGET",
   SECTION: "SECTION",
 } as const;
 
@@ -88,6 +89,10 @@ export interface QuestionData {
   id: string;
   questionText: string;
   imageUrl?: string | null;
+  targetX?: number | null;
+  targetY?: number | null;
+  targetWidth?: number | null;
+  targetHeight?: number | null;
   hostNotes?: string | null;
   questionType: QuestionType;
   timeLimit: number;
@@ -343,6 +348,12 @@ export interface ClientToServerEvents {
     gameCode: string;
     questionId: string;
     answerIds: string[];
+    selectedRect?: {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+    };
   }) => void;
   "player:updateLanguage": (data: { gameCode: string; languageCode: LanguageCode }) => void;
   "player:reconnect": (data: { gameCode: string; playerId: string }) => void;

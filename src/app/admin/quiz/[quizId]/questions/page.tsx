@@ -56,6 +56,10 @@ interface Question {
   id: string;
   questionText: string;
   imageUrl?: string | null;
+  targetX?: number | null;
+  targetY?: number | null;
+  targetWidth?: number | null;
+  targetHeight?: number | null;
   hostNotes?: string | null;
   hint?: string | null;
   questionType: string;
@@ -139,6 +143,7 @@ export default function QuestionsPage({
   // Form state
   const [questionText, setQuestionText] = useState("");
   const [imageUrl, setImageUrl] = useState("");
+  const [targetRect, setTargetRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const [hostNotes, setHostNotes] = useState("");
   const [hint, setHint] = useState("");
   const [questionType, setQuestionType] = useState("SINGLE_SELECT");
@@ -421,6 +426,7 @@ export default function QuestionsPage({
   function resetForm() {
     setQuestionText("");
     setImageUrl("");
+    setTargetRect(null);
     setHostNotes("");
     setHint("");
     setQuestionType("SINGLE_SELECT");
@@ -718,6 +724,11 @@ export default function QuestionsPage({
     setEditingQuestion(question);
     setQuestionText(question.questionText);
     setImageUrl(question.imageUrl || "");
+    setTargetRect(
+      question.targetX != null && question.targetY != null && question.targetWidth != null && question.targetHeight != null
+        ? { x: question.targetX, y: question.targetY, width: question.targetWidth, height: question.targetHeight }
+        : null
+    );
     setHostNotes(question.hostNotes || "");
     setHint(question.hint || "");
     setQuestionType(question.questionType);
@@ -855,6 +866,17 @@ export default function QuestionsPage({
       return;
     }
 
+    if (questionType === "IMAGE_TARGET") {
+      if (!imageUrl.trim()) {
+        toast.error("Image target questions require an image");
+        return;
+      }
+      if (!targetRect) {
+        toast.error("Please mark the correct rectangle on the image");
+        return;
+      }
+    }
+
     if (easterEggEnabled) {
       if (!easterEggButtonText.trim()) {
         toast.error("Easter egg button text is required");
@@ -879,6 +901,10 @@ export default function QuestionsPage({
       questionType,
       timeLimit,
       points,
+      targetX: questionType === "IMAGE_TARGET" ? targetRect?.x ?? null : null,
+      targetY: questionType === "IMAGE_TARGET" ? targetRect?.y ?? null : null,
+      targetWidth: questionType === "IMAGE_TARGET" ? targetRect?.width ?? null : null,
+      targetHeight: questionType === "IMAGE_TARGET" ? targetRect?.height ?? null : null,
       answers: validAnswers,
       easterEggEnabled,
       easterEggButtonText: easterEggEnabled ? easterEggButtonText.trim() : null,
@@ -1293,6 +1319,8 @@ export default function QuestionsPage({
         setQuestionText={setQuestionText}
         imageUrl={imageUrl}
         setImageUrl={setImageUrl}
+        targetRect={targetRect}
+        setTargetRect={setTargetRect}
         hostNotes={hostNotes}
         setHostNotes={setHostNotes}
         hint={hint}

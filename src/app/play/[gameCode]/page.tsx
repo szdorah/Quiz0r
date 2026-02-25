@@ -51,6 +51,8 @@ export default function PlayerGamePage({
   const [joinError, setJoinError] = useState("");
   const [selectedAnswers, setSelectedAnswers] = useState<Set<string>>(new Set());
   const [hasSubmitted, setHasSubmitted] = useState(false);
+  const [selectedRect, setSelectedRect] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [dragStartRect, setDragStartRect] = useState<{ x: number; y: number } | null>(null);
   const [easterEggClicked, setEasterEggClicked] = useState<Set<string>>(new Set());
   const [gameStatus, setGameStatus] = useState<"loading" | "valid" | "not_found" | "ended">("loading");
   const [joinTheme, setJoinTheme] = useState<any>(null);
@@ -59,6 +61,7 @@ export default function PlayerGamePage({
   const [showLanguageSelector, setShowLanguageSelector] = useState(false);
   const [knownPlayerId, setKnownPlayerId] = useState<string | null>(null);
   const screenRef = useRef<HTMLDivElement | null>(null);
+  const questionImageRef = useRef<HTMLDivElement | null>(null);
   const latestScreenshot = useRef<string | null>(null);
   const CAPTURE_INTERVAL_MS = 800;
 
@@ -253,6 +256,8 @@ export default function PlayerGamePage({
   // Reset selected answers when question changes
   useEffect(() => {
     setSelectedAnswers(new Set());
+    setSelectedRect(null);
+    setDragStartRect(null);
     setHasSubmitted(false);
   }, [effectiveCurrentQuestion?.id]);
 
@@ -583,6 +588,44 @@ export default function PlayerGamePage({
     // Emit power-ups before submitting answer
     emitPowerUps(effectiveCurrentQuestion.id);
     submitAnswer(effectiveCurrentQuestion.id, Array.from(selectedAnswers));
+    setHasSubmitted(true);
+  }
+
+
+  function startImageRectSelection(event: React.MouseEvent<HTMLDivElement>) {
+    if (hasSubmitted || !effectiveCurrentQuestion || effectiveCurrentQuestion.questionType !== "IMAGE_TARGET") return;
+    const el = questionImageRef.current;
+    if (!el) return;
+    const b = el.getBoundingClientRect();
+    const x = Math.min(Math.max((event.clientX - b.left) / b.width, 0), 1);
+    const y = Math.min(Math.max((event.clientY - b.top) / b.height, 0), 1);
+    setDragStartRect({ x, y });
+    setSelectedRect({ x, y, width: 0, height: 0 });
+  }
+
+  function moveImageRectSelection(event: React.MouseEvent<HTMLDivElement>) {
+    if (!dragStartRect) return;
+    const el = questionImageRef.current;
+    if (!el) return;
+    const b = el.getBoundingClientRect();
+    const x = Math.min(Math.max((event.clientX - b.left) / b.width, 0), 1);
+    const y = Math.min(Math.max((event.clientY - b.top) / b.height, 0), 1);
+    setSelectedRect({
+      x: Math.min(dragStartRect.x, x),
+      y: Math.min(dragStartRect.y, y),
+      width: Math.abs(x - dragStartRect.x),
+      height: Math.abs(y - dragStartRect.y),
+    });
+  }
+
+  function endImageRectSelection() {
+    setDragStartRect(null);
+  }
+
+  function submitImageTarget() {
+    if (!effectiveCurrentQuestion || hasSubmitted || !selectedRect) return;
+    emitPowerUps(effectiveCurrentQuestion.id);
+    submitAnswer(effectiveCurrentQuestion.id, [], selectedRect);
     setHasSubmitted(true);
   }
 
@@ -1430,11 +1473,35 @@ export default function PlayerGamePage({
               )}
             </h2>
             {effectiveCurrentQuestion?.imageUrl && (
-              <img
-                src={effectiveCurrentQuestion.imageUrl}
-                alt="Question"
-                className="max-h-24 sm:max-h-32 w-auto mx-auto rounded-lg mb-3 sm:mb-4"
-              />
+              effectiveCurrentQuestion.questionType === "IMAGE_TARGET" ? (
+                <div
+                  ref={questionImageRef}
+                  className="relative w-full max-w-2xl mx-auto rounded-lg mb-3 sm:mb-4 border overflow-hidden cursor-crosshair"
+                  onMouseDown={startImageRectSelection}
+                  onMouseMove={moveImageRectSelection}
+                  onMouseUp={endImageRectSelection}
+                  onMouseLeave={endImageRectSelection}
+                >
+                  <img
+                    src={effectiveCurrentQuestion.imageUrl}
+                    alt="Question"
+                    className="w-full max-h-64 sm:max-h-80 object-contain bg-black/5"
+                    draggable={false}
+                  />
+                  {selectedRect && (
+                    <div
+                      className="absolute border-2 border-green-500 bg-green-500/20"
+                      style={{ left: `${selectedRect.x * 100}%`, top: `${selectedRect.y * 100}%`, width: `${selectedRect.width * 100}%`, height: `${selectedRect.height * 100}%` }}
+                    />
+                  )}
+                </div>
+              ) : (
+                <img
+                  src={effectiveCurrentQuestion.imageUrl}
+                  alt="Question"
+                  className="max-h-24 sm:max-h-32 w-auto mx-auto rounded-lg mb-3 sm:mb-4"
+                />
+              )
             )}
             {effectiveCurrentQuestion?.questionType === "MULTI_SELECT" && !hasSubmitted && (
               <p className="text-xs sm:text-sm text-center text-muted-foreground mb-2">
@@ -1566,7 +1633,7 @@ export default function PlayerGamePage({
 
           {/* Answers */}
           <div className="flex-1 px-3 sm:px-8 py-3 sm:py-4 space-y-2 sm:space-y-3">
-            {effectiveCurrentQuestion?.answers.map((answer, index) => {
+            {effectiveCurrentQuestion?.questionType !== "IMAGE_TARGET" && effectiveCurrentQuestion?.answers.map((answer, index) => {
               const isSelected = selectedAnswers.has(answer.id);
               const isCorrect = correctIds.includes(answer.id);
               const wasSelected = isSelected;
@@ -1664,6 +1731,22 @@ export default function PlayerGamePage({
               );
             })}
           </div>
+
+          {/* Submit button for image target */}
+          {effectiveCurrentQuestion?.questionType === "IMAGE_TARGET" &&
+            !hasSubmitted &&
+            !isRevealing && (
+              <div className="px-8 py-4 border-t">
+                <Button
+                  onClick={submitImageTarget}
+                  disabled={!selectedRect || selectedRect.width < 0.01 || selectedRect.height < 0.01}
+                  size="lg"
+                  className="w-full"
+                >
+                  Submit Selected Area
+                </Button>
+              </div>
+            )}
 
           {/* Submit button for multi-select */}
           {effectiveCurrentQuestion?.questionType === "MULTI_SELECT" &&
