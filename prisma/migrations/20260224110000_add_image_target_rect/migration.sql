@@ -1,3 +1,7 @@
+ALTER TABLE "Question" ADD COLUMN "targetX" REAL;
+ALTER TABLE "Question" ADD COLUMN "targetY" REAL;
+ALTER TABLE "Question" ADD COLUMN "targetWidth" REAL;
+ALTER TABLE "Question" ADD COLUMN "targetHeight" REAL;
 ALTER TABLE "Question"
 ADD COLUMN "targetX" DOUBLE PRECISION,
 ADD COLUMN "targetY" DOUBLE PRECISION,
